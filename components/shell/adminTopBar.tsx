@@ -1,0 +1,43 @@
+import type { ReactNode } from "react";
+import Link from "next/link";
+import { Icon } from "../icons/icon";
+import { Tag } from "../ui/tag";
+import { IconButton } from "../ui/iconButton";
+import { TopBar } from "./topBar";
+
+const adminUserMenuItems = [
+  { icon: "grid" as const, label: "Switch to portal view", href: "/dashboard" },
+  { icon: "settings" as const, label: "Settings", href: "/admin/settings" },
+];
+
+interface AdminTopBarProps {
+  label: string;
+  actions?: ReactNode;
+  showBell?: boolean;
+}
+
+export const AdminTopBar = ({ label, actions, showBell = true }: AdminTopBarProps) => {
+  return (
+    <TopBar
+      logoHref="/admin/dashboard"
+      userInitials="TM"
+      userName="T. Meyer"
+      userRoleLabel="System Administrator"
+      userMenuItems={adminUserMenuItems}
+      actions={
+        <>
+          {actions}
+          {showBell && <IconButton icon="bell" tone="amber" />}
+        </>
+      }
+    >
+      <Link href="/dashboard">
+        <Tag tone="primary">
+          Admin view
+          <Icon name="chevd" className="h-3.5 w-3.5" />
+        </Tag>
+      </Link>
+      <span className="text-[15px] text-bodyGray">{label}</span>
+    </TopBar>
+  );
+};
