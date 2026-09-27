@@ -1,0 +1,45 @@
+# dependencies
+node_modules/
+
+# next.js build output
+/.next/
+/out/
+
+# production build
+/build
+dist/
+
+# typescript
+*.tsbuildinfo
+
+# env files (keep .env.example as the committed template)
+.env
+.env.*
+!.env.example
+
+# secrets & certificates — never commit
+/certs/
+*.p8
+*.pem
+*.key
+*.cert
+*.crt
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# testing
+coverage/
+
+# vercel
+.vercel
+
+# os / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

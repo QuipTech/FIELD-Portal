@@ -1,0 +1,129 @@
+import { ForbiddenException, Injectable } from '@nestjs/common';
+import { DatabaseService } from '../database/database.service';
+import * as authRepository from '../auth/auth.repository';
+import { UserRow } from '../auth/types/authRows';
+import { CognitoIdentity } from '../auth/types/cognitoIdentity';
+import * as usersRepository from './users.repository';
+import { createTenantAndFirstUserFromCognito } from './cognitoSignup';
+import {
+  CognitoSignupProfile,
+  CognitoUserResolution,
+} from './types/cognitoUserResolution';
+
+const SUSPENDED_TENANT_STATUS = 'suspended';
+const ACCOUNT_UNAVAILABLE_MESSAGE =
+  'This account is disabled or its organisation is suspended.';
+const UNVERIFIED_EMAIL_MESSAGE =
+  'Verify your email address before signing in with this account.';
+
+interface SignInCandidate {
+  id: string;
+  tenant_id: string;
+  status: string;
+  first_name: string;
+  last_name: string;
+  avatar_url: string | null;
+  avatar_storage_key: string | null;
+  tenant_status: string;
+}
+
+const assertCanSignIn = (candidate: SignInCandidate): void => {
+  if (
+    candidate.status !== 'active' ||
+    candidate.tenant_status === SUSPENDED_TENANT_STATUS
+  ) {
+    throw new ForbiddenException(ACCOUNT_UNAVAILABLE_MESSAGE);
+  }
+};
+
+// Linking by email hands over an existing account (and signing up claims
+// the address), so the email must be proven. Google and Apple only release
+// verified addresses, but a Cognito user-pool-directory account can exist
+// with an unverified one.
+const assertEmailTrusted = (identity: CognitoIdentity): void => {
+  if (identity.authProvider === 'password' && !identity.emailVerified) {
+    throw new ForbiddenException(UNVERIFIED_EMAIL_MESSAGE);
+  }
+};
+
+// Mirrors what the sign-in just saved: the new photo, else the stored one.
+const toUserRow = (
+  candidate: SignInCandidate,
+  identity: CognitoIdentity,
+  email: string,
+): UserRow => ({
+  id: candidate.id,
+  tenant_id: candidate.tenant_id,
+  email,
+  first_name: candidate.first_name,
+  last_name: candidate.last_name,
+  status: candidate.status,
+  avatar_url: identity.pictureUrl ?? candidate.avatar_url,
+  avatar_storage_key: candidate.avatar_storage_key,
+});
+
+@Injectable()
+export class UsersService {
+  constructor(private readonly databaseService: DatabaseService) {}
+
+  // Login and signup are the same call: an existing account (by Cognito sub,
+  // then by email) is signed in; otherwise a new one is created — but only
+  // once the caller has sent the company name + phone number it needs.
+  findOrCreateFromCognito = async (
+    identity: CognitoIdentity,
+    signupProfile?: CognitoSignupProfile,
+  ): Promise<CognitoUserResolution> => {
+    const existingUser = await this.findExistingUser(identity);
+    if (existingUser) return { status: 'resolved', user: existingUser };
+
+    assertEmailTrusted(identity);
+    if (!signupProfile) return { status: 'profileRequired' };
+
+    const createdUser = await createTenantAndFirstUserFromCognito(
+      this.databaseService,
+      identity,
+      signupProfile,
+    );
+    return { status: 'resolved', user: createdUser };
+  };
+
+  private findExistingUser = async (
+    identity: CognitoIdentity,
+  ): Promise<UserRow | null> => {
+    const linkedUser = await usersRepository.findUserByCognitoSub(
+      this.databaseService,
+      identity.cognitoSub,
+    );
+    if (linkedUser) {
+      assertCanSignIn(linkedUser);
+      await this.databaseService.withTenant(linkedUser.tenant_id, (client) =>
+        usersRepository.recordCognitoSignIn(client, {
+          userId: linkedUser.id,
+          pictureUrl: identity.pictureUrl,
+        }),
+      );
+      return toUserRow(linkedUser, identity, linkedUser.email);
+    }
+
+    const emailMatch = await authRepository.findUserByEmailForLogin(
+      this.databaseService,
+      identity.email,
+    );
+    if (!emailMatch) return null;
+
+    assertEmailTrusted(identity);
+    assertCanSignIn(emailMatch);
+    // Overwrites any previously linked sub on purpose: signing in with
+    // Google and later Apple (same verified email) yields two different
+    // Cognito users, and both should reach the same FIELD account.
+    await this.databaseService.withTenant(emailMatch.tenant_id, (client) =>
+      usersRepository.linkCognitoIdentity(client, {
+        userId: emailMatch.id,
+        cognitoSub: identity.cognitoSub,
+        authProvider: identity.authProvider,
+        pictureUrl: identity.pictureUrl,
+      }),
+    );
+    return toUserRow(emailMatch, identity, identity.email);
+  };
+}

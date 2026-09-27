@@ -1,0 +1,45 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 5 0 R /F2 6 0 R >> >> /MediaBox [0 0 612 792] /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 579 >>
+stream
+BT /F1 18 Tf 72 760 Td (QuipTech FIELD - Data Export) Tj ET
+BT /F2 11 Tf 72 724 Td () Tj ET
+BT /F2 11 Tf 72 704 Td (Account: Jo Okoye [j.okoye@quiptech.com]) Tj ET
+BT /F2 11 Tf 72 684 Td (Tenant: QuipTech Mining) Tj ET
+BT /F2 11 Tf 72 664 Td (Generated: this is a placeholder export for the FIELD demo build.) Tj ET
+BT /F2 11 Tf 72 644 Td () Tj ET
+BT /F2 11 Tf 72 624 Td (Included in a real export:) Tj ET
+BT /F2 11 Tf 72 604 Td (- Profile details) Tj ET
+BT /F2 11 Tf 72 584 Td (- Machine history entries you authored) Tj ET
+BT /F2 11 Tf 72 564 Td (- Support case activity) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000251 00000 n 
+0000000881 00000 n 
+0000000956 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+1026
+%%EOF
