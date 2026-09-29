@@ -13,7 +13,7 @@ export const Input = ({ icon, className = "", type, ...props }: InputProps) => {
 
   return (
     <div
-      className={`flex h-10 shrink-0 items-center gap-2 rounded-lg border border-borderGrayStrong bg-white px-3 ${className}`}
+      className={`flex h-10 shrink-0 items-center gap-2 rounded-lg border border-borderGrayStrong bg-surface px-3 ${className}`}
     >
       {icon ? <Icon name={icon} className="stroke-mutedGray" /> : null}
       <input

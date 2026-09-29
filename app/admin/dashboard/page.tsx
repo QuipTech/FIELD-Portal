@@ -8,7 +8,7 @@ const AdminOverviewPage = () => {
   return (
     <AdminShell topBar={<AdminTopBar label="Overview" />}>
       <div className="flex min-h-0 flex-1 flex-col">
-        <main className="m-4 flex flex-1 flex-col gap-4 overflow-y-auto rounded-2xl border border-slate-200/80 bg-white p-6">
+        <main className="m-4 flex flex-1 flex-col gap-4 overflow-y-auto rounded-2xl border border-slate-200/80 bg-surface p-6">
           <div className="flex items-baseline">
             <h1 className="text-[22px] font-medium text-ink">Overview</h1>
             <span className="ml-auto text-xs text-mutedGray">QuipTech Mining · 3 sites</span>

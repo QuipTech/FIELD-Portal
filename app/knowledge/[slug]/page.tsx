@@ -18,7 +18,7 @@ const KnowledgeArticlePage = ({ params }: KnowledgeArticlePageProps) => {
 
   return (
     <div className="flex h-screen flex-col bg-surfaceGray">
-      <div className="flex flex-none items-center gap-2.5 border-b border-slate-200/80 bg-white px-6 py-4">
+      <div className="flex flex-none items-center gap-2.5 border-b border-slate-200/80 bg-surface px-6 py-4">
         <Link href="/knowledge" className="text-[15px] text-bodyGray">Knowledge</Link>
         <Icon name="chevr" className="stroke-mutedGray" />
         <span className="text-[15px] font-medium text-ink">{article.title}</span>
@@ -28,7 +28,7 @@ const KnowledgeArticlePage = ({ params }: KnowledgeArticlePageProps) => {
         </Button>
       </div>
       <div className="flex min-h-0 flex-1">
-        <div className="m-4 flex flex-1 gap-3 overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-3">
+        <div className="m-4 flex flex-1 gap-3 overflow-hidden rounded-2xl border border-slate-200/80 bg-surface p-3">
           <main className="flex flex-[2.4] flex-col gap-3 overflow-y-auto p-6">
             <h1 className="text-[22px] font-medium text-ink">{article.title}</h1>
             <div className="flex flex-wrap gap-2">

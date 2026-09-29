@@ -2,11 +2,15 @@
 
 import { useState } from "react";
 import { Icon } from "@/components/icons/icon";
+import { usePermissions } from "@/lib/auth/usePermissions";
+import { PERMISSIONS, describeMissingPermission } from "@/lib/auth/permissionCodes";
 
 const photoCount = 5;
 
 export const MachinePhotoGallery = () => {
   const [activeIndex, setActiveIndex] = useState(1);
+  const { isLoaded, can } = usePermissions();
+  const canAddPhoto = !isLoaded || can(PERMISSIONS.manageMachine);
 
   return (
     <div className="flex w-[300px] flex-none flex-col gap-2">
@@ -29,7 +33,7 @@ export const MachinePhotoGallery = () => {
           {Array.from({ length: photoCount }).map((_, index) => (
             <span
               key={index}
-              className={`h-1.5 w-1.5 rounded-full ${index === activeIndex ? "bg-primary" : "bg-ink/20"}`}
+              className={`h-1.5 w-1.5 rounded-full ${index === activeIndex ? "bg-primary" : "bg-inkStatic/20"}`}
             />
           ))}
         </span>
@@ -46,7 +50,17 @@ export const MachinePhotoGallery = () => {
             <Icon name="image" className="h-3.5 w-3.5" />
           </button>
         ))}
-        <span className="ml-auto text-xs text-primary">Add photo</span>
+        {canAddPhoto ? (
+          <span className="ml-auto text-xs text-primary">Add photo</span>
+        ) : (
+          <span
+            title={describeMissingPermission(PERMISSIONS.manageMachine)}
+            className="ml-auto flex cursor-not-allowed items-center gap-1 text-xs text-mutedGray"
+          >
+            <Icon name="lock" className="h-3 w-3" />
+            Add photo
+          </span>
+        )}
       </div>
     </div>
   );

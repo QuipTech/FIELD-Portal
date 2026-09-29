@@ -27,8 +27,8 @@ export const PortalGuideModal = () => {
 
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center bg-[rgba(20,18,40,0.55)]">
-      <div className="w-[440px] overflow-visible rounded-[20px] bg-white shadow-[0_30px_60px_-20px_rgba(20,18,40,0.5)]">
-        <div className="relative h-24 overflow-hidden rounded-t-[20px] bg-gradient-to-br from-primary via-primaryHover to-[#1B1740]">
+      <div className="w-[440px] overflow-visible rounded-[20px] bg-surface shadow-[0_30px_60px_-20px_rgba(20,18,40,0.5)]">
+        <div className="relative h-24 overflow-hidden rounded-t-[20px] bg-gradient-to-br from-brand via-brandDeep to-[#1B1740]">
           <Icon name="spark" className="absolute left-4 top-3.5 h-5 w-5 stroke-white/55" />
           <button
             onClick={dismissTutorial}
@@ -36,7 +36,7 @@ export const PortalGuideModal = () => {
           >
             <Icon name="x" className="h-3.5 w-3.5 stroke-white" />
           </button>
-          <div className="absolute -bottom-[26px] left-6 flex h-[52px] w-[52px] items-center justify-center rounded-2xl bg-white shadow-[0_1px_2px_rgba(35,33,30,0.05),0_1px_3px_rgba(35,33,30,0.04)]">
+          <div className="absolute -bottom-[26px] left-6 flex h-[52px] w-[52px] items-center justify-center rounded-2xl bg-surface shadow-[0_1px_2px_rgba(35,33,30,0.05),0_1px_3px_rgba(35,33,30,0.04)]">
             <Icon name="spark" className="h-6 w-6 stroke-primary" />
           </div>
         </div>

@@ -2,7 +2,10 @@ import { randomUUID } from 'crypto';
 import { PoolClient } from 'pg';
 import { hashToken } from '../common/security/tokenHasher';
 import { AuthTokenService } from './authToken.service';
+import { StorageService } from '../storage/storage.service';
+import { resolveAvatarUrl } from '../users/resolveAvatarUrl';
 import * as authRepository from './auth.repository';
+import { findUserAccess } from './userAccess.repository';
 import { AuthResponse } from './types/authResponse';
 import { TenantRow, UserRow } from './types/authRows';
 
@@ -11,6 +14,7 @@ import { TenantRow, UserRow } from './types/authRows';
 // AuthService so that file stays focused on request-level orchestration.
 export const issueSession = async (
   authTokenService: AuthTokenService,
+  storageService: StorageService,
   client: PoolClient,
   tenant: TenantRow,
   user: UserRow,
@@ -44,6 +48,7 @@ export const issueSession = async (
     });
   }
 
+  const { roles, permissions } = await findUserAccess(client, user.id);
   const accessToken = authTokenService.signAccessToken({
     sub: user.id,
     tenantId: tenant.id,
@@ -59,6 +64,9 @@ export const issueSession = async (
       email: user.email,
       firstName: user.first_name,
       lastName: user.last_name,
+      avatarUrl: await resolveAvatarUrl(storageService, user),
+      roles,
+      permissions,
     },
     tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug },
   };

@@ -1,5 +1,5 @@
 import { apiRequest } from "./httpClient";
-import type { AuthSession } from "../types/authSession";
+import type { AuthSession, AuthSessionUser, CognitoSyncResponse, SignupProfile } from "../types/authSession";
 
 export interface RegisterPayload {
   firstName: string;
@@ -25,6 +25,30 @@ export const loginRequest = (payload: LoginPayload): Promise<AuthSession> =>
   apiRequest<AuthSession>("/auth/login", {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+
+// Exchanges a Cognito ID token (Google/Apple sign-in) for a regular FIELD
+// session. A first-time user gets `profileRequired` and must call again
+// with their signup profile (company name + phone number).
+export const syncCognitoSessionRequest = (
+  cognitoIdToken: string,
+  signupProfile?: SignupProfile,
+): Promise<CognitoSyncResponse> =>
+  apiRequest<CognitoSyncResponse>("/auth/sync", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${cognitoIdToken}` },
+    body: JSON.stringify(signupProfile ?? {}),
+  });
+
+export interface CurrentUserResponse extends AuthSessionUser {
+  status: string;
+  permissions: string[];
+}
+
+// Re-reads the signed-in user, including their current roles/permissions.
+export const fetchCurrentUserRequest = (accessToken: string): Promise<CurrentUserResponse> =>
+  apiRequest<CurrentUserResponse>("/auth/me", {
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
 
 export const logoutRequest = (refreshToken: string): Promise<void> =>

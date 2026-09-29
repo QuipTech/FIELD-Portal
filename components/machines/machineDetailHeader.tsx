@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Icon } from "@/components/icons/icon";
 import { Tag } from "@/components/ui/tag";
-import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/auth/permissionButton";
+import { PERMISSIONS } from "@/lib/auth/permissionCodes";
 import { getMachineStatusMeta } from "@/lib/format/machineStatus";
 import type { Machine } from "@/lib/types/machine";
 
@@ -15,7 +16,7 @@ export const MachineDetailHeader = ({ machine, action }: MachineDetailHeaderProp
   const status = getMachineStatusMeta(machine.status);
 
   return (
-    <div className="flex h-14 flex-none items-center gap-2.5 border-b border-borderGray bg-white px-4">
+    <div className="flex h-14 flex-none items-center gap-2.5 border-b border-borderGray bg-surface px-4">
       <Link href="/machines" className="text-[15px] text-bodyGray">
         Machines
       </Link>
@@ -30,10 +31,10 @@ export const MachineDetailHeader = ({ machine, action }: MachineDetailHeaderProp
               {machine.status === "down" ? <Icon name="alert" className="h-3.5 w-3.5" /> : null}
               {status.label}
             </Tag>
-            <Button variant="primary">
+            <PermissionButton permission={PERMISSIONS.useAiAssistant} variant="primary">
               <Icon name="spark" />
               Ask AI about this
-            </Button>
+            </PermissionButton>
           </>
         )}
       </div>

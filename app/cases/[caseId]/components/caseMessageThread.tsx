@@ -11,7 +11,7 @@ export const CaseMessageThread = ({ messages }: { messages: CaseMessage[] }) => 
   return (
     <>
       {messages.map((message) => (
-        <div key={message.id} className="flex flex-col gap-2.5 rounded-xl border border-borderGray bg-white p-3.5">
+        <div key={message.id} className="flex flex-col gap-2.5 rounded-xl border border-borderGray bg-surface p-3.5">
           <div className="flex items-center gap-2.5">
             <Avatar initials={message.authorInitials} size="sm" />
             <span className="text-[15px] font-medium text-ink">{message.authorName}</span>

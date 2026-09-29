@@ -2,6 +2,89 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme colours as "R G B" channels, consumed by tailwind.config.ts. The
+   .dark class on <html> is set by themePreference.ts (and before first
+   paint by the inline script in app/layout.tsx). */
+@layer base {
+  :root {
+    color-scheme: light;
+
+    --color-ink: 30 32 36;
+    --color-primary: 74 52 199;
+    --color-primaryHover: 55 38 151;
+    --color-primaryTint: 237 235 250;
+    --color-primaryTintText: 55 38 151;
+    --color-primaryBorder: 218 213 246;
+    --color-primarySoft: 247 246 254;
+    --color-bodyGray: 88 92 100;
+    --color-mutedGray: 134 139 148;
+    --color-borderGray: 225 227 231;
+    --color-borderGrayStrong: 205 209 214;
+    --color-surface: 255 255 255;
+    --color-surfaceGray: 244 245 246;
+    --color-surfaceGrayAlt: 251 251 252;
+    --color-fillGray: 238 239 242;
+    --color-amber: 169 106 6;
+    --color-amberTint: 251 241 223;
+    --color-amberBorder: 239 220 182;
+    --color-danger: 180 35 26;
+    --color-dangerTint: 250 235 233;
+    --color-dangerBorder: 239 200 196;
+
+    /* Tailwind's default slate scale. */
+    --color-slate-50: 248 250 252;
+    --color-slate-100: 241 245 249;
+    --color-slate-200: 226 232 240;
+    --color-slate-300: 203 213 225;
+    --color-slate-400: 148 163 184;
+    --color-slate-500: 100 116 139;
+    --color-slate-600: 71 85 105;
+    --color-slate-700: 51 65 85;
+    --color-slate-800: 30 41 59;
+    --color-slate-900: 15 23 42;
+    --color-slate-950: 2 6 23;
+  }
+
+  .dark {
+    color-scheme: dark;
+
+    --color-ink: 231 232 235;
+    --color-primary: 124 106 240;
+    --color-primaryHover: 146 131 245;
+    --color-primaryTint: 42 37 74;
+    --color-primaryTintText: 196 187 255;
+    --color-primaryBorder: 63 56 110;
+    --color-primarySoft: 30 28 48;
+    --color-bodyGray: 179 183 191;
+    --color-mutedGray: 139 144 154;
+    --color-borderGray: 46 49 56;
+    --color-borderGrayStrong: 64 68 77;
+    --color-surface: 24 26 31;
+    --color-surfaceGray: 15 17 20;
+    --color-surfaceGrayAlt: 20 22 26;
+    --color-fillGray: 35 38 44;
+    --color-amber: 232 170 70;
+    --color-amberTint: 51 40 20;
+    --color-amberBorder: 82 64 30;
+    --color-danger: 242 110 100;
+    --color-dangerTint: 58 30 28;
+    --color-dangerBorder: 96 46 42;
+
+    /* Slate inverted: light shades become dark surfaces and vice versa. */
+    --color-slate-50: 26 29 35;
+    --color-slate-100: 34 38 45;
+    --color-slate-200: 46 51 59;
+    --color-slate-300: 71 77 87;
+    --color-slate-400: 139 147 161;
+    --color-slate-500: 154 163 178;
+    --color-slate-600: 180 188 200;
+    --color-slate-700: 203 210 220;
+    --color-slate-800: 226 231 238;
+    --color-slate-900: 238 242 246;
+    --color-slate-950: 248 250 252;
+  }
+}
+
 body {
   -webkit-font-smoothing: antialiased;
 }

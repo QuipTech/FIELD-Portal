@@ -11,7 +11,7 @@ interface AuthPanelBackgroundProps {
  */
 export const AuthPanelBackground = ({ children }: AuthPanelBackgroundProps) => {
   return (
-    <div className="relative flex-1 overflow-hidden bg-white">
+    <div className="relative flex-1 overflow-hidden bg-surface">
       <DecorativeBackdrop />
       <div className="relative z-10 h-full">{children}</div>
     </div>

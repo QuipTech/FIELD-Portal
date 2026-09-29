@@ -21,7 +21,7 @@ const TwoFactorSetupPage = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-surfaceGray p-6">
-      <div className="flex w-full max-w-[520px] flex-col gap-3.5 rounded-2xl bg-white p-8">
+      <div className="flex w-full max-w-[520px] flex-col gap-3.5 rounded-2xl bg-surface p-8">
         <div className="flex flex-col gap-1">
           <h1 className="text-[22px] font-medium text-ink">Secure your account</h1>
           <span className="text-xs text-mutedGray">Choose how you&apos;d like to receive your verification code</span>

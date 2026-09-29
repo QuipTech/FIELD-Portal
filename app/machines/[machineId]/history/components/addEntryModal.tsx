@@ -21,8 +21,8 @@ export const AddEntryModal = ({ machineId, hours, onClose }: AddEntryModalProps)
   const [componentAffected, setComponentAffected] = useState("");
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/40">
-      <div className="flex max-h-[90vh] w-[520px] flex-col overflow-y-auto rounded-2xl bg-white">
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-inkStatic/40">
+      <div className="flex max-h-[90vh] w-[520px] flex-col overflow-y-auto rounded-2xl bg-surface">
         <div className="flex h-14 flex-none items-center border-b border-borderGray px-4">
           <span className="text-[15px] font-medium text-ink">New history entry — {machineId}</span>
           <button onClick={onClose} className="ml-auto text-bodyGray">
@@ -59,7 +59,7 @@ export const AddEntryModal = ({ machineId, hours, onClose }: AddEntryModalProps)
             <textarea
               rows={3}
               placeholder="Describe the fault, what you did and how you verified it…"
-              className="resize-none rounded-lg border border-borderGrayStrong bg-white p-3 text-[15px] text-ink outline-none placeholder:text-mutedGray"
+              className="resize-none rounded-lg border border-borderGrayStrong bg-surface p-3 text-[15px] text-ink outline-none placeholder:text-mutedGray"
             />
           </div>
           <div className="flex flex-col gap-2">

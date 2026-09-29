@@ -19,8 +19,8 @@ export const ManageTwoFactorButton = () => {
       </Button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/40">
-          <div className="flex w-[420px] flex-col overflow-y-auto rounded-2xl bg-white">
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-inkStatic/40">
+          <div className="flex w-[420px] flex-col overflow-y-auto rounded-2xl bg-surface">
             <div className="flex h-14 flex-none items-center border-b border-borderGray px-4">
               <span className="text-[15px] font-medium text-ink">Two-factor authentication</span>
               <button onClick={() => setIsOpen(false)} className="ml-auto text-bodyGray">

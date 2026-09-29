@@ -4,7 +4,7 @@ import type { MachineComponentStatus } from "@/lib/types/machineComponent";
 
 export const ComponentStatusCard = ({ name, note, tag, tone, icon }: MachineComponentStatus) => {
   return (
-    <div className="flex flex-col gap-1.5 rounded-xl border border-borderGray bg-white p-3.5">
+    <div className="flex flex-col gap-1.5 rounded-xl border border-borderGray bg-surface p-3.5">
       <div className="flex items-center">
         <span className="text-[15px] font-medium text-ink">{name}</span>
         <Tag tone={tone} className="ml-auto">

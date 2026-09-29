@@ -19,7 +19,7 @@ const MachineConfigurationPage = ({ params }: MachineConfigurationPageProps) => 
     <div className="flex h-screen flex-col bg-surfaceGray">
       <MachineDetailHeader machine={machine} />
       <main className="flex flex-1 flex-col overflow-y-auto p-5">
-        <div className="flex min-h-0 flex-1 flex-col gap-4 rounded-2xl border border-borderGray bg-white p-5">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 rounded-2xl border border-borderGray bg-surface p-5">
           <MachineTabs machineId={machine.id} active="configuration" />
           <div className="flex min-h-0 flex-1 items-stretch gap-4">
             <SnapshotsPanel />

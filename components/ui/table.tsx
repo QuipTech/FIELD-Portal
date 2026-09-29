@@ -8,7 +8,7 @@ interface FlexChildProps {
 
 export const Table = ({ children, className = "" }: { children: ReactNode; className?: string }) => (
   <div
-    className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-borderGray bg-white ${className}`}
+    className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-borderGray bg-surface ${className}`}
   >
     {children}
   </div>

@@ -38,7 +38,7 @@ export const AdminSideNav = () => {
   const pathname = usePathname();
 
   return (
-    <div className="flex w-[216px] flex-none flex-col gap-0.5 rounded-r-[18px] bg-gradient-to-b from-primaryHover to-[#221C52] p-3">
+    <div className="flex w-[216px] flex-none flex-col gap-0.5 rounded-r-[18px] bg-gradient-to-b from-brandDeep to-[#221C52] p-3">
       {links.map((link) => (
         <NavItem key={link.href} {...link} active={pathname === link.href} />
       ))}

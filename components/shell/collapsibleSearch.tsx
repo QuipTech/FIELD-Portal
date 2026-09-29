@@ -72,7 +72,7 @@ export const CollapsibleSearch = ({ placeholder, value, onChange }: CollapsibleS
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        className={`h-9 rounded-lg border bg-white text-[15px] text-ink outline-none transition-all duration-300 ease-in-out placeholder:text-mutedGray ${
+        className={`h-9 rounded-lg border bg-surface text-[15px] text-ink outline-none transition-all duration-300 ease-in-out placeholder:text-mutedGray ${
           isSearchOpen
             ? "pointer-events-auto ml-1 w-64 border-borderGrayStrong px-3 opacity-100"
             : "pointer-events-none ml-0 w-0 border-transparent px-0 opacity-0"

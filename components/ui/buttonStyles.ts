@@ -5,9 +5,9 @@ export const buttonBaseClasses =
   "inline-flex flex-none items-center justify-center gap-2 rounded-lg border font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50";
 
 export const buttonVariantClasses: Record<ButtonVariant, string> = {
-  default: "border-borderGrayStrong bg-white text-ink hover:bg-surfaceGray",
+  default: "border-borderGrayStrong bg-surface text-ink hover:bg-surfaceGray",
   primary: "border-primary bg-primary text-white hover:bg-primaryHover",
-  danger: "border-dangerBorder bg-white text-danger hover:bg-dangerTint",
+  danger: "border-dangerBorder bg-surface text-danger hover:bg-dangerTint",
   ghost: "border-transparent bg-transparent text-bodyGray hover:bg-fillGray",
 };
 

@@ -7,7 +7,7 @@ export const KnowledgeResultCard = ({ result }: { result: KnowledgeSearchResult 
   return (
     <Link
       href={`/knowledge/${result.slug}`}
-      className="flex flex-col gap-2 rounded-xl border border-borderGray bg-white p-3.5"
+      className="flex flex-col gap-2 rounded-xl border border-borderGray bg-surface p-3.5"
     >
       <div className="flex items-center">
         <Tag tone={result.docTone}>

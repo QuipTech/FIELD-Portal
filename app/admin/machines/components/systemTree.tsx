@@ -1,56 +1,71 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Icon } from "@/components/icons/icon";
 import { Button } from "@/components/ui/button";
-import { cat793fSystemTree } from "@/lib/mockData/adminMachineLibrary";
+import { LoadingSpinner } from "@/components/ui/loadingSpinner";
+import type { MachineModelSummary } from "@/lib/types/machineLibrary";
+import { useModelTree } from "../useModelTree";
+import { SystemBranch } from "./systemBranch";
+import { SystemTreeDialogs, type TreeDialog } from "./systemTreeDialogs";
 
-export const SystemTree = () => {
-  const [expandedName, setExpandedName] = useState<string | undefined>(cat793fSystemTree[0]?.name);
+// Render with key={model.id} so switching models starts from a fresh state.
+interface SystemTreeProps {
+  model: MachineModelSummary;
+  onSystemsCountChange: (modelId: string, systemsCount: number) => void;
+}
+
+export const SystemTree = ({ model, onSystemsCountChange }: SystemTreeProps) => {
+  const { tree, isLoading, loadError, ...actions } = useModelTree(model.id, onSystemsCountChange);
+  // undefined until the tree first loads, then the first system opens.
+  const [expandedSystemId, setExpandedSystemId] = useState<string | null | undefined>(undefined);
+  const [dialog, setDialog] = useState<TreeDialog | null>(null);
+
+  useEffect(() => {
+    if (tree && expandedSystemId === undefined) setExpandedSystemId(tree.systems[0]?.id ?? null);
+  }, [tree, expandedSystemId]);
 
   return (
     <div className="flex flex-col gap-3.5">
       <span className="text-xs font-medium uppercase tracking-wide text-mutedGray">
-        System &amp; component tree — CAT 793F
+        System &amp; component tree — {model.displayName}
       </span>
-      <div className="flex flex-col gap-3">
-        {cat793fSystemTree.map((branch) => {
-          const expanded = branch.name === expandedName;
-          return (
-            <div key={branch.name} className="flex flex-col gap-2">
-              <button
-                onClick={() => setExpandedName(expanded ? undefined : branch.name)}
-                className="flex items-center gap-2"
-              >
-                <Icon name={expanded ? "chevd" : "chevr"} className="stroke-bodyGray" />
-                <span className="text-[15px] font-medium text-ink">{branch.name}</span>
-                <span className="ml-auto text-xs text-mutedGray">{branch.componentCount} components</span>
-              </button>
-              {expanded && branch.components ? (
-                <div className="flex flex-col gap-2 pl-[26px]">
-                  {branch.components.map((component) => (
-                    <div key={component} className="flex items-center gap-2">
-                      <Icon name="layers" className="h-3.5 w-3.5 stroke-mutedGray" />
-                      <span className="text-[15px] text-bodyGray">{component}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
+      {isLoading && (
+        <div className="flex items-center gap-2 py-6 text-sm text-mutedGray">
+          <LoadingSpinner /> Loading systems…
+        </div>
+      )}
+      {loadError && <span className="py-6 text-sm text-danger">{loadError}</span>}
+      {tree && (
+        <div className="flex flex-col gap-3">
+          {tree.systems.length === 0 && (
+            <span className="text-sm text-mutedGray">No systems yet. Add one or import a tree.</span>
+          )}
+          {tree.systems.map((system) => (
+            <SystemBranch
+              key={system.id}
+              system={system}
+              isExpanded={system.id === expandedSystemId}
+              onToggle={() => setExpandedSystemId(system.id === expandedSystemId ? null : system.id)}
+              onOpenDialog={setDialog}
+            />
+          ))}
+        </div>
+      )}
       <div className="flex gap-2.5">
-        <Button>
+        <Button onClick={() => setDialog({ kind: "addSystem" })} disabled={!tree}>
           <Icon name="plus" />
           Add system
         </Button>
-        <Button>
+        <Button onClick={() => setDialog({ kind: "import" })} disabled={!tree}>
           <Icon name="upload" />
           Import tree
         </Button>
       </div>
       <p className="mt-2 text-xs text-slate-400">Reused by every asset instance of the model.</p>
+      {dialog && (
+        <SystemTreeDialogs dialog={dialog} modelName={model.displayName} actions={actions} onClose={() => setDialog(null)} />
+      )}
     </div>
   );
 };

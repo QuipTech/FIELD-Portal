@@ -69,7 +69,7 @@ export const SearchSelect = ({ options, value, onChange, placeholder = "Search c
     <div ref={containerRef} className="relative">
       <div
         onClick={openDropdown}
-        className="relative flex w-full cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-white py-2.5 px-3 text-sm"
+        className="relative flex w-full cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-surface py-2.5 px-3 text-sm"
       >
         <Icon name="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         {isOpen ? (
@@ -90,7 +90,7 @@ export const SearchSelect = ({ options, value, onChange, placeholder = "Search c
       </div>
 
       {isOpen && (
-        <div className="absolute z-50 mt-1.5 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg">
+        <div className="absolute z-50 mt-1.5 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-surface p-1.5 shadow-lg">
           {filteredGroups.length === 0 ? (
             <div className="px-3 py-2.5 text-sm text-mutedGray">No components match “{query}”</div>
           ) : (

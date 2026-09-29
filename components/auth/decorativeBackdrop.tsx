@@ -11,7 +11,7 @@ export const DecorativeBackdrop = () => {
         className="pointer-events-none absolute inset-0 opacity-[0.04]"
         style={{
           backgroundImage:
-            "linear-gradient(rgba(30,32,36,.7) 1px,transparent 1px),linear-gradient(90deg,rgba(30,32,36,.7) 1px,transparent 1px)",
+            "linear-gradient(rgb(var(--color-ink) / .7) 1px,transparent 1px),linear-gradient(90deg,rgb(var(--color-ink) / .7) 1px,transparent 1px)",
           backgroundSize: "40px 40px",
           maskImage: "radial-gradient(ellipse 70% 60% at 50% 50%, black 0%, transparent 100%)",
           WebkitMaskImage: "radial-gradient(ellipse 70% 60% at 50% 50%, black 0%, transparent 100%)",

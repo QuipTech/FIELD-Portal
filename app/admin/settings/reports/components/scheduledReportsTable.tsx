@@ -2,7 +2,7 @@ import { scheduledReports } from "@/lib/mockData/reportsExports";
 
 export const ScheduledReportsTable = () => {
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white">
+    <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-surface">
       <div className="flex gap-4 bg-slate-50/50 px-4 py-3">
         <span className="min-w-0 flex-[1.8] text-[11px] font-semibold uppercase tracking-wider text-slate-400">
           Report

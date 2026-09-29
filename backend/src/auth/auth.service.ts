@@ -10,9 +10,12 @@ import {
 } from '../common/security/passwordHasher';
 import { hashToken } from '../common/security/tokenHasher';
 import { AuthTokenService } from './authToken.service';
+import { StorageService } from '../storage/storage.service';
+import { resolveAvatarUrl } from '../users/resolveAvatarUrl';
 import { issueSession } from './authSessionIssuer';
-import { registerTenantAndOwner } from './authRegistration';
+import { registerTenantAndFirstUser } from './authRegistration';
 import * as authRepository from './auth.repository';
+import { findUserAccess } from './userAccess.repository';
 import { RegisterDto } from './dto/registerDto';
 import { LoginDto } from './dto/loginDto';
 import { AuthResponse } from './types/authResponse';
@@ -29,15 +32,17 @@ export class AuthService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly authTokenService: AuthTokenService,
+    private readonly storageService: StorageService,
   ) {}
 
   register = async (dto: RegisterDto): Promise<AuthResponse> => {
     const passwordHash = await hashPassword(dto.password);
 
     try {
-      return await registerTenantAndOwner(
+      return await registerTenantAndFirstUser(
         this.databaseService,
         this.authTokenService,
+        this.storageService,
         dto,
         passwordHash,
       );
@@ -58,6 +63,7 @@ export class AuthService {
     );
     if (
       !candidate ||
+      !candidate.password_hash ||
       candidate.status !== 'active' ||
       candidate.tenant_status === SUSPENDED_TENANT_STATUS
     ) {
@@ -94,9 +100,17 @@ export class AuthService {
           first_name: candidate.first_name,
           last_name: candidate.last_name,
           status: candidate.status,
+          avatar_url: candidate.avatar_url,
+          avatar_storage_key: candidate.avatar_storage_key,
         };
 
-        return issueSession(this.authTokenService, client, tenant, user);
+        return issueSession(
+          this.authTokenService,
+          this.storageService,
+          client,
+          tenant,
+          user,
+        );
       },
     );
   };
@@ -126,6 +140,7 @@ export class AuthService {
       );
       return issueSession(
         this.authTokenService,
+        this.storageService,
         client,
         tenant,
         user,
@@ -152,7 +167,11 @@ export class AuthService {
         email: user.email,
         firstName: user.first_name,
         lastName: user.last_name,
+        avatarUrl: await resolveAvatarUrl(this.storageService, user),
         status: user.status,
+        // Re-read on each call, so role/permission changes reach the
+        // portal without signing in again.
+        ...(await findUserAccess(client, user.id)),
       };
     });
 

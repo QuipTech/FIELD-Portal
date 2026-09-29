@@ -15,7 +15,7 @@ const relatedLinks = [
 
 export const ArticleTocRail = () => {
   return (
-    <div className="flex w-[212px] flex-none flex-col gap-0.5 rounded-2xl bg-gradient-to-b from-primaryHover to-[#221C52] p-3">
+    <div className="flex w-[212px] flex-none flex-col gap-0.5 rounded-2xl bg-gradient-to-b from-brandDeep to-[#221C52] p-3">
       <span className="px-2.5 pb-2 pt-1 text-xs font-medium uppercase tracking-wide text-white/50">On this page</span>
       {sections.map((section) => (
         <div

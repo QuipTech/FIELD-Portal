@@ -29,6 +29,7 @@ export type IconName =
   | "image"
   | "send"
   | "moon"
+  | "sun"
   | "user"
   | "users"
   | "layers"

@@ -4,7 +4,7 @@ const systems = ["Powertrain", "Hydraulics", "Brakes", "Electrical", "Chassis", 
 
 export const SystemsSideNav = () => {
   return (
-    <div className="flex w-[200px] flex-none flex-col gap-0.5 rounded-r-[18px] bg-gradient-to-b from-primaryHover to-[#221C52] p-3">
+    <div className="flex w-[200px] flex-none flex-col gap-0.5 rounded-r-[18px] bg-gradient-to-b from-brandDeep to-[#221C52] p-3">
       <span className="px-2.5 pb-2 pt-1 text-xs font-semibold uppercase tracking-wider text-white/50">Systems</span>
       {systems.map((system, index) => (
         <div

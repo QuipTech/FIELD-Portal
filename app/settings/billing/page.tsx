@@ -29,7 +29,7 @@ const BillingPage = () => {
         <AddOnsRow />
 
         <h2 className="text-base font-medium text-ink">Payment method</h2>
-        <div className="rounded-xl border border-borderGray bg-white">
+        <div className="rounded-xl border border-borderGray bg-surface">
           <SettingsRow
             icon="card"
             title="Visa •••• 4242"

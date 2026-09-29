@@ -8,7 +8,7 @@ import { AuthPanelBackground } from "@/components/auth/authPanelBackground";
 import { OrDivider } from "@/components/auth/orDivider";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { resolvePostLoginRoute } from "@/lib/auth/demoLoginRouting";
+import { resolvePostLoginRoute } from "@/lib/auth/postLoginRouting";
 import { saveAuthSession } from "@/lib/auth/authSession";
 import { registerRequest } from "@/lib/api/authApi";
 import { ApiError } from "@/lib/api/httpClient";
@@ -60,7 +60,7 @@ const RegisterPage = () => {
         password: form.password,
       });
       saveAuthSession(session);
-      router.push(resolvePostLoginRoute(form.email));
+      router.push(resolvePostLoginRoute(session.user.roles));
     } catch (error) {
       setRegisterError(
         error instanceof ApiError ? error.message : "Couldn't create your account. Please try again.",

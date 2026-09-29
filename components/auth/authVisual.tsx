@@ -8,7 +8,7 @@ interface AuthVisualProps {
 
 export const AuthVisual = ({ heading, subtext }: AuthVisualProps) => {
   return (
-    <div className="relative hidden flex-[1.15] flex-col overflow-hidden bg-ink p-10 md:flex">
+    <div className="relative hidden flex-[1.15] flex-col overflow-hidden bg-inkStatic p-10 md:flex">
       <Image
         src="/images/loginAuthVisual.jpg"
         alt="A field technician using an AR headset to review live diagnostics on a machine"
@@ -17,7 +17,7 @@ export const AuthVisual = ({ heading, subtext }: AuthVisualProps) => {
         sizes="(min-width: 768px) 46vw, 100vw"
         className="object-cover"
       />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-primary via-primaryHover/90 to-[#0E7A6C] opacity-70 mix-blend-multiply" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-brand via-brandDeep/90 to-[#0E7A6C] opacity-70 mix-blend-multiply" />
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#8B7CF0]/50 via-transparent to-[#2CB8A6]/45 mix-blend-screen" />
       <div className="pointer-events-none absolute -bottom-16 -left-16 h-[320px] w-[320px] rounded-full bg-[#FF7A45] opacity-50 blur-[90px] mix-blend-screen" />
       <div className="pointer-events-none absolute -right-10 top-1/3 h-[300px] w-[300px] rounded-full bg-[#2CB8A6] opacity-50 blur-[90px] mix-blend-screen" />

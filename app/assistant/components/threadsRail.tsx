@@ -5,7 +5,7 @@ const activeThreadId = assistantThreads[0]?.id;
 
 export const ThreadsRail = () => {
   return (
-    <div className="flex w-52 flex-none flex-col gap-0.5 border-r border-borderGray bg-white p-3">
+    <div className="flex w-52 flex-none flex-col gap-0.5 border-r border-borderGray bg-surface p-3">
       <span className="px-2.5 pb-2 pt-1 text-xs font-medium uppercase tracking-wide text-mutedGray">Threads</span>
       {assistantThreads.map((thread) => (
         <div

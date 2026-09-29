@@ -11,7 +11,7 @@ const linkedItems = [
 ];
 
 const railLabelClasses = "text-xs font-semibold uppercase tracking-wider text-indigo-300/70";
-const pillClasses = "flex h-9 items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm text-slate-800 shadow-sm";
+const pillClasses = "flex h-9 items-center gap-2 rounded-xl bg-surface px-3 py-2 text-sm text-slate-800 shadow-sm";
 
 export const CaseDetailsRail = ({ item }: { item: SupportCase }) => {
   return (

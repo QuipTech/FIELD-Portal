@@ -28,8 +28,8 @@ export const activeThreadMessages: ChatMessage[] = [
     ],
     actions: [
       { label: "Open source", icon: "ext" },
-      { label: "Log as entry", icon: "file" },
-      { label: "Raise case", icon: "life" },
+      { label: "Log as entry", icon: "file", permission: "history.create" },
+      { label: "Raise case", icon: "life", permission: "support.create" },
     ],
   },
   {

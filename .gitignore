@@ -13,10 +13,18 @@ backend/dist/
 # production
 /build
 
-# misc
-.DS_Store
+# certs & keys (never commit — real credentials)
+certs/
 *.pem
 *.cert
+*.crt
+*.key
+*.p8
+*.p12
+*.pfx
+
+# misc
+.DS_Store
 
 # debug
 npm-debug.log*

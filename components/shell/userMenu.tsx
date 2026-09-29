@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { Icon, type IconName } from "../icons/icon";
 import { Avatar } from "../ui/avatar";
+import { useSignedInProfile } from "@/lib/auth/useSignedInProfile";
+import { getInitials } from "@/lib/format/nameInitials";
 import { LogoutButton } from "./logoutButton";
 
 export interface UserMenuItem {
@@ -25,26 +27,33 @@ interface UserMenuProps {
   items?: UserMenuItem[];
 }
 
-export const UserMenu = ({
-  initials = "JO",
-  name = "J. Okoye",
-  roleLabel = "Technician · Pit 4",
-  items = defaultMenuItems,
-}: UserMenuProps) => {
+// Explicit props win (e.g. the admin top bar); otherwise the signed-in
+// user is shown, falling back to the demo persona when nobody is.
+export const UserMenu = ({ initials, name, roleLabel, items = defaultMenuItems }: UserMenuProps) => {
   const [open, setOpen] = useState(false);
+  const signedInProfile = useSignedInProfile();
+  const signedInName = signedInProfile
+    ? `${signedInProfile.user.firstName} ${signedInProfile.user.lastName}`.trim()
+    : undefined;
+
+  const displayName = name ?? signedInName ?? "J. Okoye";
+  const displayInitials = initials ?? (signedInName ? getInitials(signedInName) : "JO");
+  const displayRoleLabel = roleLabel ?? signedInProfile?.tenant?.name ?? "Technician · Pit 4";
+  // A photo only belongs to the signed-in user, not to an explicit persona.
+  const avatarUrl = initials ? undefined : (signedInProfile?.user.avatarUrl ?? undefined);
 
   return (
     <div className="relative">
       <button aria-label="Account menu" onClick={() => setOpen((value) => !value)}>
-        <Avatar initials={initials} />
+        <Avatar initials={displayInitials} imageSrc={avatarUrl} />
       </button>
       {open ? (
-        <div className="absolute right-0 top-[calc(100%+8px)] z-20 flex min-w-[212px] flex-col gap-0.5 rounded-xl border border-borderGray bg-white p-1.5 shadow-[0_10px_26px_rgba(30,32,36,0.14)]">
+        <div className="absolute right-0 top-[calc(100%+8px)] z-20 flex min-w-[212px] flex-col gap-0.5 rounded-xl border border-borderGray bg-surface p-1.5 shadow-[0_10px_26px_rgba(30,32,36,0.14)]">
           <div className="flex items-center gap-2.5 px-2.5 pb-2.5 pt-2">
-            <Avatar initials={initials} />
+            <Avatar initials={displayInitials} imageSrc={avatarUrl} />
             <div className="flex flex-col gap-px">
-              <span className="text-[15px] font-medium text-ink">{name}</span>
-              <span className="text-xs text-mutedGray">{roleLabel}</span>
+              <span className="text-[15px] font-medium text-ink">{displayName}</span>
+              <span className="text-xs text-mutedGray">{displayRoleLabel}</span>
             </div>
           </div>
           <div className="mx-0.5 mb-1 h-px bg-borderGray" />

@@ -2,7 +2,8 @@ import { AppShell } from "@/components/shell/appShell";
 import { TopBar } from "@/components/shell/topBar";
 import { Icon } from "@/components/icons/icon";
 import { Tag } from "@/components/ui/tag";
-import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/auth/permissionButton";
+import { PERMISSIONS } from "@/lib/auth/permissionCodes";
 import { activeThreadMessages } from "@/lib/mockData/assistant";
 import { ThreadsRail } from "./components/threadsRail";
 import { ChatMessageBubble } from "./components/chatMessageBubble";
@@ -13,7 +14,6 @@ const AssistantPage = () => {
     <AppShell
       topBar={
         <TopBar
-          showThemeToggle={false}
           showUserMenu={false}
           actions={
             <>
@@ -21,10 +21,10 @@ const AssistantPage = () => {
                 <Icon name="truck" className="h-3.5 w-3.5" />
                 Context: HT-2201
               </Tag>
-              <Button size="sm">
+              <PermissionButton permission={PERMISSIONS.useAiAssistant} size="sm">
                 <Icon name="plus" className="h-3.5 w-3.5" />
                 New thread
-              </Button>
+              </PermissionButton>
             </>
           }
         >
@@ -32,7 +32,7 @@ const AssistantPage = () => {
         </TopBar>
       }
     >
-      <div className="m-4 flex flex-1 overflow-hidden rounded-2xl border border-slate-200/80 bg-white">
+      <div className="m-4 flex flex-1 overflow-hidden rounded-2xl border border-slate-200/80 bg-surface">
         <ThreadsRail />
         <main className="flex flex-1 flex-col gap-3.5 overflow-y-auto p-5">
           {activeThreadMessages.map((message) => (

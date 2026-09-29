@@ -1,22 +1,28 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { EditProfileModal } from "./editProfileModal";
-import { getInitials, type ProfileDetails } from "./profileDetails";
-
-const initialProfile: ProfileDetails = {
-  name: "Jo Okoye",
-  email: "j.okoye@quiptech.com",
-  role: "Technician",
-  location: "Pit 4",
-};
+import { useSignedInProfile } from "@/lib/auth/useSignedInProfile";
+import { getInitials } from "@/lib/format/nameInitials";
+import { toProfileDetails, type ProfileDetails } from "./profileDetails";
 
 export const ProfileHeaderCard = () => {
-  const [profile, setProfile] = useState<ProfileDetails>(initialProfile);
+  const signedInProfile = useSignedInProfile();
+  const [profile, setProfile] = useState<ProfileDetails | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+
+  useEffect(() => {
+    if (signedInProfile) setProfile(toProfileDetails(signedInProfile));
+  }, [signedInProfile]);
+
+  if (!profile) return null;
+
+  const caption = [profile.email, profile.role, profile.location, signedInProfile?.tenant?.name]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <>
@@ -24,9 +30,7 @@ export const ProfileHeaderCard = () => {
         <Avatar initials={getInitials(profile.name)} imageSrc={profile.avatarUrl} size="lg" />
         <div className="flex flex-col gap-0.5">
           <span className="text-[17px] font-medium text-ink">{profile.name}</span>
-          <span className="text-xs text-mutedGray">
-            {profile.email} · {profile.role} · {profile.location}
-          </span>
+          <span className="text-xs text-mutedGray">{caption}</span>
         </div>
         <Button size="sm" className="ml-auto" onClick={() => setIsEditing(true)}>
           Edit profile
@@ -39,6 +43,7 @@ export const ProfileHeaderCard = () => {
             setProfile(updated);
             setIsEditing(false);
           }}
+          onAvatarUploaded={(avatarUrl) => setProfile((current) => (current ? { ...current, avatarUrl } : current))}
           onClose={() => setIsEditing(false)}
         />
       )}

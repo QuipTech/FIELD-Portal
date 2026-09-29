@@ -11,7 +11,7 @@ const filterGroups: { label: string; value: string; tone: "primary" | "default" 
 export const MachinesFilterCard = () => {
   return (
     <div className="flex w-[200px] flex-none flex-col gap-3">
-      <div className="flex flex-col gap-3 rounded-xl border border-borderGray bg-white p-3.5">
+      <div className="flex flex-col gap-3 rounded-xl border border-borderGray bg-surface p-3.5">
         <div className="flex items-center">
           <span className="text-xs font-medium uppercase tracking-wide text-mutedGray">Filters</span>
           <Icon name="filter" className="ml-auto h-3.5 w-3.5 stroke-mutedGray" />

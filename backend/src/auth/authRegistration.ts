@@ -1,19 +1,20 @@
 import { DatabaseService } from '../database/database.service';
 import { AuthTokenService } from './authToken.service';
+import { StorageService } from '../storage/storage.service';
 import { issueSession } from './authSessionIssuer';
 import { uniqueTenantSlug } from './uniqueTenantSlug';
 import * as authRepository from './auth.repository';
+import { assignSignupRole } from './assignSignupRole';
 import { RegisterDto } from './dto/registerDto';
 import { AuthResponse } from './types/authResponse';
 
-const OWNER_ROLE_NAME = 'Owner';
-
-// Self-serve signup: creates the tenant, its first (Owner) user, and an
+// Self-serve signup: creates the tenant, its first (Customer) user, and an
 // audit trail entry, all in one transaction — kept out of AuthService so
 // that file stays focused on request-level orchestration.
-export const registerTenantAndOwner = async (
+export const registerTenantAndFirstUser = async (
   databaseService: DatabaseService,
   authTokenService: AuthTokenService,
+  storageService: StorageService,
   dto: RegisterDto,
   passwordHash: string,
 ): Promise<AuthResponse> => {
@@ -37,17 +38,7 @@ export const registerTenantAndOwner = async (
       lastName: dto.lastName,
     });
 
-    const ownerRoleId = await authRepository.findSystemRoleIdByName(
-      client,
-      OWNER_ROLE_NAME,
-    );
-    if (ownerRoleId) {
-      await authRepository.insertUserRole(client, {
-        tenantId: tenant.id,
-        userId: user.id,
-        roleId: ownerRoleId,
-      });
-    }
+    await assignSignupRole(client, { tenantId: tenant.id, userId: user.id });
 
     await authRepository.insertAuditLog(client, {
       tenantId: tenant.id,
@@ -56,6 +47,6 @@ export const registerTenantAndOwner = async (
       entityId: user.id,
     });
 
-    return issueSession(authTokenService, client, tenant, user);
+    return issueSession(authTokenService, storageService, client, tenant, user);
   });
 };

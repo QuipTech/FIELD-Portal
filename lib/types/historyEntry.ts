@@ -23,3 +23,15 @@ export const historyEntryTypeMeta: Record<HistoryEntryType, HistoryEntryTypeMeta
   Fault: { icon: "alert", tone: "amber" },
   Service: { icon: "tool", tone: "default" },
 };
+
+// Entry types stored by the backend (technical_history_entries.entry_type).
+export const liveHistoryEntryTypes: Record<
+  "service" | "repair" | "inspection" | "fault" | "note",
+  HistoryEntryTypeMeta & { label: string }
+> = {
+  repair: { label: "Repair", icon: "wrench", tone: "primary" },
+  inspection: { label: "Inspection", icon: "eye", tone: "default" },
+  fault: { label: "Fault", icon: "alert", tone: "amber" },
+  service: { label: "Service", icon: "tool", tone: "default" },
+  note: { label: "Note", icon: "file", tone: "default" },
+};

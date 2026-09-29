@@ -8,7 +8,7 @@ export const AppDownloadLinks = () => (
     <div className="flex gap-2">
       <ComingSoonButton
         label="Download on the App Store"
-        className="flex items-center gap-2.5 rounded-lg bg-ink px-3.5 py-2 text-white"
+        className="flex items-center gap-2.5 rounded-lg bg-inkStatic px-3.5 py-2 text-white"
       >
         <Icon name="apple" className="stroke-white fill-white" />
         <div className="flex flex-col gap-0 text-left">
@@ -18,7 +18,7 @@ export const AppDownloadLinks = () => (
       </ComingSoonButton>
       <ComingSoonButton
         label="Get it on Google Play"
-        className="flex items-center gap-2.5 rounded-lg bg-ink px-3.5 py-2 text-white"
+        className="flex items-center gap-2.5 rounded-lg bg-inkStatic px-3.5 py-2 text-white"
       >
         <Icon name="play" className="fill-white stroke-none" />
         <div className="flex flex-col gap-0 text-left">

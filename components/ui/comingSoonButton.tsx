@@ -28,7 +28,7 @@ export const ComingSoonButton = ({ children, label, className = "" }: ComingSoon
     >
       {children}
       {showTooltip && (
-        <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-ink px-2.5 py-1 text-[11px] font-medium text-white shadow-md">
+        <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-inkStatic px-2.5 py-1 text-[11px] font-medium text-white shadow-md">
           Coming soon
         </span>
       )}

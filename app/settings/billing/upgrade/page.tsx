@@ -6,7 +6,7 @@ import { PlanCard } from "./components/planCard";
 const UpgradePlanPage = () => {
   return (
     <div className="flex min-h-screen flex-col bg-surfaceGray">
-      <div className="flex h-14 flex-none items-center border-b border-borderGray bg-white px-4">
+      <div className="flex h-14 flex-none items-center border-b border-borderGray bg-surface px-4">
         <span className="text-[15px] font-medium text-ink">Upgrade plan</span>
         <Link href="/settings/billing" className="ml-auto text-bodyGray">
           <Icon name="x" />

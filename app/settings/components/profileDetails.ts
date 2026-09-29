@@ -1,3 +1,5 @@
+import type { SignedInProfile } from "@/lib/types/authSession";
+
 export interface ProfileDetails {
   name: string;
   email: string;
@@ -6,9 +8,11 @@ export interface ProfileDetails {
   avatarUrl?: string;
 }
 
-export const getInitials = (name: string): string => {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-};
+export const toProfileDetails = (signedIn: SignedInProfile): ProfileDetails => ({
+  name: `${signedIn.user.firstName} ${signedIn.user.lastName}`.trim(),
+  email: signedIn.user.email,
+  // Not part of the session yet; filled in via "Edit profile".
+  role: "",
+  location: "",
+  avatarUrl: signedIn.user.avatarUrl ?? undefined,
+});

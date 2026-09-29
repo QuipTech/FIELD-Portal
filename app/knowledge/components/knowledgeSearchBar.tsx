@@ -11,7 +11,7 @@ export const KnowledgeSearchBar = ({ defaultValue = "" }: KnowledgeSearchBarProp
   const [query, setQuery] = useState(defaultValue);
 
   return (
-    <div className="flex h-11 shrink-0 items-center gap-2 rounded-lg border border-borderGrayStrong bg-white px-3">
+    <div className="flex h-11 shrink-0 items-center gap-2 rounded-lg border border-borderGrayStrong bg-surface px-3">
       <Icon name="search" className="stroke-mutedGray" />
       <input
         value={query}

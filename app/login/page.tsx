@@ -10,10 +10,10 @@ import { AuthPanelBackground } from "@/components/auth/authPanelBackground";
 import { OrDivider } from "@/components/auth/orDivider";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { resolvePostLoginRoute } from "@/lib/auth/demoLoginRouting";
+import { resolvePostLoginRoute } from "@/lib/auth/postLoginRouting";
 import { usePlatformAuthenticator } from "@/lib/auth/usePlatformAuthenticator";
 import { signInWithPlatformAuthenticator } from "@/lib/auth/webauthnPlatformCredential";
-import { saveAuthSession } from "@/lib/auth/authSession";
+import { getStoredUser, saveAuthSession } from "@/lib/auth/authSession";
 import { loginRequest } from "@/lib/api/authApi";
 import { ApiError } from "@/lib/api/httpClient";
 import { OauthButtons } from "./components/oauthButtons";
@@ -35,7 +35,7 @@ const LoginPage = () => {
     try {
       const session = await loginRequest({ email, password });
       saveAuthSession(session);
-      router.push(resolvePostLoginRoute(email));
+      router.push(resolvePostLoginRoute(session.user.roles));
     } catch (error) {
       setLoginError(error instanceof ApiError ? error.message : "Couldn't sign in. Please try again.");
     } finally {
@@ -48,7 +48,7 @@ const LoginPage = () => {
     setIsBiometricPending(true);
     try {
       await signInWithPlatformAuthenticator(email);
-      router.push(resolvePostLoginRoute(email));
+      router.push(resolvePostLoginRoute(getStoredUser()?.roles));
     } catch {
       setBiometricError(
         "Face ID / Touch ID sign-in was cancelled or didn't complete.",
@@ -77,7 +77,7 @@ const LoginPage = () => {
             alt="QuipTech FIELD"
             width={200}
             height={67}
-            className="h-10 w-auto"
+            className="h-10 w-auto dark:brightness-0 dark:invert"
           />
           <span className="text-xs text-mutedGray">
             Sign in with your work account
@@ -141,7 +141,7 @@ const LoginPage = () => {
                   type="button"
                   onClick={handleBiometricSignIn}
                   disabled={isBiometricPending}
-                  className="flex h-11 items-center justify-center gap-2 rounded-lg border border-borderGrayStrong bg-white text-[15px] font-medium text-ink disabled:opacity-60"
+                  className="flex h-11 items-center justify-center gap-2 rounded-lg border border-borderGrayStrong bg-surface text-[15px] font-medium text-ink disabled:opacity-60"
                 >
                   <Icon name="faceid" />
                   {isBiometricPending

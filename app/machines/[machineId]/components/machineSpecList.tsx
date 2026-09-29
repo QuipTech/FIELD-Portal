@@ -8,7 +8,7 @@ interface MachineSpecListProps {
 
 export const MachineSpecList = ({ machine }: MachineSpecListProps) => {
   return (
-    <div className="flex flex-1 flex-col rounded-xl border border-borderGray bg-white px-3.5">
+    <div className="flex flex-1 flex-col rounded-xl border border-borderGray bg-surface px-3.5">
       <div className="flex items-center gap-3 border-b border-borderGray py-2.5">
         <span className="w-24 text-xs font-medium uppercase tracking-wide text-mutedGray">Serial</span>
         <span className="font-mono text-[15px] text-ink">4GZ01288</span>

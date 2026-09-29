@@ -14,7 +14,7 @@ interface PlanCardProps {
 export const PlanCard = ({ name, badgeLabel, badgeTone, billingNote, features, highlighted, action }: PlanCardProps) => {
   return (
     <div
-      className={`flex flex-1 flex-col gap-2.5 rounded-xl border bg-white p-3.5 ${
+      className={`flex flex-1 flex-col gap-2.5 rounded-xl border bg-surface p-3.5 ${
         highlighted ? "border-primary ring-2 ring-primaryTint" : "border-borderGray"
       }`}
     >

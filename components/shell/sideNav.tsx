@@ -38,7 +38,7 @@ export const SideNav = () => {
 
   return (
     <div
-      className={`flex flex-none flex-col gap-0.5 rounded-r-[18px] bg-gradient-to-b from-primaryHover to-[#221C52] p-3 pt-3 transition-[width] duration-150 ${
+      className={`flex flex-none flex-col gap-0.5 rounded-r-[18px] bg-gradient-to-b from-brandDeep to-[#221C52] p-3 pt-3 transition-[width] duration-150 ${
         collapsed ? "w-16" : "w-[216px]"
       }`}
     >

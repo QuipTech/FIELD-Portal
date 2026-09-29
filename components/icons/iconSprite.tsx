@@ -33,6 +33,7 @@ export const IconSprite = () => {
         <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="8.5" cy="9" r="1.6"></circle><path d="M21 15.5l-4.7-4.7L6 21"></path></symbol>
         <symbol id="i-send" viewBox="0 0 24 24"><path d="M21 3L10.5 13.5M21 3l-6.8 18-3.7-7.5L3 9.8z"></path></symbol>
         <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.4A8.6 8.6 0 0 1 9.6 4 8.6 8.6 0 1 0 20 14.4z"></path></symbol>
+        <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"></circle><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"></path></symbol>
         <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M5 21a7 7 0 0 1 14 0"></path></symbol>
         <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 4.5-9 4.5-9-4.5z"></path><path d="M3 12.5L12 17l9-4.5"></path></symbol>
         <symbol id="i-history" viewBox="0 0 24 24"><path d="M3.5 12a8.5 8.5 0 1 0 2.9-6.4"></path><path d="M3 4v5h5"></path><path d="M12 8v4.3l3 1.8"></path></symbol>

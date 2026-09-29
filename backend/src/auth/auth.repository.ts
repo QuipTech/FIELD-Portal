@@ -1,6 +1,7 @@
 import { PoolClient } from 'pg';
 import { DatabaseService } from '../database/database.service';
 import { SessionRow, TenantRow, UserLoginRow, UserRow } from './types/authRows';
+import { getRequestSource } from '../common/requestSource/requestSource';
 
 export const insertTenant = async (
   client: PoolClient,
@@ -28,7 +29,8 @@ export const insertUser = async (
   const result = await client.query<UserRow>(
     `INSERT INTO users (tenant_id, email, password_hash, first_name, last_name)
      VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, tenant_id, email, first_name, last_name, status`,
+     RETURNING id, tenant_id, email, first_name, last_name, status, avatar_url,
+               avatar_storage_key`,
     [
       params.tenantId,
       params.email,
@@ -40,42 +42,32 @@ export const insertUser = async (
   return result.rows[0];
 };
 
-export const findSystemRoleIdByName = async (
-  client: PoolClient,
-  name: string,
-): Promise<string | null> => {
-  const result = await client.query<{ id: string }>(
-    `SELECT id FROM roles
-     WHERE name = $1 AND is_system_role = true AND tenant_id IS NULL
-     LIMIT 1`,
-    [name],
-  );
-  return result.rows[0]?.id ?? null;
-};
-
-export const insertUserRole = async (
-  client: PoolClient,
-  params: { tenantId: string; userId: string; roleId: string },
-): Promise<void> => {
-  await client.query(
-    `INSERT INTO user_roles (tenant_id, user_id, role_id) VALUES ($1, $2, $3)`,
-    [params.tenantId, params.userId, params.roleId],
-  );
-};
-
 export const insertAuditLog = async (
   client: PoolClient,
   params: {
     tenantId: string;
     userId: string;
-    action: string;
+    action: 'create' | 'update' | 'delete' | 'login';
     entityId: string;
+    entityType?: string;
+    metadata?: Record<string, unknown>;
   },
 ): Promise<void> => {
+  // source is the client app behind the current request (see
+  // common/requestSource), NULL outside a request.
   await client.query(
-    `INSERT INTO audit_logs (tenant_id, user_id, action, entity_type, entity_id)
-     VALUES ($1, $2, $3, 'user', $4)`,
-    [params.tenantId, params.userId, params.action, params.entityId],
+    `INSERT INTO audit_logs
+       (tenant_id, user_id, action, entity_type, entity_id, metadata, source)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      params.tenantId,
+      params.userId,
+      params.action,
+      params.entityType ?? 'user',
+      params.entityId,
+      params.metadata ?? {},
+      getRequestSource() ?? null,
+    ],
   );
 };
 
@@ -104,7 +96,8 @@ export const findUserById = async (
   userId: string,
 ): Promise<UserRow | null> => {
   const result = await client.query<UserRow>(
-    `SELECT id, tenant_id, email, first_name, last_name, status
+    `SELECT id, tenant_id, email, first_name, last_name, status, avatar_url,
+            avatar_storage_key
      FROM users WHERE id = $1`,
     [userId],
   );

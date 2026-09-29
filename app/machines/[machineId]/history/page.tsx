@@ -1,47 +1,19 @@
-"use client";
-
-import { useState } from "react";
-import { notFound } from "next/navigation";
-import { Icon } from "@/components/icons/icon";
-import { Button } from "@/components/ui/button";
 import { findMachine } from "@/lib/mockData/machines";
-import { MachineDetailHeader } from "@/components/machines/machineDetailHeader";
-import { MachineTabs } from "@/components/machines/machineTabs";
-import { HistoryFilterBar } from "./components/historyFilterBar";
-import { HistoryTimeline } from "./components/historyTimeline";
-import { AddEntryModal } from "./components/addEntryModal";
+import { SampleMachineHistory } from "./components/sampleMachineHistory";
+import { LiveMachineHistory } from "./components/liveMachineHistory";
 
 interface MachineHistoryPageProps {
   params: { machineId: string };
 }
 
+// Sample machines (lib/mockData, e.g. HT-2201) keep their demo history
+// until a machines API exists; any other id is loaded as a real machine.
 const MachineHistoryPage = ({ params }: MachineHistoryPageProps) => {
-  const [modalOpen, setModalOpen] = useState(false);
-  const machine = findMachine(params.machineId);
-  if (!machine) {
-    notFound();
-  }
-
-  return (
-    <div className="flex h-screen flex-col bg-surfaceGray">
-      <MachineDetailHeader
-        machine={machine}
-        action={
-          <Button variant="primary" onClick={() => setModalOpen(true)}>
-            <Icon name="plus" />
-            Add entry
-          </Button>
-        }
-      />
-      <main className="flex flex-1 flex-col gap-4 overflow-y-auto p-5">
-        <MachineTabs machineId={machine.id} active="history" />
-        <HistoryFilterBar />
-        <HistoryTimeline />
-      </main>
-      {modalOpen ? (
-        <AddEntryModal machineId={machine.id} hours={machine.hours} onClose={() => setModalOpen(false)} />
-      ) : null}
-    </div>
+  const sampleMachine = findMachine(params.machineId);
+  return sampleMachine ? (
+    <SampleMachineHistory machine={sampleMachine} />
+  ) : (
+    <LiveMachineHistory machineId={params.machineId} />
   );
 };
 

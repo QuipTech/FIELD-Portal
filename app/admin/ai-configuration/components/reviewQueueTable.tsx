@@ -2,18 +2,17 @@ import { Avatar } from "@/components/ui/avatar";
 import { IconTile } from "@/components/ui/iconTile";
 import { Tag } from "@/components/ui/tag";
 import { Table, TableHeaderRow, TableHeaderCell, TableRow, TableCell } from "@/components/ui/table";
-import { reviewQueue } from "@/lib/mockData/aiConfiguration";
-import type { ReviewQueueStatus } from "@/lib/mockData/aiConfiguration";
-import type { Tone } from "@/components/ui/tone";
+import { getInitials } from "@/lib/format/nameInitials";
+import { formatShortDate } from "@/lib/format/shortDate";
+import type { ReviewQueueItem } from "@/lib/types/aiConfiguration";
+import { getReviewReasonLabel, getReviewStatusMeta } from "../reviewQueueLabels";
 
-const statusTone: Record<ReviewQueueStatus, Tone> = {
-  Unreviewed: "amber",
-  "In review": "default",
-  Resolved: "primary",
-  Escalated: "danger",
-};
+interface ReviewQueueTableProps {
+  items: ReviewQueueItem[];
+  onOpen: (item: ReviewQueueItem) => void;
+}
 
-export const ReviewQueueTable = () => {
+export const ReviewQueueTable = ({ items, onOpen }: ReviewQueueTableProps) => {
   return (
     <Table className="flex-none">
       <TableHeaderRow>
@@ -23,29 +22,48 @@ export const ReviewQueueTable = () => {
         <TableHeaderCell flex={1.1}>Reviewer</TableHeaderCell>
         <TableHeaderCell flex={0.7}>Flagged</TableHeaderCell>
       </TableHeaderRow>
-      {reviewQueue.map((item) => (
-        <TableRow key={item.id}>
-          <TableCell flex={3.4} className="flex items-center gap-2.5">
-            <IconTile icon={item.flagged ? "alert" : "msg"} tone={item.flagged ? "amber" : "default"} size="sm" />
-            <span className="font-medium">{item.question}</span>
-          </TableCell>
-          <TableCell flex={1.1} className="text-bodyGray">{item.reason}</TableCell>
-          <TableCell flex={0.8}>
-            <Tag tone={statusTone[item.status]}>{item.status}</Tag>
-          </TableCell>
-          <TableCell flex={1.1} className="flex items-center gap-2">
-            {item.reviewerInitials ? (
-              <>
-                <Avatar initials={item.reviewerInitials} size="sm" />
-                <span className="text-bodyGray">{item.reviewerName}</span>
-              </>
-            ) : (
-              <span className="text-bodyGray">—</span>
-            )}
-          </TableCell>
-          <TableCell flex={0.7} className="text-xs text-mutedGray">{item.flaggedLabel}</TableCell>
-        </TableRow>
-      ))}
+      {items.length === 0 && <div className="px-4 py-6 text-sm text-mutedGray">Nothing here right now.</div>}
+      {items.map((item) => {
+        const needsAttention = item.status === "unreviewed" || item.status === "escalated";
+        const statusMeta = getReviewStatusMeta(item.status);
+        return (
+          <TableRow key={item.id} onClick={() => onOpen(item)} className="cursor-pointer hover:bg-fillGray">
+            <TableCell flex={3.4} className="flex items-center gap-2.5">
+              <IconTile
+                icon={needsAttention ? "alert" : "msg"}
+                tone={item.status === "escalated" ? "danger" : needsAttention ? "amber" : "default"}
+                size="sm"
+              />
+              <span className="truncate font-medium">
+                {item.question ? `“${item.question}”` : "(question unavailable)"}
+              </span>
+            </TableCell>
+            <TableCell flex={1.1} className="text-bodyGray">
+              {getReviewReasonLabel(item.reasonCode, item.reason)}
+            </TableCell>
+            <TableCell flex={0.8}>
+              <Tag tone={statusMeta.tone}>{statusMeta.label}</Tag>
+            </TableCell>
+            <TableCell flex={1.1} className="flex items-center gap-2">
+              {item.reviewer ? (
+                <>
+                  <Avatar
+                    initials={getInitials(item.reviewer.name)}
+                    imageSrc={item.reviewer.avatarUrl ?? undefined}
+                    size="sm"
+                  />
+                  <span className="truncate text-bodyGray">{item.reviewer.name}</span>
+                </>
+              ) : (
+                <span className="text-bodyGray">—</span>
+              )}
+            </TableCell>
+            <TableCell flex={0.7} className="text-xs text-mutedGray">
+              {formatShortDate(item.flaggedAt)}
+            </TableCell>
+          </TableRow>
+        );
+      })}
     </Table>
   );
 };

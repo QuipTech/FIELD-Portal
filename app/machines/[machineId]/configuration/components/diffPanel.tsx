@@ -1,6 +1,8 @@
 import { Icon } from "@/components/icons/icon";
 import { Tag } from "@/components/ui/tag";
 import { Button } from "@/components/ui/button";
+import { PermissionButton } from "@/components/auth/permissionButton";
+import { PERMISSIONS } from "@/lib/auth/permissionCodes";
 import { Table, TableHeaderRow, TableHeaderCell } from "@/components/ui/table";
 import { configurationDiffRows } from "@/lib/mockData/configurationHistory";
 import type { DiffChangeKind } from "@/lib/types/configurationDiff";
@@ -49,10 +51,10 @@ export const DiffPanel = () => {
         </div>
       </Table>
       <div className="flex gap-2">
-        <Button variant="primary">
+        <PermissionButton permission={PERMISSIONS.useAiAssistant} variant="primary">
           <Icon name="spark" />
           Ask AI: what could this cause?
-        </Button>
+        </PermissionButton>
         <Button>
           <Icon name="download" />
           Export diff

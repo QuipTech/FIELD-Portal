@@ -1,20 +1,43 @@
 import type { Tone } from "@/components/ui/tone";
 
-export type AdminUserStatus = "Active" | "Invited" | "Suspended";
+// users.status as stored by the backend.
+export type AdminUserStatus = "active" | "invited" | "disabled";
 
 export interface AdminUser {
   id: string;
-  initials: string;
-  name: string;
   email: string;
-  role: string;
-  site: string;
-  lastActiveLabel: string;
+  firstName: string;
+  lastName: string;
+  avatarUrl: string | null;
   status: AdminUserStatus;
+  roles: string[];
+  organisation: { id: string; name: string };
+  lastActiveAt: string | null;
+  createdAt: string;
 }
 
+export interface AdminUserListResponse {
+  users: AdminUser[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface AdminUserListQuery {
+  search?: string;
+  role?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export const adminUserStatusLabel: Record<AdminUserStatus, string> = {
+  active: "Active",
+  invited: "Invited",
+  disabled: "Suspended",
+};
+
 export const adminUserStatusTone: Record<AdminUserStatus, Tone> = {
-  Active: "primary",
-  Invited: "amber",
-  Suspended: "danger",
+  active: "primary",
+  invited: "amber",
+  disabled: "danger",
 };

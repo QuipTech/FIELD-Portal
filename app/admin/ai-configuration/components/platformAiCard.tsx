@@ -1,14 +1,12 @@
 import { Icon } from "@/components/icons/icon";
 import { Card } from "@/components/ui/card";
 import { Tag } from "@/components/ui/tag";
+import type { AiPlatformInfo } from "@/lib/types/aiConfiguration";
 
-const rows = [
-  { label: "Provider", value: "Amazon Bedrock", note: "Platform-managed" },
-  { label: "Answers", value: "Claude Sonnet 4.5", note: "technician queries" },
-  { label: "Background", value: "Claude Haiku 4.5", note: "indexing, summaries" },
-];
+const rowLabelClasses = "w-[88px] flex-none text-xs font-medium uppercase tracking-wide text-mutedGray";
+const rowClasses = "flex items-center gap-2.5 border-b border-borderGray py-2 last:border-b-0";
 
-export const PlatformAiCard = () => {
+export const PlatformAiCard = ({ platform }: { platform: AiPlatformInfo }) => {
   return (
     <Card className="gap-3">
       <div className="flex items-center">
@@ -18,13 +16,18 @@ export const PlatformAiCard = () => {
           Locked
         </Tag>
       </div>
-      {rows.map((row) => (
-        <div key={row.label} className="flex items-center gap-2.5 border-b border-borderGray py-2 last:border-b-0">
-          <span className="w-[88px] flex-none text-xs font-medium uppercase tracking-wide text-mutedGray">
-            {row.label}
+      <div className={rowClasses}>
+        <span className={rowLabelClasses}>Provider</span>
+        <span className="text-[15px] text-ink">{platform.provider}</span>
+        <Tag className="ml-auto">{platform.region}</Tag>
+      </div>
+      {platform.models.map((model) => (
+        <div key={model.role} className={rowClasses}>
+          <span className={rowLabelClasses}>{model.role}</span>
+          <span className="text-[15px] text-ink" title={model.modelId}>
+            {model.label}
           </span>
-          <span className="text-[15px] text-ink">{row.value}</span>
-          <span className="ml-auto text-xs text-mutedGray">{row.note}</span>
+          <span className="ml-auto text-xs text-mutedGray">{model.purpose}</span>
         </div>
       ))}
       <p className="text-xs text-mutedGray">
