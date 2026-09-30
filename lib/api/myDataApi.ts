@@ -14,12 +14,6 @@ export interface DataExportStatus {
   sizeBytes: number | null;
 }
 
-export interface DeletionRequestStatus {
-  id: string;
-  status: "pending" | "completed" | "cancelled";
-  requestedAt: string;
-}
-
 // The newest export, or null if none was ever requested.
 export const getDataExportRequest = (accessToken: string) =>
   apiRequest<DataExportStatus | null>("/me/data-export", { headers: authorizationHeader(accessToken) });
@@ -27,13 +21,3 @@ export const getDataExportRequest = (accessToken: string) =>
 // Queued and built in the background; 409 while one is already in progress.
 export const requestDataExportRequest = (accessToken: string) =>
   apiRequest<DataExportStatus>("/me/data-export", { method: "POST", headers: authorizationHeader(accessToken) });
-
-export const getDeletionRequestRequest = (accessToken: string) =>
-  apiRequest<DeletionRequestStatus | null>("/me/deletion-request", { headers: authorizationHeader(accessToken) });
-
-// Records the request for an admin (audited); deletes nothing itself.
-export const requestAccountDeletionRequest = (accessToken: string) =>
-  apiRequest<DeletionRequestStatus>("/me/deletion-request", {
-    method: "POST",
-    headers: authorizationHeader(accessToken),
-  });

@@ -1,38 +1,45 @@
-import { Icon } from "@/components/icons/icon";
+"use client";
+
+import { useEffect, useRef } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Tag } from "@/components/ui/tag";
+import { formatShortDateTime } from "@/lib/format/shortDate";
+import { getInitials } from "@/lib/format/nameInitials";
 import type { CaseMessage } from "@/lib/types/caseMessage";
 
+const DELETED_AUTHOR_NAME = "Former user";
+
+// Scrolls to the newest message whenever one arrives.
 export const CaseMessageThread = ({ messages }: { messages: CaseMessage[] }) => {
+  const endRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages.length]);
+
   if (messages.length === 0) {
     return <p className="text-[15px] text-mutedGray">No messages yet on this case.</p>;
   }
 
   return (
-    <>
-      {messages.map((message) => (
-        <div key={message.id} className="flex flex-col gap-2.5 rounded-xl border border-borderGray bg-surface p-3.5">
-          <div className="flex items-center gap-2.5">
-            <Avatar initials={message.authorInitials} size="sm" />
-            <span className="text-[15px] font-medium text-ink">{message.authorName}</span>
-            <Tag tone={message.roleLabel === "Support" ? "primary" : "default"}>{message.roleLabel}</Tag>
-            <span className="ml-auto text-xs text-mutedGray">{message.timestampLabel}</span>
-          </div>
-          <span className="text-[15px] text-bodyGray">{message.body}</span>
-          {message.photoCount ? (
-            <div className="flex gap-2">
-              {Array.from({ length: message.photoCount }).map((_, index) => (
-                <div
-                  key={index}
-                  className="flex h-14 w-[76px] items-center justify-center rounded-lg border border-borderGrayStrong bg-fillGray text-mutedGray"
-                >
-                  <Icon name="image" className="h-3.5 w-3.5" />
-                </div>
-              ))}
+    <div className="flex flex-col gap-3.5" aria-live="polite">
+      {messages.map((message) => {
+        const authorName = message.author?.name || DELETED_AUTHOR_NAME;
+        return (
+          <div key={message.id} className="flex flex-col gap-2.5 rounded-xl border border-borderGray bg-surface p-3.5">
+            <div className="flex items-center gap-2.5">
+              <Avatar initials={getInitials(authorName)} size="sm" />
+              <span className="text-[15px] font-medium text-ink">{authorName}</span>
+              <Tag tone={message.authorRole === "support" ? "primary" : "default"}>
+                {message.authorRole === "support" ? "Support" : "Reported"}
+              </Tag>
+              <span className="ml-auto text-xs text-mutedGray">{formatShortDateTime(message.createdAt)}</span>
             </div>
-          ) : null}
-        </div>
-      ))}
-    </>
+            <span className="whitespace-pre-wrap text-[15px] text-bodyGray">{message.body}</span>
+          </div>
+        );
+      })}
+      <div ref={endRef} />
+    </div>
   );
 };

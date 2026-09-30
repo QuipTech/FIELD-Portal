@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import { findMachine } from "@/lib/mockData/machines";
 import { powertrainColumnOne, powertrainColumnTwo } from "@/lib/mockData/machineComponents";
 import { MachineDetailHeader } from "@/components/machines/machineDetailHeader";
@@ -12,10 +12,12 @@ interface MachineDetailPageProps {
   params: { machineId: string };
 }
 
+// The components tab is still sample-only (lib/mockData, e.g. HT-2201); a
+// registered machine (its UUID in the URL) opens on its live history.
 const MachineDetailPage = ({ params }: MachineDetailPageProps) => {
   const machine = findMachine(params.machineId);
   if (!machine) {
-    notFound();
+    redirect(`/machines/${params.machineId}/history`);
   }
 
   return (

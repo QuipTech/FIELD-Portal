@@ -6,6 +6,10 @@ export interface MachineSummary {
   id: string;
   serialNumber: string;
   fleetNumber: string | null;
+  // Asset number, else fleet number, else serial.
+  label: string;
+  site: string | null;
+  operatingHours: number | null;
   manufacturer: string;
   model: string;
   status: string;

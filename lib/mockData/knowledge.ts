@@ -1,35 +1,4 @@
-import type { KnowledgeSearchResult, KnowledgeArticleDetail } from "@/lib/types/knowledgeArticle";
-
-export const knowledgeSearchResults: KnowledgeSearchResult[] = [
-  {
-    slug: "rear-suspension-cylinder-recharge",
-    title: "Rear suspension cylinder recharge",
-    summary:
-      "Nitrogen charging sequence, ride-height check and the torque values for the upper mount. Requires two technicians and the 8T-0820 charging group.",
-    docLabel: "Procedure",
-    docIcon: "tool",
-    docTone: "default",
-    metaLabel: "CAT 793F · Rev 4",
-  },
-  {
-    slug: "suspension-system-specifications",
-    title: "Suspension system — specifications",
-    summary: "Charge pressures by machine weight class, cold and hot readings.",
-    docLabel: "Manual §",
-    docIcon: "book",
-    docTone: "default",
-    metaLabel: "Service manual · p. 214",
-  },
-  {
-    slug: "bulletin-88-revised-charge-pressure",
-    title: "Revised charge pressure for cylinders built after 2023",
-    summary: "Supersedes the manual value for serial ranges 4GZ01100 and later.",
-    docLabel: "Bulletin 88",
-    docIcon: "alert",
-    docTone: "amber",
-    metaLabel: "Issued 14 Mar",
-  },
-];
+import type { KnowledgeArticleDetail } from "@/lib/types/knowledgeArticle";
 
 export const knowledgeArticles: KnowledgeArticleDetail[] = [
   {

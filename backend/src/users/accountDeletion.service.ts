@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   Injectable,
   Logger,
   NotFoundException,
@@ -9,8 +10,17 @@ import * as usersRepository from './users.repository';
 import { CognitoUserDeletionService } from './cognitoUserDeletion.service';
 import { StorageService } from '../storage/storage.service';
 import { AccountIdentityRow } from './types/userRows';
+import { OWNER_ROLE_NAME } from '../auth/systemRoleNames';
+
+export interface AccountDeletionEligibility {
+  canDelete: boolean;
+  // Why not, in words the settings page shows instead of the button.
+  blockedReason: string | null;
+}
 
 const ACCOUNT_NOT_FOUND_MESSAGE = 'Account not found.';
+const LAST_OWNER_MESSAGE =
+  "You're the only Owner of your organisation. Make another user an Owner before deleting your account.";
 const COGNITO_UNAVAILABLE_MESSAGE =
   "We couldn't remove your sign-in right now. Nothing was deleted — please try again.";
 
@@ -24,6 +34,21 @@ export class AccountDeletionService {
     private readonly storageService: StorageService,
   ) {}
 
+  getDeletionEligibility = async (
+    userId: string,
+    tenantId: string,
+  ): Promise<AccountDeletionEligibility> => {
+    const isLastOwner = await usersRepository.isLastOwner(
+      this.databaseService,
+      { userId, tenantId, ownerRoleName: OWNER_ROLE_NAME },
+    );
+    return isLastOwner
+      ? { canDelete: false, blockedReason: LAST_OWNER_MESSAGE }
+      : { canDelete: true, blockedReason: null };
+  };
+
+  // The last Owner can't leave: the organisation would have no one to
+  // manage billing, users or settings.
   // Cognito goes first: if it fails nothing is deleted and the user can
   // retry. If the database step then fails, a retry finds no Cognito users
   // and just finishes the database delete.
@@ -36,6 +61,12 @@ export class AccountDeletionService {
       { userId, tenantId },
     );
     if (!account) throw new NotFoundException(ACCOUNT_NOT_FOUND_MESSAGE);
+
+    const { canDelete, blockedReason } = await this.getDeletionEligibility(
+      userId,
+      tenantId,
+    );
+    if (!canDelete) throw new ConflictException(blockedReason);
 
     await this.deleteCognitoUsers(userId, account);
 

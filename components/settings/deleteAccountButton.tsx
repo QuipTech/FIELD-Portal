@@ -1,76 +1,72 @@
 "use client";
 
 import { useState } from "react";
-import { Icon } from "@/components/icons/icon";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirmDialog";
+import { Input } from "@/components/ui/input";
+import { deleteAccountRequest, getDeletionEligibilityRequest } from "@/lib/api/accountApi";
 import { useApiResource } from "@/lib/hooks/useApiResource";
 import { requireAccessToken } from "@/lib/api/requireAccessToken";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
-import { getDeletionRequestRequest, requestAccountDeletionRequest } from "@/lib/api/myDataApi";
-import { formatShortDate } from "@/lib/format/shortDate";
+import { endLocalSession } from "@/lib/auth/endLocalSession";
 
-// Sends a deletion request to the organisation's admin (it shows in their
-// audit log). Nothing is deleted straight away, and asset/configuration
-// records belong to the company's CMDB, so they're never part of it.
+const CONFIRMATION_WORD = "DELETE";
+
+// Permanently deletes the signed-in user's account, then signs them out.
+// Asset and configuration records belong to the company's CMDB, so they
+// stay — just no longer attributed to this user. The organisation's last
+// Owner sees why they can't instead of the button.
 export const DeleteAccountButton = () => {
-  const pending = useApiResource(getDeletionRequestRequest, [], "Couldn't check your deletion request.");
+  const router = useRouter();
+  const eligibility = useApiResource(getDeletionEligibilityRequest, [], "Couldn't check your account.");
   const [isConfirming, setIsConfirming] = useState(false);
-  const [isSending, setIsSending] = useState(false);
-  const [sendError, setSendError] = useState<string | null>(null);
+  const [typedConfirmation, setTypedConfirmation] = useState("");
 
-  const handleConfirm = async () => {
-    setIsSending(true);
-    setSendError(null);
-    try {
-      pending.setData(await requestAccountDeletionRequest(requireAccessToken()));
-      setIsConfirming(false);
-    } catch (error) {
-      setSendError(toApiErrorMessage(error, "Couldn't send your request. Please try again."));
-    } finally {
-      setIsSending(false);
-    }
+  const closeDialog = () => {
+    setIsConfirming(false);
+    setTypedConfirmation("");
   };
 
-  if (pending.data?.status === "pending") {
-    return (
-      <span className="text-xs text-mutedGray">Deletion requested {formatShortDate(pending.data.requestedAt)}</span>
-    );
+  const deleteAccount = async () => {
+    await deleteAccountRequest(requireAccessToken());
+    await endLocalSession(() => router.replace("/login"));
+  };
+
+  if (eligibility.data && !eligibility.data.canDelete) {
+    return <span className="max-w-[320px] text-right text-xs text-mutedGray">{eligibility.data.blockedReason}</span>;
   }
 
   return (
     <>
-      <Button size="sm" variant="danger" onClick={() => setIsConfirming(true)} disabled={pending.isLoading}>
-        Request deletion
+      <Button size="sm" variant="danger" onClick={() => setIsConfirming(true)} disabled={eligibility.isLoading}>
+        Delete account
       </Button>
       {isConfirming && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-inkStatic/40">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-label="Request account deletion"
-            className="flex w-[380px] flex-col items-center gap-4 rounded-2xl bg-surface p-6 text-center"
-          >
-            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-dangerTint text-danger">
-              <Icon name="alert" />
-            </span>
-            <div className="flex flex-col gap-1">
-              <h2 className="text-[17px] font-medium text-ink">Request account deletion?</h2>
-              <p className="text-[13px] text-mutedGray">
-                Your administrator is notified and will remove your profile and sign-in. Asset and configuration records
-                belong to your company&apos;s CMDB and are not deleted with your account.
-              </p>
-            </div>
-            {sendError && <span className="text-center text-xs text-danger">{sendError}</span>}
-            <div className="flex w-full gap-2">
-              <Button className="flex-1" disabled={isSending} onClick={() => setIsConfirming(false)}>
-                Cancel
-              </Button>
-              <Button variant="danger" className="flex-1" disabled={isSending} onClick={handleConfirm}>
-                {isSending ? "Sending…" : "Request deletion"}
-              </Button>
-            </div>
+        <ConfirmDialog
+          title="Delete your account?"
+          confirmLabel="Delete account"
+          onConfirm={deleteAccount}
+          onClose={closeDialog}
+          toErrorMessage={(error) => toApiErrorMessage(error, "Couldn't delete your account. Please try again.")}
+          isConfirmDisabled={typedConfirmation.trim() !== CONFIRMATION_WORD}
+        >
+          <div className="flex flex-col gap-3">
+            <p>
+              This permanently removes your profile, sign-in and AI conversations, and signs you out. It can&apos;t be
+              undone. Asset and configuration records belong to your company&apos;s CMDB and are kept.
+            </p>
+            <p>
+              Type <span className="font-medium text-ink">{CONFIRMATION_WORD}</span> to confirm.
+            </p>
+            <Input
+              aria-label={`Type ${CONFIRMATION_WORD} to confirm`}
+              value={typedConfirmation}
+              onChange={(event) => setTypedConfirmation(event.target.value)}
+              autoComplete="off"
+            />
           </div>
-        </div>
+        </ConfirmDialog>
       )}
     </>
   );

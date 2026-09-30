@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { supportCases } from "@/lib/mockData/cases";
 
 type MachineTab = "components" | "history" | "configuration" | "manuals" | "cases";
 
@@ -9,14 +8,12 @@ interface MachineTabsProps {
 }
 
 export const MachineTabs = ({ machineId, active }: MachineTabsProps) => {
-  const openCaseCount = supportCases.filter((item) => item.assetId === machineId).length;
-
-  const tabs: { key: MachineTab; label: string; href: string; badge?: number }[] = [
+  const tabs: { key: MachineTab; label: string; href: string }[] = [
     { key: "components", label: "Components", href: `/machines/${machineId}` },
     { key: "history", label: "History", href: `/machines/${machineId}/history` },
     { key: "configuration", label: "Configuration history", href: `/machines/${machineId}/configuration` },
     { key: "manuals", label: "Manuals", href: "/knowledge" },
-    { key: "cases", label: "Open cases", href: "/cases", badge: openCaseCount },
+    { key: "cases", label: "Open cases", href: "/cases" },
   ];
 
   return (
@@ -32,11 +29,6 @@ export const MachineTabs = ({ machineId, active }: MachineTabsProps) => {
           }`}
         >
           {tab.label}
-          {tab.badge ? (
-            <span className="rounded-full bg-amberTint px-2 py-0.5 text-xs font-medium text-amber">
-              {tab.badge}
-            </span>
-          ) : null}
         </Link>
       ))}
     </div>

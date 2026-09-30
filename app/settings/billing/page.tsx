@@ -20,7 +20,7 @@ const BillingPage = () => {
             Upgrade plan
           </Link>
         </div>
-        <SubscriptionSummaryCard captionLine="Billed per asset, monthly · 42 assets" />
+        <SubscriptionSummaryCard />
 
         <h2 className="text-base font-medium text-ink">AI query allowance</h2>
         <AiAllowanceCard />

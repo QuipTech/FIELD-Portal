@@ -21,7 +21,7 @@ const SettingsPage = () => {
         <ProfileHeaderCard />
 
         <h2 className="text-base font-medium text-ink">Subscription</h2>
-        <SubscriptionSummaryCard captionLine="QuipTech Mining · billed per asset, monthly" showBillingLink />
+        <SubscriptionSummaryCard showBillingLink />
 
         <SecuritySettingsSection />
 
@@ -36,8 +36,8 @@ const SettingsPage = () => {
           <SettingsRow
             icon="alert"
             tone="danger"
-            title="Request account deletion"
-            caption="Your admin removes your profile; asset and configuration records stay on the company's CMDB"
+            title="Delete account"
+            caption="Permanently removes your profile and personal data; asset and configuration records stay on the company's CMDB"
             bordered={false}
             trailing={<DeleteAccountButton />}
           />

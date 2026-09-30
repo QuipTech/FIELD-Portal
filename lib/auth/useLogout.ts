@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { logoutRequest } from "../api/authApi";
-import { clearAuthSession, getRefreshToken } from "./authSession";
-import { signOutOfCognito } from "./cognitoFederatedSignIn";
+import { getRefreshToken } from "./authSession";
+import { endLocalSession } from "./endLocalSession";
 
 // Best-effort: the session is revoked server-side when the API call
 // succeeds, but the user is always signed out locally and redirected even
@@ -23,11 +23,7 @@ export const useLogout = () => {
     if (refreshToken) {
       await logoutRequest(refreshToken).catch(() => undefined);
     }
-    clearAuthSession();
-    // Leaves the page via Cognito's logout endpoint for Google/Apple users;
-    // for everyone else it resolves immediately and the push below runs.
-    await signOutOfCognito().catch(() => undefined);
-    router.push("/login");
+    await endLocalSession(() => router.push("/login"));
   };
 
   return { logout, isLoggingOut };

@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  Get,
   HttpCode,
   HttpStatus,
   Patch,
@@ -50,6 +51,15 @@ export class UsersController {
     @UploadedFile() file: IncomingFile | undefined,
   ) {
     return this.userProfileService.uploadAvatar(user, file);
+  }
+
+  // Whether the Delete account button applies (the last Owner can't).
+  @Get('deletion-eligibility')
+  getDeletionEligibility(@CurrentUser() user: AuthenticatedUser) {
+    return this.accountDeletionService.getDeletionEligibility(
+      user.userId,
+      user.tenantId,
+    );
   }
 
   @Delete()

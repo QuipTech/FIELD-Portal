@@ -86,6 +86,31 @@ export const findAccountIdentity = async (
   return result.rows[0] ?? null;
 };
 
+// True when the user holds Owner and no other live, active user in the
+// tenant does — deleting them would leave the organisation unmanaged.
+export const isLastOwner = async (
+  databaseService: DatabaseService,
+  params: { userId: string; tenantId: string; ownerRoleName: string },
+): Promise<boolean> => {
+  const result = await databaseService.withTenant(params.tenantId, (client) =>
+    client.query<{ is_last_owner: boolean }>(
+      `SELECT EXISTS (
+                SELECT 1 FROM user_roles ur
+                JOIN roles r ON r.id = ur.role_id AND r.deleted_at IS NULL
+                WHERE ur.user_id = $1 AND r.name = $2)
+              AND NOT EXISTS (
+                SELECT 1 FROM user_roles ur
+                JOIN roles r ON r.id = ur.role_id AND r.deleted_at IS NULL
+                JOIN users u ON u.id = ur.user_id
+                WHERE ur.tenant_id = $3 AND ur.user_id <> $1 AND r.name = $2
+                  AND u.deleted_at IS NULL AND u.status = 'active')
+              AS is_last_owner`,
+      [params.userId, params.ownerRoleName, params.tenantId],
+    ),
+  );
+  return result.rows[0]?.is_last_owner ?? false;
+};
+
 // Hard-deletes the user and all of their personal data in one transaction
 // (see 0025_delete_user_account.sql). False means no such user in that tenant.
 export const deleteUserAccount = async (

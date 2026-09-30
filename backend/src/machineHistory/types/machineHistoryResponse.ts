@@ -2,6 +2,10 @@ export interface MachineSummary {
   id: string;
   serialNumber: string;
   fleetNumber: string | null;
+  // What people call the machine: asset number, else fleet, else serial.
+  label: string;
+  site: string | null;
+  operatingHours: number | null;
   manufacturer: string;
   model: string;
   status: string;

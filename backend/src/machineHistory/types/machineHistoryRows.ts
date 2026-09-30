@@ -2,6 +2,10 @@ export interface MachineRow {
   id: string;
   serial_number: string;
   fleet_number: string | null;
+  // Asset number, else fleet number, else serial (see MACHINE_LABEL_SQL).
+  label: string;
+  site: string | null;
+  operating_hours: number | null;
   status: string;
   manufacturer_name: string;
   model_name: string;

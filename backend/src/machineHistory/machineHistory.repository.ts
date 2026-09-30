@@ -1,4 +1,5 @@
 import { PoolClient } from 'pg';
+import { MACHINE_LABEL_SQL } from '../machineFleet/machineFleet.repository';
 import { StoredFile } from '../storage/types/storedFile';
 import {
   HistoryEntryRow,
@@ -16,6 +17,7 @@ export const findMachine = async (
 ): Promise<MachineRow | null> => {
   const result = await client.query<MachineRow>(
     `SELECT m.id, m.serial_number, m.fleet_number, m.status,
+            ${MACHINE_LABEL_SQL} AS label, m.site, m.operating_hours,
             mf.name AS manufacturer_name, mm.name AS model_name
      FROM machines m
      JOIN machine_manufacturers mf ON mf.id = m.manufacturer_id

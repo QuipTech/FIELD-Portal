@@ -7,23 +7,21 @@ import { LinkButton } from "@/components/ui/linkButton";
 import { PermissionButton } from "@/components/auth/permissionButton";
 import { MachineDetailHeader } from "@/components/machines/machineDetailHeader";
 import { PERMISSIONS } from "@/lib/auth/permissionCodes";
-import type { Machine, MachineStatus } from "@/lib/types/machine";
+import type { Machine } from "@/lib/types/machine";
+import { toMachineStatus } from "@/lib/format/machineStatus";
 import type { MachineSummary } from "@/lib/types/machineHistory";
 import { useLiveMachineHistory } from "../useLiveMachineHistory";
 import { LiveHistoryTimeline } from "./liveHistoryTimeline";
 import { LiveAddEntryModal } from "./liveAddEntryModal";
 
-const toHeaderStatus = (status: string): MachineStatus =>
-  status === "down" ? "down" : status === "service_due" ? "serviceDue" : "running";
-
-// The shared header expects the portal's Machine shape; the fleet number
-// (or serial) is what people call a machine by.
+// The shared header expects the portal's Machine shape; the label (asset
+// number, else fleet or serial) is what people call a machine by.
 const toHeaderMachine = (machine: MachineSummary): Machine => ({
-  id: machine.fleetNumber ?? machine.serialNumber,
+  id: machine.label,
   model: `${machine.manufacturer} ${machine.model}`,
-  site: "",
-  status: toHeaderStatus(machine.status),
-  hours: 0,
+  site: machine.site ?? "",
+  status: toMachineStatus(machine.status),
+  hours: machine.operatingHours ?? 0,
 });
 
 // History for a machine registered in the database (its UUID in the URL).

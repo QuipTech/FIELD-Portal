@@ -51,6 +51,10 @@ backend/
 │   ├── adminSubscriptions/   ← /admin/subscriptions — each organisation's subscription (Owner only)
 │   ├── organisationBranding/ ← /organisation/branding — the caller's own organisation's branding
 │   ├── organisationNotifications/ ← /organisation/notifications — alert rules + delivery channels (Owner)
+│   ├── organisationSubscription/ ← GET /organisation/subscription — the caller's plan, or Free
+│   ├── supportCases/         ← /support-cases REST + Socket.IO gateway (live case chat)
+│   ├── machineFleet/         ← GET/POST /machines (the Machines list), GET /machine-catalog
+│   ├── knowledgeLibrary/     ← GET /knowledge/library — the Knowledge screen's search
 │   ├── dataGovernance/       ← dataSchemas.config.ts: the platform/app/billing split (page + DB test)
 │   ├── adminDataRetention/   ← /admin/settings/data-retention + nightly AI log purge job
 │   ├── billing/              ← the ONLY Stripe code: webhook → app.subscriptions/entitlements
@@ -59,10 +63,11 @@ backend/
 │   └── users/
 │       ├── users.module.ts / users.service.ts  ← findOrCreateFromCognito
 │       ├── userProfile.service.ts ← PATCH /users/me, POST /users/me/avatar
-│       ├── cognitoSignup.ts      ← new tenant + Owner for first-time Google/Apple users
+│       ├── cognitoSignup.ts      ← new tenant + Customer for first-time Google/Apple users
 │       ├── users.controller.ts / accountDeletion.service.ts
 │       │   / cognitoUserDeletion.service.ts
-│       │                         ← DELETE /users/me (self-service account deletion)
+│       │                         ← DELETE /users/me (self-service; the last Owner is refused),
+│       │                            GET /users/me/deletion-eligibility
 │       └── users.repository.ts   ← Cognito lookup/link + account deletion queries
 ├── db/
 │   └── migrations/          ← numbered SQL migrations, applied in order
@@ -265,6 +270,35 @@ and Apple sign-in, and is exchanged for the same FIELD session:
   `app.subscriptions` + `app.entitlements`; invoices go to
   `billing.stripe_invoices`. Feature checks use `EntitlementsService`
   (`GET /organisation/entitlements`), never Stripe.
+- **Organisation subscription** (`src/organisationSubscription`, any signed-in
+  user): `GET /organisation/subscription` returns the organisation's plan from
+  `app.subscriptions`, or the Free plan when there is none, its term has ended,
+  or Stripe cancelled it.
+- **Knowledge library search** (`src/knowledgeLibrary`, any signed-in user):
+  `GET /knowledge/library` (`search`, `type`, `make`, `model`, `sort`) returns up
+  to 50 documents with their best passage, page and the models they mention,
+  from the organisation's own and the shared library — the same visibility
+  rule as AI retrieval (live version, not archived). With search text it
+  ranks by Bedrock embeddings; if the model can't be reached it falls back
+  to Postgres full-text (any word, title weighted) and retries AI after 5
+  minutes. `searchMode` says which: `semantic`, `keyword` or `browse`.
+- **Machines list** (`src/machineFleet`, migration `0052`): `GET /machines`
+  (`machine.view`; filters `search`, `site`, `make`, `status`, `machineClass`)
+  returns up to 200 machines, the filtered `total`, filter choices from the
+  whole fleet, and `featuredDown` — a down machine with its most urgent open
+  support case. `POST /machines` (`machine.create`, audited) registers a
+  machine against a Machine library model (409 on a duplicate serial);
+  `GET /machine-catalog` lists the library's makes and models for it.
+  `machines.status` is the operating status: `running`, `down`, `service_due`.
+- **Support cases** (`src/supportCases`, migration `0051`): REST at
+  `/support-cases` — list (filters `status`, `priority`, `assignee`, `search`),
+  `options`, create, `GET/PATCH /:caseNumber`, `GET/POST /:caseNumber/messages`.
+  Raising, reading and replying need `support.create`; assign / status /
+  priority need `support.manage`; replying to a resolved case is a 409. Live
+  delivery is Socket.IO at namespace `/support-cases` (token in the handshake
+  `auth.token`, checked in middleware): each portal joins its tenant's room
+  (`case:updated`), and `case:join` adds a case's room (`case:message`,
+  `case:typing`). Messages are saved over REST and pushed after commit.
 - **My data** (`src/myData`, any signed-in user): `POST /me/data-export`
   queues an export (202; 409 if one is in progress) that the worker builds
   as JSON in S3 (`exports/…`, link valid 7 days); `GET /me/data-export`

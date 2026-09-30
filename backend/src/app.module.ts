@@ -22,6 +22,10 @@ import { AdminDataRetentionModule } from './adminDataRetention/adminDataRetentio
 import { BillingModule } from './billing/billing.module';
 import { EntitlementsModule } from './entitlements/entitlements.module';
 import { MyDataModule } from './myData/myData.module';
+import { OrganisationSubscriptionModule } from './organisationSubscription/organisationSubscription.module';
+import { SupportCasesModule } from './supportCases/supportCases.module';
+import { MachineFleetModule } from './machineFleet/machineFleet.module';
+import { KnowledgeLibraryModule } from './knowledgeLibrary/knowledgeLibrary.module';
 import { RequestSourceMiddleware } from './common/requestSource/requestSource.middleware';
 
 @Module({
@@ -50,6 +54,10 @@ import { RequestSourceMiddleware } from './common/requestSource/requestSource.mi
     BillingModule,
     EntitlementsModule,
     MyDataModule,
+    OrganisationSubscriptionModule,
+    SupportCasesModule,
+    MachineFleetModule,
+    KnowledgeLibraryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

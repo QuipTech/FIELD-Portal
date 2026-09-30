@@ -28,3 +28,22 @@ export const uploadAvatarRequest = (
   onProgress?: (fraction: number) => void,
 ): Promise<{ profile: UserProfile; file: UploadedFile }> =>
   uploadMultipart("/users/me/avatar", { accessToken, file, onProgress });
+
+// Permanently deletes the caller's profile, sign-in and personal data
+// (204). Shared asset/configuration records stay, detached from the user.
+export const deleteAccountRequest = (accessToken: string): Promise<null> =>
+  apiRequest<null>("/users/me", {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+export interface AccountDeletionEligibility {
+  canDelete: boolean;
+  // Shown instead of the Delete account button, e.g. for the last Owner.
+  blockedReason: string | null;
+}
+
+export const getDeletionEligibilityRequest = (accessToken: string) =>
+  apiRequest<AccountDeletionEligibility>("/users/me/deletion-eligibility", {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });

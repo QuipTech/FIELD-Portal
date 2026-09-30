@@ -47,6 +47,8 @@ session (set per-request by `DatabaseService.withTenant`).
 | `0048` | Retention — audit_logs append-only grants, no deletes on configuration snapshots, `tenants.ai_query_log_retention_months`, `purge_expired_ai_query_logs()` |
 | `0049` | My data — `data_export_requests` (+ worker claim/finish/expire functions), `account_deletion_requests` |
 | `0050` | An admin edit of a subscription makes it manually managed (`source = 'manual'`, clears `stripe_status`), so a Stripe-cancelled row doesn't keep entitlements off |
+| `0051` | Support cases — `case_number` (from 1001), `priority`, `category`, `created_by` (reporter, SET NULL), `resolved_at`; status/priority/category checks |
+| `0052` | Machines list — `machines.site`, `operating_hours`; `status` becomes the operating status (`running`/`down`/`service_due`, was `active`) |
 
 ## Two forward references, resolved across files
 
