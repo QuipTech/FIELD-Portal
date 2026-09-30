@@ -5,8 +5,8 @@
 This is the backend API for the QuipTech FIELD Portal — a NestJS service that
 backs the User Portal and Admin Console frontend at `portal/`. The full
 Phase 1 database schema (multi-tenant, RLS-enforced) lives under
-`db/migrations/`, and the first API surface — registration and login — is
-implemented under `src/auth/`.
+`db/migrations/`. Sign-up and sign-in go through Amazon Cognito; `src/auth/`
+exchanges the Cognito login for a FIELD session.
 
 ## Folder structure
 
@@ -142,8 +142,9 @@ outside local dev.
   `app.tenant_id` for that transaction so PostgreSQL RLS does the actual
   tenant isolation — the query itself never needs a manual `WHERE tenant_id
   = …`.
-- Passwords are hashed with bcrypt (via `bcryptjs`, pure JS — no native
-  build step). Refresh tokens are signed JWTs; only their SHA-256 digest is
+- The backend never sees passwords: Cognito stores and checks them
+  (`users.password_hash` is only set on accounts from before the move to
+  Cognito, and nothing reads it for sign-in). Refresh tokens are signed JWTs; only their SHA-256 digest is
   stored (`sessions.refresh_token_hash`), so a leaked database dump can't be
   replayed as a live session.
 - `DATABASE_URL` uses `sslmode=verify-full`, and Node doesn't ship Amazon's
@@ -154,11 +155,15 @@ outside local dev.
   so if both are present the explicit CA is silently ignored and you get
   `self-signed certificate in certificate chain`.
 
-## Cognito sign-in (Google / Apple)
+## Cognito sign-in (email/password, Google, Apple)
 
-Email/password auth (`/auth/register`, `/auth/login`, `/auth/refresh`,
-`/auth/logout`, `/auth/me`) is unchanged. Cognito is used only for Google
-and Apple sign-in, and is exchanged for the same FIELD session:
+Every user signs up and signs in through Cognito; the backend has no
+password endpoints of its own. Email/password accounts live in the Cognito
+user pool directory — the portal calls Amplify's `signUp` /
+`confirmSignUp` (Cognito emails the 6-digit code) / `signIn` — and Google
+and Apple are federated providers. Either way the resulting Cognito ID
+token is exchanged for a FIELD session (`/auth/refresh`, `/auth/logout`
+and `/auth/me` then work as before):
 
 - `CognitoAuthGuard` (`src/auth/guards/cognitoAuth.guard.ts`) verifies the
   bearer **ID token** against `COGNITO_USER_POOL_ID` / `COGNITO_CLIENT_ID`
@@ -174,12 +179,19 @@ and Apple sign-in, and is exchanged for the same FIELD session:
      `{ status: 'profileRequired' }` and writes nothing. Called again with
      `{ companyName, phoneNumber }` (`SyncCognitoDto`, both required for
      signup), it runs self-serve signup (`src/users/cognitoSignup.ts`): a
-     new tenant named after the company, the user as its Owner with that
-     phone number and no password — the same shape `/auth/register` creates.
+     new tenant named after the company, the user as its Customer with that
+     phone number and no password. The portal's register form sends both
+     straight after the email is verified; Google/Apple users get the
+     signup profile dialog.
 
   Signed-in responses are `{ status: 'signedIn', session }`, where
-  `session` is the same shape `/auth/login` returns, so
-  every `JwtAuthGuard` route works for Google/Apple users unchanged.
+  `session` is `{ accessToken, refreshToken, expiresIn, user, tenant }`,
+  and every `JwtAuthGuard` route accepts it.
+- `POST /auth/password-reset/check` `{ email }` (public) runs before the
+  portal asks Cognito for a reset code: `ListUsers` by email returns
+  `eligible`, `notFound`, `federatedOnly` (`provider: google | apple` — no
+  password to reset) or `unverified` (Cognito can't email an unverified
+  address). It reveals whether an email has an account, as signup does.
 - `DELETE /users/me` (`JwtAuthGuard`, 204) permanently deletes the
   caller's own account. First every Cognito user with the account's email
   or `cognito_sub` is deleted (`cognitoUserDeletion.service.ts`; a failure
@@ -395,7 +407,7 @@ and Apple sign-in, and is exchanged for the same FIELD session:
     unless it already has a reviewer, and `unreviewed` releases it.
   Prompt and review changes are audited (`ai_prompt_version`,
   `ai_review_item`) in the same transaction, like roles.
-- Every session's `user` (login, register, refresh, Google/Apple) and
+- Every session's `user` (`/auth/sync`, `/auth/refresh`) and
   `GET /auth/me` carry `roles` and `permissions` — the permission codes
   the user's roles grant (`userAccess.repository.ts`). `/auth/me` re-reads
   them each call, so the portal picks up role changes without a new login.

@@ -6,7 +6,8 @@ import "aws-amplify/auth/enable-oauth-listener";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Hub } from "aws-amplify/utils";
-import { getCognitoIdToken } from "@/lib/auth/cognitoFederatedSignIn";
+import { getCognitoSession } from "@/lib/auth/cognitoFederatedSignIn";
+import { clearPendingSignupProfile, readPendingSignupProfile } from "@/lib/auth/pendingSignupProfile";
 import { saveAuthSession } from "@/lib/auth/authSession";
 import { resolvePostLoginRoute } from "@/lib/auth/postLoginRouting";
 import { logAuthDebug } from "@/lib/auth/authDebugLog";
@@ -14,7 +15,7 @@ import { syncCognitoSessionRequest } from "@/lib/api/authApi";
 import { ApiError } from "@/lib/api/httpClient";
 import type { SignupProfile } from "@/lib/types/authSession";
 
-const SIGN_IN_FAILED_MESSAGE = "Sign-in with Google or Apple didn't complete. Please try again.";
+const SIGN_IN_FAILED_MESSAGE = "Sign-in didn't complete. Please try again.";
 const PROFILE_FAILED_MESSAGE = "Couldn't create your account. Please try again.";
 
 type SyncOutcome = "entered" | "profileRequired" | "noSession";
@@ -38,17 +39,21 @@ export const useCompleteFederatedSignIn = () => {
   const syncAndEnterPortal = async (signupProfile?: SignupProfile): Promise<SyncOutcome> => {
     // Re-read each time: Amplify refreshes the ID token if the user sat on
     // the signup dialog long enough for it to expire.
-    const cognitoIdToken = await getCognitoIdToken();
-    if (!cognitoIdToken) return "noSession";
+    const cognitoSession = await getCognitoSession();
+    if (!cognitoSession) return "noSession";
 
-    const response = await syncCognitoSessionRequest(cognitoIdToken, signupProfile);
+    // An email/password sign-up saved its company + phone before verifying;
+    // it's ignored if the account already exists.
+    const profile = signupProfile ?? readPendingSignupProfile(cognitoSession.email);
+    const response = await syncCognitoSessionRequest(cognitoSession.idToken, profile);
     logAuthDebug("Backend /auth/sync response", {
       status: response.status,
       user: response.status === "signedIn" ? response.session.user : undefined,
     });
     if (response.status === "profileRequired") return "profileRequired";
 
-    saveAuthSession(response.session, "federated");
+    clearPendingSignupProfile();
+    saveAuthSession(response.session, cognitoSession.signInMethod);
     router.replace(resolvePostLoginRoute(response.session.user.roles));
     return "entered";
   };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -13,9 +13,8 @@ import { Button } from "@/components/ui/button";
 import { resolvePostLoginRoute } from "@/lib/auth/postLoginRouting";
 import { usePlatformAuthenticator } from "@/lib/auth/usePlatformAuthenticator";
 import { signInWithPlatformAuthenticator } from "@/lib/auth/webauthnPlatformCredential";
-import { getStoredUser, saveAuthSession } from "@/lib/auth/authSession";
-import { loginRequest } from "@/lib/api/authApi";
-import { ApiError } from "@/lib/api/httpClient";
+import { getStoredUser } from "@/lib/auth/authSession";
+import { resendEmailCode, signInWithEmail, toCognitoErrorMessage } from "@/lib/auth/cognitoPasswordAuth";
 import { OauthButtons } from "./components/oauthButtons";
 import { AppDownloadLinks } from "./components/appDownloadLinks";
 
@@ -28,16 +27,42 @@ const LoginPage = () => {
   const [isBiometricPending, setIsBiometricPending] = useState(false);
   const [biometricError, setBiometricError] = useState<string | null>(null);
   const hasPlatformAuthenticator = usePlatformAuthenticator();
+  const [notice, setNotice] = useState<string | null>(null);
+
+  // Arriving from /verify-email (when it couldn't sign in automatically) or
+  // from a password reset. Read after mount (not useSearchParams) so the
+  // page stays static.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("verified") === "1") {
+      setNotice("Email verified. Sign in to finish creating your account.");
+    } else if (params.get("reset") === "1") {
+      setNotice("Password updated. Sign in with your new password.");
+    } else {
+      return;
+    }
+    setEmail(params.get("email") ?? "");
+  }, []);
 
   const handleSignIn = async () => {
     setLoginError(null);
     setIsSubmitting(true);
+    const trimmedEmail = email.trim();
     try {
-      const session = await loginRequest({ email, password });
-      saveAuthSession(session);
-      router.push(resolvePostLoginRoute(session.user.roles));
+      const outcome = await signInWithEmail(trimmedEmail, password);
+      if (outcome === "signedIn") {
+        // Exchanges the Cognito sign-in for a FIELD session, as for Google/Apple.
+        router.push("/auth/callback");
+        return;
+      }
+      // Signed up but never verified: send a fresh code (the first may have
+      // expired) and finish on the code screen.
+      const verifyUrl = `/verify-email?email=${encodeURIComponent(trimmedEmail)}`;
+      await resendEmailCode(trimmedEmail)
+        .then(() => router.push(`${verifyUrl}&sent=1`))
+        .catch(() => router.push(verifyUrl));
     } catch (error) {
-      setLoginError(error instanceof ApiError ? error.message : "Couldn't sign in. Please try again.");
+      setLoginError(toCognitoErrorMessage(error, "Couldn't sign in. Please try again."));
     } finally {
       setIsSubmitting(false);
     }
@@ -109,6 +134,9 @@ const LoginPage = () => {
                 onChange={(event) => setPassword(event.target.value)}
               />
             </div>
+            {notice && !loginError && (
+              <span className="text-center text-xs text-mutedGray">{notice}</span>
+            )}
             {loginError && (
               <span className="text-center text-xs text-danger">{loginError}</span>
             )}
@@ -126,11 +154,7 @@ const LoginPage = () => {
                 Create an account
               </Link>
             </span>
-            <div className="flex justify-center gap-2.5 text-xs text-mutedGray">
-              <Link href="#" className="text-primary">
-                Single sign-on
-              </Link>
-              <span>·</span>
+            <div className="flex justify-center text-xs">
               <Link href="/forgot-password" className="text-primary">
                 Forgot password
               </Link>

@@ -51,7 +51,9 @@ export type IconName =
   | "faceid"
   | "card"
   | "eyeoff"
-  | "mail";
+  | "mail"
+  | "scan"
+  | "wifioff";
 
 interface IconProps {
   name: IconName;

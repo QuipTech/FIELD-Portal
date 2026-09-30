@@ -10,6 +10,7 @@ import { CognitoAuthController } from './cognitoAuth.controller';
 import { CognitoAuthService } from './cognitoAuth.service';
 import { CognitoTokenVerifierService } from './cognito/cognitoTokenVerifier.service';
 import { CognitoAuthGuard } from './guards/cognitoAuth.guard';
+import { PasswordResetService } from './passwordReset/passwordReset.service';
 
 @Module({
   imports: [PassportModule, JwtModule.register({}), UsersModule],
@@ -17,6 +18,7 @@ import { CognitoAuthGuard } from './guards/cognitoAuth.guard';
   providers: [
     AuthService,
     AuthTokenService,
+    PasswordResetService,
     JwtStrategy,
     CognitoAuthService,
     CognitoTokenVerifierService,

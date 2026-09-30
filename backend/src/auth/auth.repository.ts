@@ -16,32 +16,6 @@ export const insertTenant = async (
   return result.rows[0];
 };
 
-export const insertUser = async (
-  client: PoolClient,
-  params: {
-    tenantId: string;
-    email: string;
-    passwordHash: string;
-    firstName: string;
-    lastName: string;
-  },
-): Promise<UserRow> => {
-  const result = await client.query<UserRow>(
-    `INSERT INTO users (tenant_id, email, password_hash, first_name, last_name)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, tenant_id, email, first_name, last_name, status, avatar_url,
-               avatar_storage_key`,
-    [
-      params.tenantId,
-      params.email,
-      params.passwordHash,
-      params.firstName,
-      params.lastName,
-    ],
-  );
-  return result.rows[0];
-};
-
 export const insertAuditLog = async (
   client: PoolClient,
   params: {

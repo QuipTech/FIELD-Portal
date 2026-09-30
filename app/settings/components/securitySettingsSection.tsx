@@ -1,9 +1,9 @@
 "use client";
 
 import { Tag } from "@/components/ui/tag";
-import { LinkButton } from "@/components/ui/linkButton";
 import { SettingsRow } from "@/components/settings/settingsRow";
 import { ManageTwoFactorButton } from "@/components/settings/manageTwoFactorButton";
+import { ChangePasswordButton } from "@/components/settings/changePasswordButton";
 import { useSignedInProfile } from "@/lib/auth/useSignedInProfile";
 
 // Google/Apple users have no FIELD password, and their second factor is
@@ -21,11 +21,7 @@ export const SecuritySettingsSection = () => {
           icon="lock"
           title="Password"
           caption="Last changed 3 months ago"
-          trailing={
-            <LinkButton href="/forgot-password" size="sm">
-              Change
-            </LinkButton>
-          }
+          trailing={<ChangePasswordButton email={signedInProfile.user.email} />}
         />
         <SettingsRow
           icon="shield"

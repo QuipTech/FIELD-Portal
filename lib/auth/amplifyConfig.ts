@@ -11,8 +11,9 @@ const COGNITO_SCOPES = ["openid", "email", "profile"];
 // it with the https:// prefix — accept either in the env var.
 const stripProtocol = (domain: string) => domain.replace(/^https?:\/\//, "");
 
-// Only Google/Apple go through Cognito; email/password still uses our own
-// backend. Redirect URLs follow the current origin so dev/staging/prod need
+// Every sign-in goes through Cognito: email/password against the user pool
+// directly (lib/auth/cognitoPasswordAuth), Google/Apple via the hosted UI's
+// OAuth redirect, configured here. Redirect URLs follow the current origin so dev/staging/prod need
 // no extra env vars — each origin must still be allowed on the app client.
 // A module flag rather than Amplify.getConfig(), which logs a
 // "not configured" warning when asked before the first configure().

@@ -1,35 +1,9 @@
 import { apiRequest } from "./httpClient";
 import type { AuthSession, AuthSessionUser, CognitoSyncResponse, SignupProfile } from "../types/authSession";
 
-export interface RegisterPayload {
-  firstName: string;
-  lastName: string;
-  companyName: string;
-  email: string;
-  phoneNumber?: string;
-  password: string;
-}
-
-export interface LoginPayload {
-  email: string;
-  password: string;
-}
-
-export const registerRequest = (payload: RegisterPayload): Promise<AuthSession> =>
-  apiRequest<AuthSession>("/auth/register", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-
-export const loginRequest = (payload: LoginPayload): Promise<AuthSession> =>
-  apiRequest<AuthSession>("/auth/login", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
-
-// Exchanges a Cognito ID token (Google/Apple sign-in) for a regular FIELD
-// session. A first-time user gets `profileRequired` and must call again
-// with their signup profile (company name + phone number).
+// Exchanges a Cognito ID token (any sign-in: email/password, Google, Apple)
+// for a FIELD session. A first-time user without a signup profile gets
+// `profileRequired` and must call again with company name + phone number.
 export const syncCognitoSessionRequest = (
   cognitoIdToken: string,
   signupProfile?: SignupProfile,
@@ -38,6 +12,20 @@ export const syncCognitoSessionRequest = (
     method: "POST",
     headers: { Authorization: `Bearer ${cognitoIdToken}` },
     body: JSON.stringify(signupProfile ?? {}),
+  });
+
+export type PasswordResetEligibility =
+  | { status: "eligible" }
+  | { status: "notFound" }
+  | { status: "federatedOnly"; provider: "google" | "apple" }
+  | { status: "unverified" };
+
+// Whether a password login exists for this email, before Cognito is asked
+// to send a reset code.
+export const checkPasswordResetRequest = (email: string): Promise<PasswordResetEligibility> =>
+  apiRequest<PasswordResetEligibility>("/auth/password-reset/check", {
+    method: "POST",
+    body: JSON.stringify({ email }),
   });
 
 export interface CurrentUserResponse extends AuthSessionUser {

@@ -55,6 +55,8 @@ export const IconSprite = () => {
         <symbol id="i-faceid" viewBox="0 0 24 24"><path d="M4 8V5a1 1 0 0 1 1-1h3M20 8V5a1 1 0 0 0-1-1h-3M4 16v3a1 1 0 0 0 1 1h3M20 16v3a1 1 0 0 1-1 1h-3"></path><circle cx="9" cy="10" r=".7" fill="currentColor" stroke="none"></circle><circle cx="15" cy="10" r=".7" fill="currentColor" stroke="none"></circle><path d="M9 15c1 1 5 1 6 0"></path></symbol>
         <symbol id="i-card" viewBox="0 0 24 24"><rect x="2.5" y="5.5" width="19" height="13" rx="2.2"></rect><path d="M2.5 10h19"></path><path d="M6 14.5h5"></path></symbol>
         <symbol id="i-mail" viewBox="0 0 24 24"><rect x="2.5" y="5" width="19" height="14" rx="2"></rect><path d="M3.5 6.5l8.5 7 8.5-7"></path></symbol>
+        <symbol id="i-scan" viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path><path d="M7 12h10"></path></symbol>
+        <symbol id="i-wifioff" viewBox="0 0 24 24"><path d="M12 20h.01"></path><path d="M8.5 16.43a5 5 0 0 1 7 0"></path><path d="M5 12.86a10 10 0 0 1 5.17-2.69"></path><path d="M19 12.86a10 10 0 0 0-2-1.52"></path><path d="M2 8.82a15 15 0 0 1 4.18-2.64"></path><path d="M22 8.82a15 15 0 0 0-11.29-3.76"></path><path d="M2 2l20 20"></path></symbol>
       </defs>
     </svg>
   );

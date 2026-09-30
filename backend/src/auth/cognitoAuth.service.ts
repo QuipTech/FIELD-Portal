@@ -21,9 +21,8 @@ const toSignupProfile = (
     ? { companyName: dto.companyName, phoneNumber: dto.phoneNumber }
     : undefined;
 
-// Exchanges a verified Cognito identity for a regular FIELD session, so
-// Google/Apple users end up with exactly the same access/refresh tokens as
-// email/password users and every existing JwtAuthGuard route just works.
+// Exchanges a verified Cognito identity (email/password, Google or Apple)
+// for a regular FIELD session, so every JwtAuthGuard route just works.
 @Injectable()
 export class CognitoAuthService {
   private readonly logger = new Logger(CognitoAuthService.name);
