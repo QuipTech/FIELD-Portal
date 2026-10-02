@@ -1,4 +1,5 @@
 import {
+  PlatformUsageRow,
   QueriesPerDayRow,
   UsageByOrganisationRow,
   UsageSummaryRow,
@@ -15,15 +16,35 @@ export const calculateChangePercent = (
 ): number | null =>
   prior === 0 ? null : Math.round(((current - prior) / prior) * 100);
 
+// Costs are fractions of a cent per call (embeddings far less), so they
+// keep 6 decimal places; the portal formats them.
+const COST_DECIMALS = 6;
+
+const toOtherUsage = (rows: PlatformUsageRow[]) =>
+  rows.map((row) => ({
+    source: row.source,
+    calls: Number(row.call_count),
+    tokens: Number(row.input_tokens) + Number(row.output_tokens),
+    cost: roundTo(Number(row.total_cost), COST_DECIMALS),
+  }));
+
 export const toUsageOverview = (
   days: number,
-  summary: UsageSummaryRow,
-  perDay: QueriesPerDayRow[],
-  byOrganisation: UsageByOrganisationRow[],
+  rows: {
+    summary: UsageSummaryRow;
+    perDay: QueriesPerDayRow[];
+    byOrganisation: UsageByOrganisationRow[];
+    platformUsage: PlatformUsageRow[];
+  },
 ): AiUsageOverview => {
+  const { summary, perDay, byOrganisation, platformUsage } = rows;
   const totalQueries = Number(summary.total_queries);
   const priorPeriodQueries = Number(summary.prior_queries);
-  const totalCost = Number(summary.total_cost);
+  const assistantCost = Number(summary.total_cost);
+  const otherCost = platformUsage.reduce(
+    (sum, row) => sum + Number(row.total_cost),
+    0,
+  );
   return {
     periodDays: days,
     totalQueries,
@@ -31,8 +52,11 @@ export const toUsageOverview = (
     changePercent: calculateChangePercent(totalQueries, priorPeriodQueries),
     activeUsers: Number(summary.active_users),
     totalUsers: Number(summary.total_users),
-    totalCost: roundTo(totalCost, 2),
-    avgCostPerQuery: totalQueries ? roundTo(totalCost / totalQueries, 4) : 0,
+    totalCost: roundTo(assistantCost + otherCost, COST_DECIMALS),
+    assistantCost: roundTo(assistantCost, COST_DECIMALS),
+    avgCostPerQuery: totalQueries
+      ? roundTo(assistantCost / totalQueries, COST_DECIMALS)
+      : 0,
     averageQueriesPerDay: Math.round(totalQueries / days),
     flaggedInPeriod: Number(summary.flagged_in_period),
     unreviewedCount: Number(summary.unreviewed_count),
@@ -51,5 +75,6 @@ export const toUsageOverview = (
           : 0,
       };
     }),
+    otherUsage: toOtherUsage(platformUsage),
   };
 };

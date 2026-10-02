@@ -4,7 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { Socket } from 'socket.io';
 import { DatabaseService } from '../database/database.service';
 import { findUserPermissionCodes } from '../auth/userAccess.repository';
-import { AccessTokenPayload } from '../auth/types/jwtPayload';
+import { verifySocketToken } from '../common/security/verifySocketToken';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { findUserDisplayName } from './caseOptions.repository';
 
@@ -26,13 +26,11 @@ export class CaseSocketAuthenticator {
   ) {}
 
   authenticate = async (socket: Socket): Promise<CaseSocketUser | null> => {
-    const token: unknown = socket.handshake.auth?.token;
-    if (typeof token !== 'string' || !token) return null;
-    const payload = await this.jwtService
-      .verifyAsync<AccessTokenPayload>(token, {
-        secret: this.configService.getOrThrow<string>('JWT_SECRET'),
-      })
-      .catch(() => null);
+    const payload = await verifySocketToken(
+      socket,
+      this.jwtService,
+      this.configService.getOrThrow<string>('JWT_SECRET'),
+    );
     if (!payload) return null;
 
     const { sub: userId, tenantId, email } = payload;

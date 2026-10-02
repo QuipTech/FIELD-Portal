@@ -22,9 +22,10 @@ import { NotificationSettingsService } from './notificationSettings.service';
 import { AlertRulesService } from './alertRules.service';
 import { AlertRuleDto, SetAlertRuleEnabledDto } from './dto/alertRuleDto';
 import { UpdateChannelsDto } from './dto/updateChannelsDto';
+import { AlertEngineService } from '../alertEngine/alertEngine.service';
 
 // Settings → Notifications & alerts for the signed-in user's own
-// organisation — Owner only. Stores configuration; nothing is sent yet.
+// organisation — Owner only. src/alertEngine evaluates and sends the rules.
 @Controller('organisation/notifications')
 @UseGuards(JwtAuthGuard, RequireRolesGuard)
 @RequireRoles(OWNER_ROLE_NAME)
@@ -32,6 +33,7 @@ export class OrganisationNotificationsController {
   constructor(
     private readonly notificationSettingsService: NotificationSettingsService,
     private readonly alertRulesService: AlertRulesService,
+    private readonly alertEngine: AlertEngineService,
   ) {}
 
   // Rules and channel switches; creates the defaults on first visit.
@@ -79,6 +81,17 @@ export class OrganisationNotificationsController {
     @Body() dto: SetAlertRuleEnabledDto,
   ) {
     return this.alertRulesService.setRuleEnabled(actor, ruleId, dto.isEnabled);
+  }
+
+  // A sample alert to the caller only, on the rule's channels; resolves to
+  // what each channel did (null when the caller can't be notified).
+  @Post('rules/:ruleId/test')
+  @HttpCode(HttpStatus.OK)
+  sendTest(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('ruleId', ParseUUIDPipe) ruleId: string,
+  ) {
+    return this.alertEngine.sendTest(actor, ruleId);
   }
 
   @Delete('rules/:ruleId')

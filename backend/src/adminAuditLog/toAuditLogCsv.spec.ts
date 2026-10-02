@@ -1,4 +1,5 @@
-import { toAuditLogCsv, toCsvCell } from './toAuditLogCsv';
+import { toAuditLogCsv } from './toAuditLogCsv';
+import { toCsvCell } from '../common/utils/toCsvText';
 
 describe('toCsvCell', () => {
   it('quotes commas, quotes and newlines', () => {

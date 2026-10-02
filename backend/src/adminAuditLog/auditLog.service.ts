@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { AdminScope } from '../auth/adminScope/adminScope';
 import * as auditLogRepository from './auditLog.repository';
 import { describeAuditEvent } from './describeAuditEvent';
 import { labelEventType } from './auditEventLabels';
@@ -37,14 +38,19 @@ const toAuditLogEvent = (row: AuditLogRow): AuditLogEvent => ({
   organisationName: row.organisation_name,
 });
 
-// Every organisation's audit events, newest first.
+// Audit events newest first: the caller's organisation, or every
+// organisation for the Owner (AdminScope).
 @Injectable()
 export class AuditLogService {
   constructor(private readonly databaseService: DatabaseService) {}
 
-  listEvents = async (query: ListAuditLogQueryDto): Promise<AuditLogPage> => {
+  listEvents = async (
+    scope: AdminScope,
+    query: ListAuditLogQueryDto,
+  ): Promise<AuditLogPage> => {
     const rows = await auditLogRepository.listAuditLogs(
       this.databaseService,
+      scope,
       query,
       {
         limit: query.pageSize,
@@ -59,10 +65,10 @@ export class AuditLogService {
     };
   };
 
-  listFilters = async (): Promise<AuditLogFilters> => {
+  listFilters = async (scope: AdminScope): Promise<AuditLogFilters> => {
     const [actors, eventTypes] = await Promise.all([
-      auditLogRepository.listAuditActors(this.databaseService),
-      auditLogRepository.listAuditEventTypes(this.databaseService),
+      auditLogRepository.listAuditActors(this.databaseService, scope),
+      auditLogRepository.listAuditEventTypes(this.databaseService, scope),
     ]);
     return {
       actors: actors.map((row) => ({
@@ -83,10 +89,12 @@ export class AuditLogService {
 
   // isTruncated when more events matched than one export holds.
   exportCsv = async (
+    scope: AdminScope,
     filters: AuditLogFilterQueryDto,
   ): Promise<{ csv: string; isTruncated: boolean }> => {
     const rows = await auditLogRepository.listAuditLogs(
       this.databaseService,
+      scope,
       filters,
       {
         limit: EXPORT_ROW_LIMIT,

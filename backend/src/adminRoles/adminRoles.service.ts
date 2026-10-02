@@ -1,6 +1,8 @@
+import { PLATFORM_PERMISSION_CODE } from '../auth/systemRoleNames';
 import { ConflictException, Injectable } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { DatabaseService } from '../database/database.service';
+import { AdminScope } from '../auth/adminScope/adminScope';
 import * as authRepository from '../auth/auth.repository';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import * as adminRolesRepository from './adminRoles.repository';
@@ -29,8 +31,9 @@ interface RoleAuditEntry {
 const isUniqueViolation = (error: unknown): boolean =>
   (error as { code?: string } | null)?.code === UNIQUE_VIOLATION_CODE;
 
-// System roles are shared by every organisation, so each change is audited
-// under the acting admin's own organisation.
+// Roles & permissions: system roles (every organisation) plus each
+// organisation's own roles. The Owner manages all of them. Each
+// change is audited under the acting admin's own organisation.
 @Injectable()
 export class AdminRolesService {
   constructor(private readonly databaseService: DatabaseService) {}
@@ -39,40 +42,49 @@ export class AdminRolesService {
     const rows = await adminRolesRepository.listPermissions(
       this.databaseService,
     );
-    return rows.map((row) => ({ code: row.code, label: row.description }));
+    // platform.manage isn't a toggle: only Owner holds it (0055).
+    return rows
+      .filter((row) => row.code !== PLATFORM_PERMISSION_CODE)
+      .map((row) => ({ code: row.code, label: row.description }));
   };
 
-  listRoles = async (): Promise<AdminRole[]> => {
-    const rows = await adminRolesRepository.listRoles(this.databaseService);
-    return rows.map(toAdminRole);
+  listRoles = async (scope: AdminScope): Promise<AdminRole[]> => {
+    const rows = await adminRolesRepository.listRoles(
+      this.databaseService,
+      scope,
+    );
+    return rows.map((row) => toAdminRole(row, scope));
   };
 
-  getRole = async (roleId: string): Promise<AdminRole> => {
+  getRole = async (scope: AdminScope, roleId: string): Promise<AdminRole> => {
     const [row] = await adminRolesRepository.listRoles(
       this.databaseService,
+      scope,
       roleId,
     );
-    return toAdminRole(assertRoleFound(row));
+    return toAdminRole(assertRoleFound(row), scope);
   };
 
   createRole = async (
     actor: AuthenticatedUser,
+    scope: AdminScope,
     dto: CreateRoleDto,
   ): Promise<AdminRole> => {
     await this.assertKnownPermissions(dto.permissionCodes);
     const roleId = await this.runAudited(actor, async (client) => {
-      const id = await adminRolesRepository.createRole(client, dto);
+      const id = await adminRolesRepository.createRole(client, scope, dto);
       return { action: 'create', roleId: id, metadata: { ...dto } };
     });
-    return this.getRole(roleId);
+    return this.getRole(scope, roleId);
   };
 
   updateRole = async (
     actor: AuthenticatedUser,
+    scope: AdminScope,
     roleId: string,
     dto: UpdateRoleDto,
   ): Promise<AdminRole> => {
-    const role = await this.getRole(roleId);
+    const role = await this.getRole(scope, roleId);
     assertRoleEditable(role, {
       isRename: dto.name !== undefined && dto.name !== role.name,
       isPermissionChange: dto.permissionCodes !== undefined,
@@ -82,7 +94,7 @@ export class AdminRolesService {
     }
 
     await this.runAudited(actor, async (client) => {
-      const isUpdated = await adminRolesRepository.updateRole(client, {
+      const isUpdated = await adminRolesRepository.updateRole(client, scope, {
         roleId,
         ...dto,
       });
@@ -91,20 +103,28 @@ export class AdminRolesService {
       const before = { name: role.name, permissionCodes: role.permissionCodes };
       return { action: 'update', roleId, metadata: { before, after: dto } };
     });
-    return this.getRole(roleId);
+    return this.getRole(scope, roleId);
   };
 
   deleteRole = async (
     actor: AuthenticatedUser,
+    scope: AdminScope,
     roleId: string,
   ): Promise<void> => {
-    const role = await this.getRole(roleId);
+    const role = await this.getRole(scope, roleId);
     assertRoleDeletable(role);
     await this.runAudited(actor, async (client) => {
-      const outcome = await adminRolesRepository.deleteRole(client, roleId);
+      const outcome = await adminRolesRepository.deleteRole(
+        client,
+        scope,
+        roleId,
+      );
       if (outcome === 'in_use')
         throw new ConflictException(ROLE_IN_USE_MESSAGE);
       if (outcome === 'not_found') assertRoleFound(undefined);
+      // The service checks first; this covers a role marked default since.
+      if (outcome === 'default_role')
+        assertRoleDeletable({ ...role, isBuiltIn: true });
       return { action: 'delete', roleId, metadata: { name: role.name } };
     });
   };

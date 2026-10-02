@@ -17,7 +17,8 @@ import {
 
 interface SubscriptionsTableProps {
   items: TenantSubscription[];
-  onEdit: (item: TenantSubscription) => void;
+  // Omitted for an Owner, who can only read their own subscription.
+  onEdit?: (item: TenantSubscription) => void;
 }
 
 const notifyButtonClasses = `${buttonBaseClasses} ${buttonVariantClasses.default} ${buttonSizeClasses.sm}`;
@@ -42,7 +43,11 @@ export const SubscriptionsTable = ({ items, onEdit }: SubscriptionsTableProps) =
         const statusOption = getStatusOption(item.status);
         const canNotify = item.status === "expiring_soon" || item.status === "expired";
         return (
-          <TableRow key={item.tenantId} onClick={() => onEdit(item)} className="cursor-pointer hover:bg-fillGray">
+          <TableRow
+            key={item.tenantId}
+            onClick={onEdit ? () => onEdit(item) : undefined}
+            className={onEdit ? "cursor-pointer hover:bg-fillGray" : ""}
+          >
             <TableCell flex={1.8} className="flex items-center gap-2.5">
               <Avatar initials={getInitials(item.tenantName)} size="sm" />
               <span className="truncate font-medium">{item.tenantName}</span>
@@ -72,7 +77,7 @@ export const SubscriptionsTable = ({ items, onEdit }: SubscriptionsTableProps) =
             {/* Clicks here mustn't also open the editor. */}
             <TableCell flex={0.8} className="overflow-visible">
               <span onClick={(event) => event.stopPropagation()}>
-                {canNotify && (
+                {canNotify && onEdit && (
                   <ComingSoonButton label="Notify" className={notifyButtonClasses}>
                     <Icon name="msg" className="h-3.5 w-3.5" />
                     Notify

@@ -5,9 +5,12 @@ import type {
   MachineFleetFilters,
   MachineFleetList,
   NewMachine,
+  OperatingStatus,
 } from "../types/machineFleet";
 
 const authorizationHeader = (accessToken: string) => ({ Authorization: `Bearer ${accessToken}` });
+
+export const EMPTY_MACHINE_FILTERS: MachineFleetFilters = { site: "", make: "", status: "", machineClass: "" };
 
 const toQueryString = (filters: MachineFleetFilters, search: string): string => {
   const params = new URLSearchParams();
@@ -31,4 +34,12 @@ export const registerMachineRequest = (accessToken: string, machine: NewMachine)
     method: "POST",
     headers: authorizationHeader(accessToken),
     body: JSON.stringify(machine),
+  });
+
+// Needs machine.manage. Each change feeds the dashboard's fleet uptime.
+export const updateMachineStatusRequest = (accessToken: string, machineId: string, status: OperatingStatus) =>
+  apiRequest<FleetMachine>(`/machines/${machineId}/status`, {
+    method: "PATCH",
+    headers: authorizationHeader(accessToken),
+    body: JSON.stringify({ status }),
   });

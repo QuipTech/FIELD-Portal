@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
+import { AdminScope } from '../../auth/adminScope/adminScope';
 import { AiPlatformConfig, toModelLabel } from '../aiPlatformConfig';
 import * as aiUsageRepository from './aiUsage.repository';
 import { toUsageOverview } from './aiUsageRules';
@@ -7,7 +8,8 @@ import { AiPlatformInfo, AiUsageOverview } from '../types/adminAiResponse';
 
 const TOP_ORGANISATIONS_LIMIT = 5;
 
-// Figures span every organisation on the platform.
+// Figures for the caller's organisation, or every organisation for the
+// Owner (AdminScope).
 @Injectable()
 export class AiUsageService {
   constructor(
@@ -15,16 +17,25 @@ export class AiUsageService {
     private readonly aiPlatformConfig: AiPlatformConfig,
   ) {}
 
-  getUsageOverview = async (days: number): Promise<AiUsageOverview> => {
-    const [summary, perDay, byOrganisation] = await Promise.all([
-      aiUsageRepository.getUsageSummary(this.databaseService, days),
-      aiUsageRepository.listQueriesPerDay(this.databaseService, days),
-      aiUsageRepository.listUsageByOrganisation(this.databaseService, {
+  getUsageOverview = async (
+    scope: AdminScope,
+    days: number,
+  ): Promise<AiUsageOverview> => {
+    const [summary, perDay, byOrganisation, platformUsage] = await Promise.all([
+      aiUsageRepository.getUsageSummary(this.databaseService, scope, days),
+      aiUsageRepository.listQueriesPerDay(this.databaseService, scope, days),
+      aiUsageRepository.listUsageByOrganisation(this.databaseService, scope, {
         days,
         limit: TOP_ORGANISATIONS_LIMIT,
       }),
+      aiUsageRepository.listPlatformUsage(this.databaseService, scope, days),
     ]);
-    return toUsageOverview(days, summary, perDay, byOrganisation);
+    return toUsageOverview(days, {
+      summary,
+      perDay,
+      byOrganisation,
+      platformUsage,
+    });
   };
 
   getPlatformInfo = (): AiPlatformInfo => {

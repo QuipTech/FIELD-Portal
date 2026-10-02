@@ -7,10 +7,11 @@ import { ConfigService } from '@nestjs/config';
 // model_name LIKE 'au.%' / ap-southeast-2 checks in migration 0019. Set
 // the env vars to a global./apac. profile if au. isn't enabled on the
 // AWS account.
-const DEFAULT_ANSWER_MODEL_ID = 'au.anthropic.claude-sonnet-4-5-20250929-v1:0';
-const DEFAULT_BACKGROUND_MODEL_ID =
+export const DEFAULT_ANSWER_MODEL_ID =
+  'au.anthropic.claude-sonnet-4-5-20250929-v1:0';
+export const DEFAULT_BACKGROUND_MODEL_ID =
   'au.anthropic.claude-haiku-4-5-20251001-v1:0';
-const DEFAULT_REGION = 'ap-southeast-2';
+export const DEFAULT_REGION = 'ap-southeast-2';
 
 const MODEL_LABELS: [pattern: string, label: string][] = [
   ['claude-sonnet-4-5', 'Claude Sonnet 4.5'],

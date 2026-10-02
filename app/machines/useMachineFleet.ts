@@ -2,12 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useApiResource } from "@/lib/hooks/useApiResource";
-import { listMachinesRequest } from "@/lib/api/machineFleetApi";
+import { EMPTY_MACHINE_FILTERS, listMachinesRequest } from "@/lib/api/machineFleetApi";
 import type { MachineFleetFilters } from "@/lib/types/machineFleet";
 
 const SEARCH_DEBOUNCE_MS = 300;
-
-export const EMPTY_MACHINE_FILTERS: MachineFleetFilters = { site: "", make: "", status: "", machineClass: "" };
 
 // The Machines list for the filter panel's choices and the top bar search.
 // Bumping `reloadToken` (e.g. after adding a machine) loads it again.

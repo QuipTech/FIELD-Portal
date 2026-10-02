@@ -5,10 +5,11 @@ import type {
   DeliveryChannels,
   NotificationOptions,
   NotificationSettings,
+  SendTestResult,
 } from "../types/notificationSettings";
 
-// The signed-in admin's own organisation. Owner role only. Configuration
-// only: nothing is sent yet.
+// The signed-in admin's own organisation. Owner role only. The server's
+// rule engine evaluates and sends the saved rules.
 const authorizationHeader = (accessToken: string) => ({ Authorization: `Bearer ${accessToken}` });
 
 const sendJson = <T>(accessToken: string, path: string, method: string, body?: unknown) =>
@@ -38,3 +39,7 @@ export const setAlertRuleEnabledRequest = (accessToken: string, ruleId: string, 
 
 export const deleteAlertRuleRequest = (accessToken: string, ruleId: string) =>
   sendJson<void>(accessToken, `/organisation/notifications/rules/${ruleId}`, "DELETE");
+
+// A sample alert to the caller only, on the rule's channels.
+export const sendTestAlertRequest = (accessToken: string, ruleId: string) =>
+  sendJson<SendTestResult | null>(accessToken, `/organisation/notifications/rules/${ruleId}/test`, "POST");

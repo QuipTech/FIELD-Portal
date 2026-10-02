@@ -11,21 +11,22 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwtAuthGuard';
-import { RequireRolesGuard } from '../auth/guards/requireRoles.guard';
-import { RequireRoles } from '../auth/decorators/requireRoles.decorator';
+import { RequirePermissionsGuard } from '../auth/guards/requirePermissions.guard';
+import { RequirePermissions } from '../auth/decorators/requirePermissions.decorator';
 import { CurrentUser } from '../auth/decorators/currentUser.decorator';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
-import { OWNER_ROLE_NAME } from '../auth/systemRoleNames';
+import { PLATFORM_PERMISSION_CODE } from '../auth/systemRoleNames';
 import { AiPromptsService } from './prompts/aiPrompts.service';
 import { AiPromptTestService } from './prompts/aiPromptTest.service';
 import { CreatePromptVersionDto } from './dto/createPromptVersionDto';
 import { TestPromptDto } from './dto/testPromptDto';
 import { PromptDiffQueryDto } from './dto/promptDiffQueryDto';
 
-// The platform-wide assistant prompt and its version history. Owner only.
+// The platform-wide assistant prompt and its version history. Owner
+// only (platform.manage).
 @Controller('admin/ai/prompts')
-@UseGuards(JwtAuthGuard, RequireRolesGuard)
-@RequireRoles(OWNER_ROLE_NAME)
+@UseGuards(JwtAuthGuard, RequirePermissionsGuard)
+@RequirePermissions(PLATFORM_PERMISSION_CODE)
 export class AdminAiPromptsController {
   constructor(
     private readonly aiPromptsService: AiPromptsService,

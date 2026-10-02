@@ -2,6 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import { Modal } from "@/components/ui/modal";
+import { usePermissions } from "@/lib/auth/usePermissions";
+import { PERMISSIONS } from "@/lib/auth/permissionCodes";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
@@ -15,6 +17,7 @@ const CREATE_FAILED_MESSAGE = "Couldn't create the role. Please try again.";
 
 // Creates the role with no permissions; they're set in the panel after.
 export const NewRoleModal = ({ onCreate, onClose }: NewRoleModalProps) => {
+  const { can } = usePermissions();
   const [name, setName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -49,7 +52,10 @@ export const NewRoleModal = ({ onCreate, onClose }: NewRoleModalProps) => {
           />
         </div>
         <span className="text-xs text-mutedGray">
-          The role starts with no permissions. Choose them after it&apos;s created.
+          {can(PERMISSIONS.managePlatform)
+            ? "This becomes a system role every organisation can use."
+            : "This role belongs to your organisation only."}{" "}
+          It starts with no permissions. Choose them after it&apos;s created.
         </span>
         {createError && <span className="text-xs text-danger">{createError}</span>}
         <div className="flex">

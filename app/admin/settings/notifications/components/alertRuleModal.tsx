@@ -27,6 +27,9 @@ const defaultsFor = (options: NotificationOptions, triggerType: string): Trigger
     ]),
   );
 
+const DEFAULT_COOLDOWN_MINUTES = 240;
+const MAX_COOLDOWN_HOURS = 168;
+
 const toggle = <T,>(values: T[], value: T, isOn: boolean) =>
   isOn ? [...values, value] : values.filter((item) => item !== value);
 
@@ -41,6 +44,7 @@ export const AlertRuleModal = ({ options, rule, onSave, onClose }: AlertRuleModa
         audiences: ["admins"],
         channels: ["email"],
         isEnabled: true,
+        cooldownMinutes: DEFAULT_COOLDOWN_MINUTES,
       },
   );
   const [isSaving, setIsSaving] = useState(false);
@@ -60,8 +64,11 @@ export const AlertRuleModal = ({ options, rule, onSave, onClose }: AlertRuleModa
     setIsSaving(true);
     setSaveError(null);
     try {
-      const { name, triggerType: type, triggerParams, audiences, channels, isEnabled } = form;
-      await onSave({ name: name.trim(), triggerType: type, triggerParams, audiences, channels, isEnabled }, rule?.id);
+      const { name, triggerType: type, triggerParams, audiences, channels, isEnabled, cooldownMinutes } = form;
+      await onSave(
+        { name: name.trim(), triggerType: type, triggerParams, audiences, channels, isEnabled, cooldownMinutes },
+        rule?.id,
+      );
       onClose();
     } catch (error) {
       setSaveError(toApiErrorMessage(error, "Couldn't save the rule. Please try again."));
@@ -137,6 +144,20 @@ export const AlertRuleModal = ({ options, rule, onSave, onClose }: AlertRuleModa
           </div>
           <span className="text-xs text-mutedGray">SMS is only for P1 case rules.</span>
         </div>
+        <label className="flex flex-col gap-1.5">
+          <span className={labelClasses}>Don&apos;t repeat for (hours)</span>
+          <Input
+            type="number"
+            min={0}
+            max={MAX_COOLDOWN_HOURS}
+            step={0.5}
+            value={form.cooldownMinutes / 60}
+            onChange={(event) => update({ cooldownMinutes: Math.round(Number(event.target.value) * 60) })}
+          />
+          <span className="text-xs text-mutedGray">
+            The same person isn&apos;t alerted again about the same machine or case within this time.
+          </span>
+        </label>
         {saveError && <span className="text-xs text-danger">{saveError}</span>}
         <div className="flex">
           <Button type="button" variant="ghost" onClick={onClose} disabled={isSaving}>

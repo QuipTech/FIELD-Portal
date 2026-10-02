@@ -32,9 +32,11 @@ export const listFleetFacets = async (client: PoolClient, tenantId: string) => {
   };
 };
 
-// Every live model in the shared Machine library, grouped later by make.
+// The models an organisation can register machines against: the shared
+// Machine library plus its own private models. Grouped later by make.
 export const listCatalogModels = async (
   client: PoolClient,
+  tenantId: string,
 ): Promise<CatalogModelRow[]> => {
   const result = await client.query<CatalogModelRow>(
     `SELECT mf.id AS manufacturer_id, mf.name AS manufacturer_name,
@@ -42,18 +44,23 @@ export const listCatalogModels = async (
      FROM machine_models mm
      JOIN machine_manufacturers mf ON mf.id = mm.manufacturer_id
      WHERE mm.deleted_at IS NULL AND mf.deleted_at IS NULL
+       AND (mm.tenant_id IS NULL OR mm.tenant_id = $1)
      ORDER BY mf.name, mm.name`,
+    [tenantId],
   );
   return result.rows;
 };
 
+// null when the model doesn't exist or is another organisation's.
 export const findModelManufacturerId = async (
   client: PoolClient,
-  modelId: string,
+  params: { modelId: string; tenantId: string },
 ): Promise<string | null> => {
   const result = await client.query<{ manufacturer_id: string }>(
-    `SELECT manufacturer_id FROM machine_models WHERE id = $1 AND deleted_at IS NULL`,
-    [modelId],
+    `SELECT manufacturer_id FROM machine_models
+     WHERE id = $1 AND deleted_at IS NULL
+       AND (tenant_id IS NULL OR tenant_id = $2)`,
+    [params.modelId, params.tenantId],
   );
   return result.rows[0]?.manufacturer_id ?? null;
 };

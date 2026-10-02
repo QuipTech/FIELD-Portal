@@ -70,14 +70,19 @@ export const insertChunks = async (
   );
 };
 
+// The models a document can be about: the shared catalog, plus its own
+// organisation's private models (none for a shared-library document).
 export const listMachineModels = async (
   databaseService: DatabaseService,
+  documentTenantId: string | null,
 ): Promise<MachineModelRef[]> => {
   const result = await databaseService.query<MachineModelRef>(
     `SELECT mm.id, mm.name, mf.name AS manufacturer
      FROM machine_models mm
      JOIN machine_manufacturers mf ON mf.id = mm.manufacturer_id AND mf.deleted_at IS NULL
-     WHERE mm.deleted_at IS NULL`,
+     WHERE mm.deleted_at IS NULL
+       AND (mm.tenant_id IS NULL OR mm.tenant_id = $1)`,
+    [documentTenantId],
   );
   return result.rows;
 };

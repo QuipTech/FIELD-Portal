@@ -5,6 +5,7 @@ import { requireAccessToken } from "@/lib/api/requireAccessToken";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import {
   createAdminRoleRequest,
+  deleteAdminRoleRequest,
   listAdminPermissionsRequest,
   listAdminRolesRequest,
   updateAdminRoleRequest,
@@ -59,6 +60,15 @@ export const useAdminRoles = () => {
     setSelectedRoleId(created.id);
   };
 
+  // Rejects with the API's error (e.g. still assigned to users) so the
+  // confirmation dialog can show it.
+  const deleteRole = async (roleId: string) => {
+    await deleteAdminRoleRequest(requireAccessToken(), roleId);
+    const remaining = roles.filter((role) => role.id !== roleId);
+    setRoles(remaining);
+    setSelectedRoleId(remaining[0]?.id ?? null);
+  };
+
   return {
     roles,
     permissions,
@@ -68,5 +78,6 @@ export const useAdminRoles = () => {
     loadError,
     saveRolePermissions,
     createRole,
+    deleteRole,
   };
 };

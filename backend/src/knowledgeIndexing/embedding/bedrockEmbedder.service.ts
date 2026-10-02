@@ -4,18 +4,18 @@ import {
   InvokeModelCommand,
 } from '@aws-sdk/client-bedrock-runtime';
 import { IndexingConfig } from '../indexingConfig';
+import { retryBedrockCall } from '../../bedrock/retryBedrockCall';
+import { AiPlatformUsageService } from '../../aiPlatformUsage/aiPlatformUsage.service';
 
 const EMBEDDING_DIMENSIONS = 1024;
 // Titan v2 accepts up to 8k tokens (~50k characters) per request.
 const MAX_INPUT_CHARS = 30000;
-const MAX_ATTEMPTS = 5;
-const RETRYABLE_ERRORS = [
-  'ThrottlingException',
-  'ServiceUnavailableException',
-  'ModelNotReadyException',
-];
 
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+export interface TextEmbedding {
+  embedding: number[];
+  modelId: string;
+  inputTokens: number;
+}
 
 // Text → 1024-dimension vector with Amazon Bedrock (Titan Text Embeddings
 // v2 by default). Normalised, so cosine distance works in pgvector.
@@ -23,15 +23,19 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 export class BedrockEmbedderService {
   private readonly client: BedrockRuntimeClient;
 
-  constructor(private readonly indexingConfig: IndexingConfig) {
+  constructor(
+    private readonly indexingConfig: IndexingConfig,
+    private readonly aiPlatformUsage: AiPlatformUsageService,
+  ) {
     this.client = new BedrockRuntimeClient({
       region: indexingConfig.bedrockRegion,
     });
   }
 
-  embed = async (text: string): Promise<number[]> => {
+  embed = async (text: string): Promise<TextEmbedding> => {
+    const modelId = this.indexingConfig.embeddingModelId;
     const command = new InvokeModelCommand({
-      modelId: this.indexingConfig.embeddingModelId,
+      modelId,
       contentType: 'application/json',
       accept: 'application/json',
       body: JSON.stringify({
@@ -40,21 +44,33 @@ export class BedrockEmbedderService {
         normalize: true,
       }),
     });
-    for (let attempt = 1; ; attempt += 1) {
-      try {
-        const response = await this.client.send(command);
-        return (
-          JSON.parse(new TextDecoder().decode(response.body)) as {
-            embedding: number[];
-          }
-        ).embedding;
-      } catch (error) {
-        const name = (error as { name?: string }).name ?? '';
-        if (attempt >= MAX_ATTEMPTS || !RETRYABLE_ERRORS.includes(name))
-          throw error;
-        await wait(500 * 2 ** attempt);
-      }
-    }
+    const response = await retryBedrockCall(() => this.client.send(command));
+    const body = JSON.parse(new TextDecoder().decode(response.body)) as {
+      embedding: number[];
+      inputTextTokenCount?: number;
+    };
+    return {
+      embedding: body.embedding,
+      modelId,
+      inputTokens: body.inputTextTokenCount ?? 0,
+    };
+  };
+
+  // A search box or assistant question, recorded as that organisation's
+  // search usage. Callers handle failures (they differ per screen).
+  embedSearchQuery = async (
+    query: string,
+    tenantId: string,
+  ): Promise<number[]> => {
+    const { embedding, modelId, inputTokens } = await this.embed(query);
+    void this.aiPlatformUsage.recordUsage({
+      tenantId,
+      source: 'search',
+      modelId,
+      inputTokens,
+      outputTokens: 0,
+    });
+    return embedding;
   };
 }
 

@@ -2,10 +2,13 @@
 
 import { LoadingSpinner } from "@/components/ui/loadingSpinner";
 import { useApiResource } from "@/lib/hooks/useApiResource";
+import { usePermissions } from "@/lib/auth/usePermissions";
+import { PERMISSIONS } from "@/lib/auth/permissionCodes";
 import { getAiPlatformRequest, getAiUsageRequest } from "@/lib/api/aiConfigurationApi";
 import { UsageStatCards } from "./usageStatCards";
 import { QueriesPerDayCard } from "./queriesPerDayCard";
 import { UsageByOrganisationCard } from "./usageByOrganisationCard";
+import { OtherAiUsageCard } from "./otherAiUsageCard";
 import { PlatformAiCard } from "./platformAiCard";
 import { PromptCard } from "./promptCard";
 import { ReviewQueueSection } from "./reviewQueueSection";
@@ -19,6 +22,8 @@ export const AiConfigurationDashboard = () => {
     "Couldn't load AI usage. Please try again.",
   );
   const platform = useApiResource(getAiPlatformRequest, [], "Couldn't load the platform AI setup.");
+  // The assistant prompt is platform-wide, so only the Owner edits it.
+  const { can } = usePermissions();
 
   return (
     <>
@@ -35,12 +40,13 @@ export const AiConfigurationDashboard = () => {
       {usage.data && (
         <>
           <UsageStatCards usage={usage.data} />
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <QueriesPerDayCard
               queriesPerDay={usage.data.queriesPerDay}
               averageQueriesPerDay={usage.data.averageQueriesPerDay}
             />
             <UsageByOrganisationCard rows={usage.data.usageByOrganisation} />
+            <OtherAiUsageCard rows={usage.data.otherUsage} />
           </div>
         </>
       )}
@@ -50,7 +56,7 @@ export const AiConfigurationDashboard = () => {
         ) : (
           <span className="text-sm text-mutedGray">{platform.error ?? "Loading platform AI…"}</span>
         )}
-        <PromptCard />
+        {can(PERMISSIONS.managePlatform) && <PromptCard />}
       </div>
       <ReviewQueueSection />
     </>

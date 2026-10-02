@@ -11,7 +11,12 @@ export interface NewAlertRule {
   audiences: AlertAudience[];
   channels: AlertChannel[];
   isEnabled: boolean;
+  // How long before the rule may alert the same person about the same
+  // machine or case again. DEFAULT_COOLDOWN_MINUTES when left out.
+  cooldownMinutes?: number;
 }
+
+export const DEFAULT_COOLDOWN_MINUTES = 240;
 
 // What every organisation starts with, the first time its notification
 // settings are opened. Deleting them later doesn't bring them back.

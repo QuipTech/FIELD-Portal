@@ -1,4 +1,5 @@
-import { NotFoundException } from '@nestjs/common';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { AdminScope } from '../auth/adminScope/adminScope';
 import { MachineModelRow, ModelTreeRow } from './types/machineLibraryRows';
 import {
   MachineModelSummary,
@@ -11,14 +12,41 @@ export const MODEL_NOT_FOUND_MESSAGE = 'Machine model not found.';
 export const SYSTEM_NOT_FOUND_MESSAGE = 'System not found.';
 export const COMPONENT_NOT_FOUND_MESSAGE = 'Component not found.';
 
+const SHARED_MODEL_MESSAGE =
+  'This model is in the shared QuipTech catalog. Only QuipTech admins can change it.';
+
+// Owner (platform): any model. Organisation admin: only their own models,
+// never the shared catalog (tenantId null).
+export const canEditModel = (
+  scope: AdminScope,
+  modelTenantId: string | null,
+): boolean =>
+  scope.isPlatform ||
+  (modelTenantId !== null && modelTenantId === scope.tenantId);
+
+export const assertCanEditModel = (
+  scope: AdminScope,
+  modelTenantId: string | null,
+): void => {
+  if (!canEditModel(scope, modelTenantId)) {
+    throw new ForbiddenException(SHARED_MODEL_MESSAGE);
+  }
+};
+
 export const toMachineModelSummary = (
   row: MachineModelRow,
+  scope: AdminScope,
 ): MachineModelSummary => ({
   id: row.id,
   manufacturerName: row.manufacturer_name,
   name: row.name,
   displayName: `${row.manufacturer_name} ${row.name}`,
   category: row.product_family,
+  organisation:
+    row.tenant_id && row.organisation_name
+      ? { id: row.tenant_id, name: row.organisation_name }
+      : null,
+  isEditable: canEditModel(scope, row.tenant_id),
   systemsCount: Number(row.systems_count),
   assetsCount: Number(row.assets_count),
 });

@@ -1,9 +1,11 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { AdminScope } from '../auth/adminScope/adminScope';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import * as machineModelsRepository from './machineModels.repository';
 import { runAuditedChange } from '../common/audit/runAuditedChange';
 import {
+  assertCanEditModel,
   assertFound,
   MODEL_NOT_FOUND_MESSAGE,
   toMachineModelSummary,
@@ -23,25 +25,48 @@ export class MachineModelsService {
   constructor(private readonly databaseService: DatabaseService) {}
 
   listModels = async (
+    scope: AdminScope,
     query: ListMachineModelsQueryDto,
   ): Promise<MachineModelSummary[]> => {
     const rows = await machineModelsRepository.listModels(
       this.databaseService,
+      scope,
       { search: query.search },
     );
-    return rows.map(toMachineModelSummary);
+    return rows.map((row) => toMachineModelSummary(row, scope));
   };
 
-  getModel = async (modelId: string): Promise<MachineModelSummary> => {
+  // 404 for a model outside the caller's scope (another organisation's).
+  getModel = async (
+    scope: AdminScope,
+    modelId: string,
+  ): Promise<MachineModelSummary> => {
     const [row] = await machineModelsRepository.listModels(
       this.databaseService,
+      scope,
       { modelId },
     );
-    return toMachineModelSummary(assertFound(row, MODEL_NOT_FOUND_MESSAGE));
+    return toMachineModelSummary(
+      assertFound(row, MODEL_NOT_FOUND_MESSAGE),
+      scope,
+    );
   };
 
+  // Visible and changeable by the caller, else 404 / 403.
+  getEditableModel = async (
+    scope: AdminScope,
+    modelId: string,
+  ): Promise<MachineModelSummary> => {
+    const model = await this.getModel(scope, modelId);
+    assertCanEditModel(scope, model.organisation?.id ?? null);
+    return model;
+  };
+
+  // The Owner's new model joins the shared catalog; an organisation
+  // admin's would be their organisation's own.
   createModel = async (
     actor: AuthenticatedUser,
+    scope: AdminScope,
     dto: CreateMachineModelDto,
   ): Promise<MachineModelSummary> => {
     const modelId = await runAuditedChange(
@@ -55,6 +80,7 @@ export class MachineModelsService {
             dto.manufacturerName,
           );
         const id = await machineModelsRepository.createModel(client, {
+          tenantId: scope.tenantId,
           manufacturerId,
           name: dto.name,
           category: dto.category,
@@ -69,15 +95,16 @@ export class MachineModelsService {
         };
       },
     );
-    return this.getModel(modelId);
+    return this.getModel(scope, modelId);
   };
 
   updateModel = async (
     actor: AuthenticatedUser,
+    scope: AdminScope,
     modelId: string,
     dto: UpdateMachineModelDto,
   ): Promise<MachineModelSummary> => {
-    const before = await this.getModel(modelId);
+    const before = await this.getEditableModel(scope, modelId);
     await runAuditedChange(
       this.databaseService,
       actor,
@@ -108,14 +135,15 @@ export class MachineModelsService {
         };
       },
     );
-    return this.getModel(modelId);
+    return this.getModel(scope, modelId);
   };
 
   deleteModel = async (
     actor: AuthenticatedUser,
+    scope: AdminScope,
     modelId: string,
   ): Promise<void> => {
-    const model = await this.getModel(modelId);
+    const model = await this.getEditableModel(scope, modelId);
     if (model.assetsCount > 0)
       throw new ConflictException(MODEL_IN_USE_MESSAGE);
     await runAuditedChange(

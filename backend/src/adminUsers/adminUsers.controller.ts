@@ -1,20 +1,67 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwtAuthGuard';
-import { RequireRolesGuard } from '../auth/guards/requireRoles.guard';
-import { RequireRoles } from '../auth/decorators/requireRoles.decorator';
-import { OWNER_ROLE_NAME } from '../auth/systemRoleNames';
+import { AdminScopeGuard } from '../auth/adminScope/adminScope.guard';
+import { CurrentAdminScope } from '../auth/adminScope/currentAdminScope.decorator';
+import { AdminScope } from '../auth/adminScope/adminScope';
+import { CurrentUser } from '../auth/decorators/currentUser.decorator';
+import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { AdminUsersService } from './adminUsers.service';
+import { AdminUserInvitationsService } from './adminUserInvitations.service';
+import { InviteUserDto } from './dto/inviteUserDto';
+import { AdminUserRolesService } from './adminUserRoles.service';
+import { ChangeUserRoleDto } from './dto/changeUserRoleDto';
 import { ListAdminUsersQueryDto } from './dto/listAdminUsersQueryDto';
 
-// Platform-wide: lists users from every organisation, so Owner only.
+// Users for the caller's AdminScope: every organisation's for the Owner
+// (AdminScopeGuard).
 @Controller('admin/users')
-@UseGuards(JwtAuthGuard, RequireRolesGuard)
-@RequireRoles(OWNER_ROLE_NAME)
+@UseGuards(JwtAuthGuard, AdminScopeGuard)
 export class AdminUsersController {
-  constructor(private readonly adminUsersService: AdminUsersService) {}
+  constructor(
+    private readonly adminUsersService: AdminUsersService,
+    private readonly invitations: AdminUserInvitationsService,
+    private readonly userRoles: AdminUserRolesService,
+  ) {}
 
   @Get()
-  list(@Query() query: ListAdminUsersQueryDto) {
-    return this.adminUsersService.listUsers(query);
+  list(
+    @CurrentAdminScope() scope: AdminScope,
+    @Query() query: ListAdminUsersQueryDto,
+  ) {
+    return this.adminUsersService.listUsers(scope, query);
+  }
+
+  // Creates the sign-in (Cognito emails a temporary password) and the
+  // 'invited' FIELD account with its role.
+  @Post('invitations')
+  invite(
+    @CurrentUser() actor: AuthenticatedUser,
+    @CurrentAdminScope() scope: AdminScope,
+    @Body() dto: InviteUserDto,
+  ) {
+    return this.invitations.inviteUser(actor, scope, dto);
+  }
+
+  // Replaces the user's role. Not your own, and never the last Owner.
+  @Patch(':userId/role')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  changeRole(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Body() dto: ChangeUserRoleDto,
+  ) {
+    return this.userRoles.changeRole(actor, userId, dto);
   }
 }

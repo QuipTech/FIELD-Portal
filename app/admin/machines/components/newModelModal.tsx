@@ -2,6 +2,8 @@
 
 import { useState, type FormEvent } from "react";
 import { Modal } from "@/components/ui/modal";
+import { usePermissions } from "@/lib/auth/usePermissions";
+import { PERMISSIONS } from "@/lib/auth/permissionCodes";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
@@ -16,6 +18,7 @@ const CREATE_FAILED_MESSAGE = "Couldn't create the model. Please try again.";
 const fieldLabelClasses = "text-xs font-medium uppercase tracking-wide text-mutedGray";
 
 export const NewModelModal = ({ onCreate, onClose }: NewModelModalProps) => {
+  const { can } = usePermissions();
   const [manufacturerName, setManufacturerName] = useState("");
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
@@ -68,6 +71,11 @@ export const NewModelModal = ({ onCreate, onClose }: NewModelModalProps) => {
             maxLength={120}
           />
         </label>
+        <span className="text-xs text-mutedGray">
+          {can(PERMISSIONS.managePlatform)
+            ? "Added to the shared catalog every organisation can use."
+            : "Private to your organisation. The shared QuipTech catalog stays available too."}
+        </span>
         {createError && <span className="text-xs text-danger">{createError}</span>}
         <div className="flex">
           <Button type="button" variant="ghost" onClick={onClose} disabled={isCreating}>

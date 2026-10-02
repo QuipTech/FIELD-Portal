@@ -8,6 +8,7 @@ import {
   getNotificationOptionsRequest,
   getNotificationSettingsRequest,
   replaceAlertRuleRequest,
+  sendTestAlertRequest,
   setAlertRuleEnabledRequest,
   updateChannelsRequest,
 } from "@/lib/api/notificationSettingsApi";
@@ -54,6 +55,7 @@ export const useNotificationSettings = () => {
         current ? { ...current, rules: current.rules.filter((rule) => rule.id !== ruleId) } : current,
       );
     },
+    sendTest: (ruleId: string) => sendTestAlertRequest(requireAccessToken(), ruleId),
     // Rules are re-read too, since their "channel switched off" markers change.
     setChannel: async (channel: AlertChannel, isOn: boolean) => {
       settings.setData(await updateChannelsRequest(requireAccessToken(), { [channel]: isOn }));

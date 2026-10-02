@@ -2,6 +2,7 @@ import { PoolClient } from 'pg';
 import { escapeLikePattern } from '../common/utils/escapeLikePattern';
 import { ListMachinesQueryDto } from './dto/listMachinesQueryDto';
 import { FeaturedDownRow, FleetMachineRow } from './types/machineFleetRows';
+import { OperatingStatus } from './types/machineFleetResponse';
 
 const PAGE_LIMIT = 200;
 
@@ -9,12 +10,12 @@ const PAGE_LIMIT = 200;
 // bypass RLS.
 export const MACHINE_LABEL_SQL = `COALESCE(NULLIF(m.asset_number, ''), NULLIF(m.fleet_number, ''), m.serial_number)`;
 
-const FLEET_COLUMNS = `
+export const FLEET_COLUMNS = `
   m.id, ${MACHINE_LABEL_SQL} AS label, m.serial_number,
   mf.name AS manufacturer_name, mm.name AS model_name, mm.product_family,
   m.site, m.operating_hours, m.status`;
 
-const FLEET_FROM = `
+export const FLEET_FROM = `
   FROM machines m
   JOIN machine_manufacturers mf ON mf.id = m.manufacturer_id
   JOIN machine_models mm ON mm.id = m.model_id`;
@@ -110,4 +111,20 @@ export const findFeaturedDownMachine = async (
     [tenantId],
   );
   return result.rows[0] ?? null;
+};
+
+// The previous status, or null when there's no such machine.
+export const updateMachineStatus = async (
+  client: PoolClient,
+  params: { tenantId: string; machineId: string; status: OperatingStatus },
+): Promise<OperatingStatus | null> => {
+  const result = await client.query<{ previous_status: OperatingStatus }>(
+    `UPDATE machines m SET status = $3
+     FROM machines previous
+     WHERE m.id = $1 AND m.tenant_id = $2 AND m.deleted_at IS NULL
+       AND previous.id = m.id
+     RETURNING previous.status AS previous_status`,
+    [params.machineId, params.tenantId, params.status],
+  );
+  return result.rows[0]?.previous_status ?? null;
 };

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { AdminScope } from '../auth/adminScope/adminScope';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import * as modelTreeRepository from './modelTree.repository';
 import * as modelTreeChanges from './modelTreeChanges.repository';
@@ -26,10 +27,11 @@ export class ModelTreeImportService {
 
   importTree = async (
     actor: AuthenticatedUser,
+    scope: AdminScope,
     modelId: string,
     dto: ImportModelTreeDto,
   ): Promise<ModelSystemTree> => {
-    await this.machineModelsService.getModel(modelId);
+    await this.machineModelsService.getEditableModel(scope, modelId);
     const systems = normalizeImportedSystems(dto.systems);
 
     await runAuditedChange(
@@ -74,6 +76,6 @@ export class ModelTreeImportService {
         };
       },
     );
-    return this.modelTreeService.getTree(modelId);
+    return this.modelTreeService.getTree(scope, modelId);
   };
 }

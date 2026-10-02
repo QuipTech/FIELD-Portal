@@ -34,7 +34,11 @@ export const createMachineModelRequest = (
     body: JSON.stringify(payload),
   });
 
-export const getModelTreeRequest = (accessToken: string, modelId: string): Promise<ModelSystemTree> =>
+// Refused (409) while machines still use the model.
+export const deleteMachineModelRequest = (accessToken: string, modelId: string): Promise<void> =>
+  apiRequest<void>(`/admin/machineModels/${modelId}`, { method: "DELETE", headers: authorizationHeader(accessToken) });
+
+export const getModelTreeRequest =(accessToken: string, modelId: string): Promise<ModelSystemTree> =>
   apiRequest<ModelSystemTree>(`/admin/machineModels/${modelId}/tree`, { headers: authorizationHeader(accessToken) });
 
 export const addModelSystemRequest = (accessToken: string, modelId: string, name: string) =>

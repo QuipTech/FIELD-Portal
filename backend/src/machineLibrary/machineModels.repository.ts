@@ -1,15 +1,20 @@
 import { PoolClient } from 'pg';
 import { DatabaseService } from '../database/database.service';
 import { escapeLikePattern } from '../common/utils/escapeLikePattern';
+import { AdminScope } from '../auth/adminScope/adminScope';
 import { MachineModelRow } from './types/machineLibraryRows';
 
+// The shared catalog plus the scoped organisation's own models; every model
+// for the Owner (admin_list_machine_models, migration 0057).
 export const listModels = async (
   databaseService: DatabaseService,
+  scope: AdminScope,
   params: { search?: string; modelId?: string } = {},
 ): Promise<MachineModelRow[]> => {
   const result = await databaseService.query<MachineModelRow>(
-    `SELECT * FROM admin_list_machine_models($1, $2)`,
+    `SELECT * FROM admin_list_machine_models($1, $2, $3)`,
     [
+      scope.tenantId,
       params.search ? escapeLikePattern(params.search) : null,
       params.modelId ?? null,
     ],
@@ -42,13 +47,24 @@ export const findOrCreateManufacturer = async (
 
 export const createModel = async (
   client: PoolClient,
-  params: { manufacturerId: string; name: string; category?: string },
+  params: {
+    // null adds it to the shared catalog.
+    tenantId: string | null;
+    manufacturerId: string;
+    name: string;
+    category?: string;
+  },
 ): Promise<string> => {
   const result = await client.query<{ id: string }>(
-    `INSERT INTO machine_models (manufacturer_id, name, product_family)
-     VALUES ($1, $2, NULLIF($3, ''))
+    `INSERT INTO machine_models (tenant_id, manufacturer_id, name, product_family)
+     VALUES ($1, $2, $3, NULLIF($4, ''))
      RETURNING id`,
-    [params.manufacturerId, params.name, params.category ?? null],
+    [
+      params.tenantId,
+      params.manufacturerId,
+      params.name,
+      params.category ?? null,
+    ],
   );
   return result.rows[0].id;
 };
@@ -91,4 +107,17 @@ export const softDeleteModel = async (
     [modelId],
   );
   return (result.rowCount ?? 0) > 0;
+};
+
+// Which organisation a live model belongs to: null for the shared catalog,
+// undefined when there's no such model.
+export const findModelTenantId = async (
+  client: PoolClient,
+  modelId: string,
+): Promise<string | null | undefined> => {
+  const result = await client.query<{ tenant_id: string | null }>(
+    `SELECT tenant_id FROM machine_models WHERE id = $1 AND deleted_at IS NULL`,
+    [modelId],
+  );
+  return result.rows.length ? result.rows[0].tenant_id : undefined;
 };

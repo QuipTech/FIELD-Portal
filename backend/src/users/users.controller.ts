@@ -31,6 +31,11 @@ export class UsersController {
     private readonly userProfileService: UserProfileService,
   ) {}
 
+  @Get()
+  getProfile(@CurrentUser() user: AuthenticatedUser) {
+    return this.userProfileService.getProfile(user);
+  }
+
   @Patch()
   updateProfile(
     @CurrentUser() user: AuthenticatedUser,

@@ -4,6 +4,9 @@ export interface MachineModelRow {
   manufacturer_name: string;
   name: string;
   product_family: string | null;
+  // NULL for the shared catalog; otherwise the organisation it belongs to.
+  tenant_id: string | null;
+  organisation_name: string | null;
   // bigint arrives from pg as a string.
   systems_count: string;
   assets_count: string;

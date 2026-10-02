@@ -12,6 +12,7 @@ export interface AlertRule {
   audiences: AlertAudience[];
   channels: AlertChannel[];
   isEnabled: boolean;
+  cooldownMinutes: number;
   // Ready-to-show text for the table.
   triggerLabel: string;
   notifyLabel: string;

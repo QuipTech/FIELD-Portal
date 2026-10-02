@@ -6,6 +6,7 @@ export interface AlertRuleRow {
   audiences: string[];
   channels: string[];
   is_enabled: boolean;
+  cooldown_minutes: number;
   created_at: Date;
   updated_at: Date;
 }

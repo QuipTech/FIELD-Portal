@@ -19,7 +19,7 @@ const links: AdminNavLink[] = [
   { href: "/admin/machines", label: "Machine library", icon: "db" },
   { href: "/admin/ai-configuration", label: "AI configuration", icon: "sliders" },
   { href: "/admin/audit-log", label: "Audit log", icon: "file" },
-  { href: "/admin/subscriptions", label: "All subscriptions", icon: "card" },
+  { href: "/admin/subscriptions", label: "Subscriptions", icon: "card" },
 ];
 
 const NavItem = ({ href, label, icon, active }: AdminNavLink & { active: boolean }) => (

@@ -9,7 +9,9 @@ import {
   getMachineRequest,
   listMachineHistoryRequest,
 } from "@/lib/api/machineHistoryApi";
+import { updateMachineStatusRequest } from "@/lib/api/machineFleetApi";
 import type { LiveHistoryEntry, LiveHistoryEntryType, MachinePhoto, MachineSummary } from "@/lib/types/machineHistory";
+import type { OperatingStatus } from "@/lib/types/machineFleet";
 
 const LOAD_FAILED_MESSAGE = "Couldn't load this machine's history. Please try again.";
 
@@ -61,5 +63,11 @@ export const useLiveMachineHistory = (machineId: string) => {
     );
   };
 
-  return { machine, entries, isLoading, loadError, createEntry, addPhoto, deletePhoto };
+  // Rejects with the API error so the control can show it.
+  const changeStatus = async (status: OperatingStatus) => {
+    const updated = await updateMachineStatusRequest(requireAccessToken(), machineId, status);
+    setMachine((current) => (current ? { ...current, status: updated.status } : current));
+  };
+
+  return { machine, entries, isLoading, loadError, createEntry, addPhoto, deletePhoto, changeStatus };
 };

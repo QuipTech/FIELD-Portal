@@ -1,12 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { DatabaseService } from '../database/database.service';
+import { AdminScope } from '../auth/adminScope/adminScope';
+import * as machineModelsRepository from './machineModels.repository';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import * as modelTreeRepository from './modelTree.repository';
 import * as modelTreeChanges from './modelTreeChanges.repository';
 import { AuditEntry, runAuditedChange } from '../common/audit/runAuditedChange';
 import { MachineModelsService } from './machineModels.service';
 import {
+  assertCanEditModel,
   assertFound,
   buildSystemTree,
   COMPONENT_NOT_FOUND_MESSAGE,
@@ -30,8 +33,11 @@ export class ModelTreeService {
     private readonly machineModelsService: MachineModelsService,
   ) {}
 
-  getTree = async (modelId: string): Promise<ModelSystemTree> => {
-    await this.machineModelsService.getModel(modelId);
+  getTree = async (
+    scope: AdminScope,
+    modelId: string,
+  ): Promise<ModelSystemTree> => {
+    await this.machineModelsService.getModel(scope, modelId);
     const rows = await modelTreeRepository.listTreeRows(
       this.databaseService,
       modelId,
@@ -41,10 +47,11 @@ export class ModelTreeService {
 
   addSystem = async (
     actor: AuthenticatedUser,
+    scope: AdminScope,
     modelId: string,
     name: string,
   ): Promise<ModelSystemTree> => {
-    await this.machineModelsService.getModel(modelId);
+    await this.machineModelsService.getEditableModel(scope, modelId);
     await runAuditedChange(
       this.databaseService,
       actor,
@@ -61,11 +68,16 @@ export class ModelTreeService {
         return { result: modelId, audit };
       },
     );
-    return this.getTree(modelId);
+    return this.getTree(scope, modelId);
   };
 
-  addComponent = (actor: AuthenticatedUser, systemId: string, name: string) =>
-    this.changeTreeNode(actor, {
+  addComponent = (
+    actor: AuthenticatedUser,
+    scope: AdminScope,
+    systemId: string,
+    name: string,
+  ) =>
+    this.changeTreeNode(actor, scope, {
       entityType: 'model_component',
       action: 'create',
       notFoundMessage: SYSTEM_NOT_FOUND_MESSAGE,
@@ -82,8 +94,13 @@ export class ModelTreeService {
       },
     });
 
-  renameSystem = (actor: AuthenticatedUser, systemId: string, name: string) =>
-    this.changeTreeNode(actor, {
+  renameSystem = (
+    actor: AuthenticatedUser,
+    scope: AdminScope,
+    systemId: string,
+    name: string,
+  ) =>
+    this.changeTreeNode(actor, scope, {
       entityType: 'model_system',
       action: 'update',
       notFoundMessage: SYSTEM_NOT_FOUND_MESSAGE,
@@ -97,8 +114,12 @@ export class ModelTreeService {
       }),
     });
 
-  deleteSystem = (actor: AuthenticatedUser, systemId: string) =>
-    this.changeTreeNode(actor, {
+  deleteSystem = (
+    actor: AuthenticatedUser,
+    scope: AdminScope,
+    systemId: string,
+  ) =>
+    this.changeTreeNode(actor, scope, {
       entityType: 'model_system',
       action: 'delete',
       notFoundMessage: SYSTEM_NOT_FOUND_MESSAGE,
@@ -111,10 +132,11 @@ export class ModelTreeService {
 
   renameComponent = (
     actor: AuthenticatedUser,
+    scope: AdminScope,
     componentId: string,
     name: string,
   ) =>
-    this.changeTreeNode(actor, {
+    this.changeTreeNode(actor, scope, {
       entityType: 'model_component',
       action: 'update',
       notFoundMessage: COMPONENT_NOT_FOUND_MESSAGE,
@@ -128,8 +150,12 @@ export class ModelTreeService {
       }),
     });
 
-  deleteComponent = (actor: AuthenticatedUser, componentId: string) =>
-    this.changeTreeNode(actor, {
+  deleteComponent = (
+    actor: AuthenticatedUser,
+    scope: AdminScope,
+    componentId: string,
+  ) =>
+    this.changeTreeNode(actor, scope, {
       entityType: 'model_component',
       action: 'delete',
       notFoundMessage: COMPONENT_NOT_FOUND_MESSAGE,
@@ -144,9 +170,12 @@ export class ModelTreeService {
     });
 
   // Applies one system/component change and audits it; `apply` resolves
-  // to the owning model's id, or undefined when the node isn't live.
+  // to the owning model's id, or undefined when the node isn't live. The
+  // caller's right to edit that model is checked in the same transaction,
+  // so a refused change is rolled back.
   private changeTreeNode = async (
     actor: AuthenticatedUser,
+    scope: AdminScope,
     change: {
       entityType: TreeEntity;
       action: AuditEntry['action'];
@@ -171,6 +200,19 @@ export class ModelTreeService {
           outcome.modelId,
           change.notFoundMessage,
         );
+        const modelTenantId = await machineModelsRepository.findModelTenantId(
+          client,
+          foundModelId,
+        );
+        if (
+          modelTenantId !== undefined &&
+          !scope.isPlatform &&
+          modelTenantId !== scope.tenantId
+        ) {
+          // Another organisation's model: behave as if it doesn't exist.
+          assertFound(undefined, change.notFoundMessage);
+        }
+        assertCanEditModel(scope, modelTenantId ?? null);
         const metadata = { ...change.metadata, modelId: foundModelId };
         const audit = this.auditEntry(
           change.action,
@@ -181,7 +223,7 @@ export class ModelTreeService {
         return { result: foundModelId, audit };
       },
     );
-    return this.getTree(modelId);
+    return this.getTree(scope, modelId);
   };
 
   private auditEntry = (

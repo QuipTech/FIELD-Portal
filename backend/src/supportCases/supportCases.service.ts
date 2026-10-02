@@ -85,8 +85,8 @@ export class SupportCasesService {
     actor: AuthenticatedUser,
     dto: CreateSupportCaseDto,
   ): Promise<SupportCase> => {
-    const created = await this.databaseService.withTenant(
-      actor.tenantId,
+    const created = await this.databaseService.withActor(
+      actor,
       async (client) => {
         if (
           dto.machineId &&
@@ -127,8 +127,8 @@ export class SupportCasesService {
     caseNumber: number,
     dto: UpdateSupportCaseDto,
   ): Promise<SupportCase> => {
-    const updated = await this.databaseService.withTenant(
-      actor.tenantId,
+    const updated = await this.databaseService.withActor(
+      actor,
       async (client) => {
         const existing = await requireSupportCase(
           client,

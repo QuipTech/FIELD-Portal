@@ -19,6 +19,7 @@ export const toKnowledgeDocument = (
 ): KnowledgeDocument => ({
   id: row.id,
   isShared: row.tenant_id === null,
+  organisationName: row.organisation_name,
   title: row.title,
   type: row.type,
   status: row.status,

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { Tag } from "@/components/ui/tag";
+import { ActionMenu } from "@/components/ui/actionMenu";
 import { LoadingSpinner } from "@/components/ui/loadingSpinner";
 import { Table, TableHeaderRow, TableHeaderCell, TableRow, TableCell } from "@/components/ui/table";
 import { getInitials } from "@/lib/format/nameInitials";
@@ -11,13 +12,17 @@ interface UsersTableProps {
   users: AdminUser[];
   isLoading: boolean;
   errorMessage: string | null;
+  // The signed-in admin: no row menu on their own row (they can't change
+  // their own role).
+  currentUserId: string | null;
+  onChangeRole: (user: AdminUser) => void;
 }
 
 const TableMessage = ({ children }: { children: ReactNode }) => (
   <div className="flex items-center justify-center gap-2 p-10 text-sm text-mutedGray">{children}</div>
 );
 
-export const UsersTable = ({ users, isLoading, errorMessage }: UsersTableProps) => {
+export const UsersTable = ({ users, isLoading, errorMessage, currentUserId, onChangeRole }: UsersTableProps) => {
   return (
     <Table>
       <TableHeaderRow>
@@ -26,6 +31,7 @@ export const UsersTable = ({ users, isLoading, errorMessage }: UsersTableProps) 
         <TableHeaderCell flex={0.8}>Organisation</TableHeaderCell>
         <TableHeaderCell flex={0.8}>Last active</TableHeaderCell>
         <TableHeaderCell flex={0.7}>Status</TableHeaderCell>
+        <TableHeaderCell flex={0.3}>{""}</TableHeaderCell>
       </TableHeaderRow>
       {errorMessage && <TableMessage><span className="text-danger">{errorMessage}</span></TableMessage>}
       {!errorMessage && isLoading && users.length === 0 && (
@@ -55,6 +61,14 @@ export const UsersTable = ({ users, isLoading, errorMessage }: UsersTableProps) 
               <TableCell flex={0.8} className="text-xs text-mutedGray">{formatLastActiveLabel(user)}</TableCell>
               <TableCell flex={0.7}>
                 <Tag tone={adminUserStatusTone[user.status]}>{adminUserStatusLabel[user.status]}</Tag>
+              </TableCell>
+              <TableCell flex={0.3} className="flex justify-end">
+                {user.id !== currentUserId && (
+                  <ActionMenu
+                    label={fullName}
+                    items={[{ label: "Change role", icon: "shield", onSelect: () => onChangeRole(user) }]}
+                  />
+                )}
               </TableCell>
             </TableRow>
           );

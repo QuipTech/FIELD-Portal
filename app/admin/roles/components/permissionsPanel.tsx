@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Icon } from "@/components/icons/icon";
 import { Switch } from "@/components/ui/switch";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import type { AdminPermission, AdminRole } from "@/lib/types/adminRole";
@@ -11,6 +12,8 @@ interface PermissionsPanelProps {
   role: AdminRole;
   permissions: AdminPermission[];
   onSave: (roleId: string, permissionCodes: string[]) => Promise<void>;
+  // Shown only for roles that were added (default roles can't be deleted).
+  onDelete: (role: AdminRole) => void;
 }
 
 const SAVE_FAILED_MESSAGE = "Couldn't save the permissions. Please try again.";
@@ -18,7 +21,7 @@ const SAVE_FAILED_MESSAGE = "Couldn't save the permissions. Please try again.";
 const hasSameCodes = (draft: Set<string>, saved: string[]) =>
   draft.size === saved.length && saved.every((code) => draft.has(code));
 
-export const PermissionsPanel = ({ role, permissions, onSave }: PermissionsPanelProps) => {
+export const PermissionsPanel = ({ role, permissions, onSave, onDelete }: PermissionsPanelProps) => {
   const [draftCodes, setDraftCodes] = useState(() => new Set(role.permissionCodes));
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -31,6 +34,8 @@ export const PermissionsPanel = ({ role, permissions, onSave }: PermissionsPanel
   }, [role]);
 
   const isDirty = !hasSameCodes(draftCodes, role.permissionCodes);
+  // System roles are read-only for an Owner; the API refuses them too.
+  const isReadOnly = role.arePermissionsLocked || !role.isEditable;
 
   const togglePermission = (code: string) => {
     setDraftCodes((current) => {
@@ -56,10 +61,20 @@ export const PermissionsPanel = ({ role, permissions, onSave }: PermissionsPanel
 
   return (
     <div className="flex flex-[1.7] flex-col rounded-xl border border-borderGray bg-surface p-4">
-      <div className="flex items-baseline pb-2.5">
+      <div className="flex items-center gap-3 pb-2.5">
         <h2 className="text-base font-medium text-ink">Permissions — {role.name}</h2>
+        {role.isEditable && !role.isBuiltIn && (
+          <Button variant="ghost" size="sm" className="text-danger" onClick={() => onDelete(role)}>
+            <Icon name="x" className="h-3.5 w-3.5" />
+            Delete role
+          </Button>
+        )}
         <span className="ml-auto text-xs text-mutedGray">
-          {role.arePermissionsLocked ? "Always has every permission" : "Changes are audited"}
+          {role.arePermissionsLocked
+            ? "Always has every permission"
+            : role.isEditable
+              ? "Changes are audited"
+              : "System role — managed by QuipTech"}
         </span>
       </div>
       <div className="flex flex-col divide-y divide-slate-100 overflow-y-auto">
@@ -70,13 +85,13 @@ export const PermissionsPanel = ({ role, permissions, onSave }: PermissionsPanel
               <Switch
                 on={draftCodes.has(permission.code)}
                 onToggle={() => togglePermission(permission.code)}
-                disabled={role.arePermissionsLocked || isSaving}
+                disabled={isReadOnly || isSaving}
               />
             </span>
           </div>
         ))}
       </div>
-      <div className="mt-auto flex items-center gap-3 border-t border-slate-100 pt-3.5">
+      <div className={`mt-auto items-center gap-3 border-t border-slate-100 pt-3.5 ${isReadOnly ? "hidden" : "flex"}`}>
         <Button
           variant="ghost"
           onClick={() => setDraftCodes(new Set(role.permissionCodes))}

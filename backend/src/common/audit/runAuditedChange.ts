@@ -21,10 +21,12 @@ export interface AuditedChange<T> {
 const isUniqueViolation = (error: unknown): boolean =>
   (error as { code?: string } | null)?.code === UNIQUE_VIOLATION_CODE;
 
-// For platform-wide admin changes: each is audited under the acting
-// admin's own organisation, and the change and its audit entry share one
-// transaction, so neither is ever saved without the other. A unique
-// violation surfaces as a 409 with `conflictMessage`.
+// For audited changes: each is audited under the actor's own
+// organisation, and the change and its audit entry share one transaction,
+// so neither is ever saved without the other. app.user_id is set for the
+// transaction so database triggers (e.g. machine status history) can
+// record who made the change. A unique violation surfaces as a 409 with
+// `conflictMessage`.
 export const runAuditedChange = async <T>(
   databaseService: DatabaseService,
   actor: AuthenticatedUser,
@@ -32,7 +34,7 @@ export const runAuditedChange = async <T>(
   applyChange: (client: PoolClient) => Promise<AuditedChange<T>>,
 ): Promise<T> => {
   try {
-    return await databaseService.withTenant(actor.tenantId, async (client) => {
+    return await databaseService.withActor(actor, async (client) => {
       const { result, audit } = await applyChange(client);
       await authRepository.insertAuditLog(client, {
         tenantId: actor.tenantId,

@@ -22,6 +22,8 @@ export interface PhoneNumberValue {
 }
 
 interface PhoneNumberInputProps {
+  // A saved E.164 number to start from.
+  initialE164?: string | null;
   onChange: (phone: PhoneNumberValue) => void;
   onBlur?: () => void;
   autoFocus?: boolean;
@@ -30,10 +32,11 @@ interface PhoneNumberInputProps {
 
 const DEFAULT_COUNTRY: CountryCode = "AU";
 
-export const PhoneNumberInput = ({ onChange, onBlur, autoFocus, className = "" }: PhoneNumberInputProps) => {
+export const PhoneNumberInput = ({ initialE164, onChange, onBlur, autoFocus, className = "" }: PhoneNumberInputProps) => {
   const countryOptions = useMemo(buildPhoneCountryOptions, []);
-  const [country, setCountry] = useState<CountryCode>(DEFAULT_COUNTRY);
-  const [digits, setDigits] = useState("");
+  const initial = useMemo(() => (initialE164 ? parseInternationalInput(initialE164) : null), [initialE164]);
+  const [country, setCountry] = useState<CountryCode>(initial?.country ?? DEFAULT_COUNTRY);
+  const [digits, setDigits] = useState(initial?.digits ?? "");
   // Country names come from the runtime's Intl data, which differs between
   // Node and each browser (e.g. "Falkland Islands" vs "… (Islas Malvinas)"),
   // and the list is sorted by them. So the server render and hydration list

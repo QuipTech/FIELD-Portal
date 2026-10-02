@@ -1,5 +1,6 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DatabaseModule } from './database/database.module';
@@ -14,7 +15,10 @@ import { MachineHistoryModule } from './machineHistory/machineHistory.module';
 import { KnowledgeSearchModule } from './knowledgeSearch/knowledgeSearch.module';
 import { MachineLibraryModule } from './machineLibrary/machineLibrary.module';
 import { AdminAiModule } from './adminAi/adminAi.module';
+import { AiPlatformUsageModule } from './aiPlatformUsage/aiPlatformUsage.module';
 import { AdminAuditLogModule } from './adminAuditLog/adminAuditLog.module';
+import { AdminReportsModule } from './adminReports/adminReports.module';
+import { AlertEngineModule } from './alertEngine/alertEngine.module';
 import { AdminSubscriptionsModule } from './adminSubscriptions/adminSubscriptions.module';
 import { OrganisationBrandingModule } from './organisationBranding/organisationBranding.module';
 import { OrganisationNotificationsModule } from './organisationNotifications/organisationNotifications.module';
@@ -26,6 +30,10 @@ import { OrganisationSubscriptionModule } from './organisationSubscription/organ
 import { SupportCasesModule } from './supportCases/supportCases.module';
 import { MachineFleetModule } from './machineFleet/machineFleet.module';
 import { KnowledgeLibraryModule } from './knowledgeLibrary/knowledgeLibrary.module';
+import { AiAssistantModule } from './aiAssistant/aiAssistant.module';
+import { DashboardModule } from './dashboard/dashboard.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { AdminOverviewModule } from './adminOverview/adminOverview.module';
 import { RequestSourceMiddleware } from './common/requestSource/requestSource.middleware';
 
 @Module({
@@ -34,9 +42,11 @@ import { RequestSourceMiddleware } from './common/requestSource/requestSource.mi
       isGlobal: true,
       envFilePath: `.env.${process.env.NODE_ENV ?? 'development'}`,
     }),
+    ScheduleModule.forRoot(),
     DatabaseModule,
     StorageModule,
     KnowledgeIndexingModule,
+    AiPlatformUsageModule,
     AuthModule,
     AdminUsersModule,
     AdminRolesModule,
@@ -47,6 +57,8 @@ import { RequestSourceMiddleware } from './common/requestSource/requestSource.mi
     MachineLibraryModule,
     AdminAiModule,
     AdminAuditLogModule,
+    AdminReportsModule,
+    AlertEngineModule,
     AdminSubscriptionsModule,
     OrganisationBrandingModule,
     OrganisationNotificationsModule,
@@ -58,6 +70,10 @@ import { RequestSourceMiddleware } from './common/requestSource/requestSource.mi
     SupportCasesModule,
     MachineFleetModule,
     KnowledgeLibraryModule,
+    AiAssistantModule,
+    DashboardModule,
+    NotificationsModule,
+    AdminOverviewModule,
   ],
   controllers: [AppController],
   providers: [AppService],

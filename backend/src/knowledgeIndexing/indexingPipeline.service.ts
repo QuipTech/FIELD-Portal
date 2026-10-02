@@ -19,6 +19,7 @@ import {
 } from './embedding/bedrockEmbedder.service';
 import { detectMachineModels } from './machineModelDetection';
 import { countDocumentPages } from '../knowledge/documentPageCounter';
+import { AiPlatformUsageService } from '../aiPlatformUsage/aiPlatformUsage.service';
 
 const PDF = 'application/pdf';
 const DOCX =
@@ -42,9 +43,30 @@ export class IndexingPipelineService {
     private readonly indexingConfig: IndexingConfig,
     private readonly textractOcr: TextractOcrService,
     private readonly embedder: BedrockEmbedderService,
+    private readonly aiPlatformUsage: AiPlatformUsageService,
   ) {}
 
+  // One usage row per run, also when it fails part-way: the chunks
+  // embedded before the failure were still billed.
   indexVersion = async (job: IndexingJob): Promise<string> => {
+    const usage = { inputTokens: 0 };
+    try {
+      return await this.runPipeline(job, usage);
+    } finally {
+      void this.aiPlatformUsage.recordUsage({
+        tenantId: job.tenant_id,
+        source: 'indexing',
+        modelId: this.indexingConfig.embeddingModelId,
+        inputTokens: usage.inputTokens,
+        outputTokens: 0,
+      });
+    }
+  };
+
+  private runPipeline = async (
+    job: IndexingJob,
+    usage: { inputTokens: number },
+  ): Promise<string> => {
     const report = this.progressReporter(job.version_id);
     if (Number(job.size_bytes ?? 0) > this.indexingConfig.maxIndexBytes) {
       throw new DocumentExtractionError(
@@ -66,13 +88,15 @@ export class IndexingPipelineService {
     for (let start = 0; start < chunks.length; start += CHUNK_BATCH_SIZE) {
       const batch = chunks.slice(start, start + CHUNK_BATCH_SIZE);
       const embeddings = await Promise.all(
-        batch.map((chunk) =>
-          this.embedder.embed(
+        batch.map(async (chunk) => {
+          const result = await this.embedder.embed(
             [job.title, chunk.heading, chunk.content]
               .filter(Boolean)
               .join('\n'),
-          ),
-        ),
+          );
+          usage.inputTokens += result.inputTokens;
+          return result.embedding;
+        }),
       );
       await indexingRepository.insertChunks(this.databaseService, {
         versionId: job.version_id,
@@ -91,6 +115,7 @@ export class IndexingPipelineService {
     const fullText = extracted.blocks.map((block) => block.text).join('\n');
     const models = await indexingRepository.listMachineModels(
       this.databaseService,
+      job.tenant_id,
     );
     await indexingRepository.linkMachineModels(this.databaseService, {
       itemId: job.knowledge_item_id,

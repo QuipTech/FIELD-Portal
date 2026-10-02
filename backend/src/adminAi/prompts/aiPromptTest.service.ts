@@ -4,20 +4,25 @@ import { AiPlatformConfig } from '../aiPlatformConfig';
 import { TestPromptDto } from '../dto/testPromptDto';
 import { PromptTestResult } from '../types/adminAiResponse';
 import { toBedrockHttpError } from './toBedrockHttpError';
+import { AiPlatformUsageService } from '../../aiPlatformUsage/aiPlatformUsage.service';
 
 // Non-streaming, so keep responses well under the SDK's HTTP timeout.
 const TEST_MAX_TOKENS = 16000;
 const REFUSAL_MESSAGE = 'Claude declined to answer this question.';
 
 // The prompt editor's Test button: runs a draft prompt (saved or not)
-// against one sample question on the same model technicians get. Nothing
-// is stored and no usage is logged against a tenant.
+// against one sample question on the same model technicians get. The
+// prompt and answer aren't stored; the tokens are recorded as platform
+// usage (no tenant).
 @Injectable()
 export class AiPromptTestService {
   private readonly logger = new Logger(AiPromptTestService.name);
   private client: AnthropicBedrock | null = null;
 
-  constructor(private readonly aiPlatformConfig: AiPlatformConfig) {}
+  constructor(
+    private readonly aiPlatformConfig: AiPlatformConfig,
+    private readonly aiPlatformUsage: AiPlatformUsageService,
+  ) {}
 
   testPrompt = async (dto: TestPromptDto): Promise<PromptTestResult> => {
     const modelId = this.aiPlatformConfig.answerModelId;
@@ -28,6 +33,13 @@ export class AiPromptTestService {
         max_tokens: TEST_MAX_TOKENS,
         system: dto.body,
         messages: [{ role: 'user', content: dto.question }],
+      });
+      void this.aiPlatformUsage.recordUsage({
+        tenantId: null,
+        source: 'prompt_test',
+        modelId,
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
       });
       const answer = response.content
         .map((block) => (block.type === 'text' ? block.text : ''))

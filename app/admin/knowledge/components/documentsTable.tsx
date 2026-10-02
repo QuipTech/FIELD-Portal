@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 import { IconTile } from "@/components/ui/iconTile";
 import { ActionMenu } from "@/components/ui/actionMenu";
+import { OwnershipTag } from "@/components/admin/ownershipTag";
+import { usePermissions } from "@/lib/auth/usePermissions";
+import { PERMISSIONS } from "@/lib/auth/permissionCodes";
 import { Tag } from "@/components/ui/tag";
 import { LoadingSpinner } from "@/components/ui/loadingSpinner";
 import { Table, TableHeaderRow, TableHeaderCell, TableRow, TableCell } from "@/components/ui/table";
@@ -52,6 +55,8 @@ const DocumentSubtitle = ({ document }: { document: KnowledgeDocument }) => {
 };
 
 export const DocumentsTable = ({ documents, isLoading, loadError, onAction }: DocumentsTableProps) => {
+  const { can } = usePermissions();
+  const canReview = can(PERMISSIONS.managePlatform);
   return (
     <Table>
       <TableHeaderRow>
@@ -76,7 +81,10 @@ export const DocumentsTable = ({ documents, isLoading, loadError, onAction }: Do
               <TableCell flex={3.2} className="flex items-center gap-2.5">
                 <IconTile icon={icon} tone={tone} size="sm" />
                 <div className="flex min-w-0 flex-col">
-                  <span className="truncate font-medium">{document.title}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="truncate font-medium">{document.title}</span>
+                    <OwnershipTag organisationName={document.organisationName} />
+                  </span>
                   <DocumentSubtitle document={document} />
                 </div>
               </TableCell>
@@ -95,7 +103,7 @@ export const DocumentsTable = ({ documents, isLoading, loadError, onAction }: Do
               <TableCell flex={0.3} className="flex justify-end">
                 <ActionMenu
                   label={document.title}
-                  items={availableRowActions(document).map((item) => ({
+                  items={availableRowActions(document, canReview).map((item) => ({
                     label: item.label,
                     icon: item.icon,
                     tone: item.tone,

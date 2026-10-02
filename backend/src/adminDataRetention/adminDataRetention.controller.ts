@@ -8,7 +8,8 @@ import { OWNER_ROLE_NAME } from '../auth/systemRoleNames';
 import { DataRetentionService } from './dataRetention.service';
 import { UpdateDataRetentionDto } from './dto/updateDataRetentionDto';
 
-// Admin → Settings → Data & retention — Owner only.
+// Admin → Settings → Data & retention for the caller's own organisation —
+// Owner only.
 @Controller('admin/settings/data-retention')
 @UseGuards(JwtAuthGuard, RequireRolesGuard)
 @RequireRoles(OWNER_ROLE_NAME)

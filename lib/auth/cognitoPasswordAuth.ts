@@ -2,6 +2,7 @@ import {
   AuthError,
   autoSignIn,
   confirmResetPassword,
+  confirmSignIn,
   confirmSignUp,
   resendSignUpCode,
   resetPassword,
@@ -16,7 +17,9 @@ import { configureAmplify } from "./amplifyConfig";
 // portal goes to /auth/callback, which exchanges the Cognito ID token for
 // a FIELD session exactly as it does for Google/Apple.
 
-export type PasswordSignInOutcome = "signedIn" | "emailNotVerified";
+// newPasswordRequired: an invited user signing in with the temporary
+// password Cognito emailed them; they choose their own on /set-password.
+export type PasswordSignInOutcome = "signedIn" | "emailNotVerified" | "newPasswordRequired";
 
 const USER_ALREADY_AUTHENTICATED = "UserAlreadyAuthenticatedException";
 
@@ -109,11 +112,21 @@ export const signInWithEmail = async (email: string, password: string): Promise<
 
   if (result.isSignedIn) return "signedIn";
   if (result.nextStep.signInStep === "CONFIRM_SIGN_UP") return "emailNotVerified";
+  if (result.nextStep.signInStep === "CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED") return "newPasswordRequired";
   if (result.nextStep.signInStep === "RESET_PASSWORD") {
     throw new UnsupportedSignInStepError("You need to reset your password. Use “Forgot password” below.");
   }
   // MFA and other challenges aren't turned on for the portal's app client.
   throw new UnsupportedSignInStepError("This sign-in needs a step the portal doesn't support yet. Please contact support.");
+};
+
+// Finishes an invited user's first sign-in with the password they chose.
+// Only works in the same page session as signInWithEmail (Amplify keeps the
+// pending challenge in memory); true once signed in.
+export const completeFirstSignIn = async (newPassword: string): Promise<boolean> => {
+  configureAmplify();
+  const { isSignedIn } = await confirmSignIn({ challengeResponse: newPassword });
+  return isSignedIn;
 };
 
 export const requestPasswordReset = async (email: string): Promise<void> => {

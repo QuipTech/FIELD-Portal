@@ -9,12 +9,13 @@ interface AlertRulesTableProps {
   pendingRuleId: string | null;
   onToggle: (rule: AlertRule) => void;
   onEdit: (rule: AlertRule) => void;
+  onSendTest: (rule: AlertRule) => void;
   onDelete: (rule: AlertRule) => void;
 }
 
 const headerClasses = "min-w-0 text-[11px] font-semibold uppercase tracking-wider text-slate-400";
 
-export const AlertRulesTable = ({ rules, pendingRuleId, onToggle, onEdit, onDelete }: AlertRulesTableProps) => {
+export const AlertRulesTable = ({ rules, pendingRuleId, onToggle, onEdit, onSendTest, onDelete }: AlertRulesTableProps) => {
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-surface">
       <div className="flex gap-4 bg-slate-50/50 px-4 py-3">
@@ -50,6 +51,7 @@ export const AlertRulesTable = ({ rules, pendingRuleId, onToggle, onEdit, onDele
               label={rule.name}
               items={[
                 { label: "Edit", icon: "sliders", onSelect: () => onEdit(rule) },
+                { label: "Send test", icon: "bell", onSelect: () => onSendTest(rule) },
                 { label: "Delete", icon: "x", tone: "danger", onSelect: () => onDelete(rule) },
               ]}
             />

@@ -1,3 +1,5 @@
+import { AiPlatformUsageSource } from '../../aiPlatformUsage/types/aiPlatformUsageEntry';
+
 export interface AiUsageOverview {
   periodDays: number;
   totalQueries: number;
@@ -6,7 +8,9 @@ export interface AiUsageOverview {
   changePercent: number | null;
   activeUsers: number;
   totalUsers: number;
+  // Assistant answers plus otherUsage.
   totalCost: number;
+  assistantCost: number;
   avgCostPerQuery: number;
   averageQueriesPerDay: number;
   flaggedInPeriod: number;
@@ -17,6 +21,13 @@ export interface AiUsageOverview {
     name: string;
     queries: number;
     sharePercent: number;
+  }[];
+  // Bedrock calls that aren't answers: prompt tests, indexing, search.
+  otherUsage: {
+    source: AiPlatformUsageSource;
+    calls: number;
+    tokens: number;
+    cost: number;
   }[];
 }
 

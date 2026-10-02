@@ -27,9 +27,13 @@ interface SignInCandidate {
   tenant_status: string;
 }
 
+// An invited user (admin portal → Invite user) may sign in; their first
+// sign-in makes them active (recordCognitoSignIn / linkCognitoIdentity).
+const SIGN_IN_STATUSES = ['active', 'invited'];
+
 const assertCanSignIn = (candidate: SignInCandidate): void => {
   if (
-    candidate.status !== 'active' ||
+    !SIGN_IN_STATUSES.includes(candidate.status) ||
     candidate.tenant_status === SUSPENDED_TENANT_STATUS
   ) {
     throw new ForbiddenException(ACCOUNT_UNAVAILABLE_MESSAGE);

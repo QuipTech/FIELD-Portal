@@ -12,7 +12,8 @@ import { toMachineStatus } from "@/lib/format/machineStatus";
 import type { MachineSummary } from "@/lib/types/machineHistory";
 import { useLiveMachineHistory } from "../useLiveMachineHistory";
 import { LiveHistoryTimeline } from "./liveHistoryTimeline";
-import { LiveAddEntryModal } from "./liveAddEntryModal";
+import { LiveAddEntryModal } from "@/components/machines/liveAddEntryModal";
+import { MachineStatusSelect } from "./machineStatusSelect";
 
 // The shared header expects the portal's Machine shape; the label (asset
 // number, else fleet or serial) is what people call a machine by.
@@ -27,7 +28,8 @@ const toHeaderMachine = (machine: MachineSummary): Machine => ({
 // History for a machine registered in the database (its UUID in the URL).
 // The other machine tabs are still sample-only, so they aren't linked here.
 export const LiveMachineHistory = ({ machineId }: { machineId: string }) => {
-  const { machine, entries, isLoading, loadError, createEntry, addPhoto, deletePhoto } = useLiveMachineHistory(machineId);
+  const { machine, entries, isLoading, loadError, createEntry, addPhoto, deletePhoto, changeStatus } =
+    useLiveMachineHistory(machineId);
   const [isAdding, setIsAdding] = useState(false);
 
   if (isLoading || loadError || !machine) {
@@ -51,10 +53,13 @@ export const LiveMachineHistory = ({ machineId }: { machineId: string }) => {
       <MachineDetailHeader
         machine={headerMachine}
         action={
-          <PermissionButton permission={PERMISSIONS.addHistoryEntry} variant="primary" onClick={() => setIsAdding(true)}>
-            <Icon name="plus" />
-            Add entry
-          </PermissionButton>
+          <>
+            <MachineStatusSelect status={machine.status} onChange={changeStatus} />
+            <PermissionButton permission={PERMISSIONS.addHistoryEntry} variant="primary" onClick={() => setIsAdding(true)}>
+              <Icon name="plus" />
+              Add entry
+            </PermissionButton>
+          </>
         }
       />
       <main className="flex flex-1 flex-col gap-4 overflow-y-auto p-5">

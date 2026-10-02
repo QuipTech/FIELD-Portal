@@ -7,6 +7,7 @@ import { ConfirmDialog } from "@/components/ui/confirmDialog";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import type { AlertChannel, AlertRule } from "@/lib/types/notificationSettings";
 import { useNotificationSettings } from "../useNotificationSettings";
+import { describeTestResult } from "../describeTestResult";
 import { AlertRulesTable } from "./alertRulesTable";
 import { DeliveryChannelsGrid } from "./deliveryChannelsGrid";
 import { AlertRuleModal } from "./alertRuleModal";
@@ -19,6 +20,7 @@ export const NotificationSettingsManager = () => {
   const [pendingRuleId, setPendingRuleId] = useState<string | null>(null);
   const [pendingChannel, setPendingChannel] = useState<AlertChannel | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [testNote, setTestNote] = useState<{ text: string; isError: boolean } | null>(null);
   const { settings, options } = notifications;
 
   // Switch changes save straight away; a failure is shown above the table.
@@ -31,6 +33,15 @@ export const NotificationSettingsManager = () => {
       setActionError(toApiErrorMessage(error, "Couldn't save that change. Please try again."));
     } finally {
       clearPending();
+    }
+  };
+
+  const sendTest = async (rule: AlertRule) => {
+    setTestNote({ text: `Sending a test of "${rule.name}"…`, isError: false });
+    try {
+      setTestNote(describeTestResult(await notifications.sendTest(rule.id)));
+    } catch (error) {
+      setTestNote({ text: toApiErrorMessage(error, "Couldn't send the test. Please try again."), isError: true });
     }
   };
 
@@ -58,6 +69,7 @@ export const NotificationSettingsManager = () => {
       )}
       {notifications.loadError && <span className="text-sm text-danger">{notifications.loadError}</span>}
       {actionError && <span className="text-xs text-danger">{actionError}</span>}
+      {testNote && <span className={`text-xs ${testNote.isError ? "text-danger" : "text-mutedGray"}`}>{testNote.text}</span>}
       {settings && (
         <>
           <div>
@@ -73,6 +85,7 @@ export const NotificationSettingsManager = () => {
                 )
               }
               onEdit={(rule) => setDialog({ kind: "edit", rule })}
+              onSendTest={sendTest}
               onDelete={(rule) => setDialog({ kind: "delete", rule })}
             />
           </div>
@@ -90,9 +103,6 @@ export const NotificationSettingsManager = () => {
               }
             />
           </div>
-          <p className="text-xs text-slate-400">
-            Rules and channels are saved for your organisation. Sending notifications isn&apos;t switched on yet.
-          </p>
         </>
       )}
       {dialog?.kind === "edit" && options && (

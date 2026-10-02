@@ -1,7 +1,7 @@
 // Every kind of alert rule an organisation can set up, the settings each
 // takes, and how it reads in the table. The API validates rules against
-// this, the portal builds its "New rule" form from it, and a future rule
-// engine evaluates the same trigger_type/trigger_params.
+// this, the portal builds its "New rule" form from it, and the rule engine
+// (src/alertEngine) evaluates the same trigger_type/trigger_params.
 
 export type TriggerParamValue = number | string | string[];
 export type TriggerParams = Record<string, TriggerParamValue>;
@@ -83,7 +83,7 @@ export const ALERT_TRIGGER_TYPES: AlertTriggerType[] = [
     fields: [
       {
         key: 'hours',
-        label: 'Hours past due',
+        label: 'In "Service due" for more than',
         kind: 'number',
         unit: 'h',
         min: 1,
@@ -91,7 +91,7 @@ export const ALERT_TRIGGER_TYPES: AlertTriggerType[] = [
         default: 100,
       },
     ],
-    describe: (params) => `Hours past due > ${params.hours} h`,
+    describe: (params) => `Service due for > ${params.hours} h`,
   },
   {
     type: 'case_unactioned',
@@ -162,7 +162,8 @@ export const ALERT_TRIGGER_TYPES: AlertTriggerType[] = [
 export const findTriggerType = (type: string): AlertTriggerType | undefined =>
   ALERT_TRIGGER_TYPES.find((triggerType) => triggerType.type === type);
 
-// Who a rule notifies. Matched to people when sending is built.
+// Who a rule notifies; src/alertEngine/resolveRecipients.ts matches them
+// to people.
 export const ALERT_AUDIENCES = [
   { value: 'admins', label: 'Admins' },
   { value: 'site_supervisors', label: 'Site supervisor' },

@@ -44,8 +44,8 @@ export class CaseMessagesService {
     caseNumber: number,
     dto: PostCaseMessageDto,
   ): Promise<CaseMessage> => {
-    const { message, supportCase } = await this.databaseService.withTenant(
-      actor.tenantId,
+    const { message, supportCase } = await this.databaseService.withActor(
+      actor,
       async (client) => {
         const existing = await requireSupportCase(
           client,

@@ -1,3 +1,5 @@
+import { AiPlatformUsageSource } from '../../aiPlatformUsage/types/aiPlatformUsageEntry';
+
 // Rows of the SECURITY DEFINER functions in migration 0041. bigint and
 // numeric values arrive from pg as strings.
 
@@ -9,6 +11,15 @@ export interface UsageSummaryRow {
   total_cost: number;
   flagged_in_period: string;
   unreviewed_count: string;
+}
+
+// admin_ai_platform_usage (migration 0063): one row per source.
+export interface PlatformUsageRow {
+  source: AiPlatformUsageSource;
+  call_count: string;
+  input_tokens: string;
+  output_tokens: string;
+  total_cost: number;
 }
 
 export interface QueriesPerDayRow {

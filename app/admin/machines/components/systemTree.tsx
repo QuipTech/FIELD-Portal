@@ -48,11 +48,17 @@ export const SystemTree = ({ model, onSystemsCountChange }: SystemTreeProps) => 
               isExpanded={system.id === expandedSystemId}
               onToggle={() => setExpandedSystemId(system.id === expandedSystemId ? null : system.id)}
               onOpenDialog={setDialog}
+              isEditable={model.isEditable}
             />
           ))}
         </div>
       )}
-      <div className="flex gap-2.5">
+      {!model.isEditable && (
+        <span className="text-xs text-mutedGray">
+          Shared QuipTech model — read-only. Add your own model to customise its systems.
+        </span>
+      )}
+      <div className={`gap-2.5 ${model.isEditable ? "flex" : "hidden"}`}>
         <Button onClick={() => setDialog({ kind: "addSystem" })} disabled={!tree}>
           <Icon name="plus" />
           Add system

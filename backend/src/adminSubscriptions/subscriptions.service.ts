@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { AdminScope } from '../auth/adminScope/adminScope';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { runAuditedChange } from '../common/audit/runAuditedChange';
 import * as subscriptionsRepository from './subscriptions.repository';
@@ -22,17 +23,20 @@ const ORGANISATION_NOT_FOUND_MESSAGE = 'Organisation not found.';
 const SAVE_CONFLICT_MESSAGE =
   'Someone else saved this subscription at the same time. Reload and try again.';
 
-// Every organisation's subscription, including ones not set up yet.
+// Subscriptions, including ones not set up yet: every organisation's for
+// the Owner. Only the Owner changes them (enforced on the route).
 @Injectable()
 export class SubscriptionsService {
   constructor(private readonly databaseService: DatabaseService) {}
 
   listSubscriptions = async (
+    scope: AdminScope,
     query: ListSubscriptionsQueryDto,
   ): Promise<TenantSubscriptionList> => {
     const today = todayUtc();
     const rows = await subscriptionsRepository.listTenantSubscriptions(
       this.databaseService,
+      scope.tenantId,
     );
     const all = rows.map((row) => toTenantSubscription(row, today));
     const statusCounts = Object.fromEntries(
@@ -47,7 +51,14 @@ export class SubscriptionsService {
     return { items, total: all.length, statusCounts };
   };
 
-  getSubscription = async (tenantId: string): Promise<TenantSubscription> => {
+  // Outside the caller's scope is a 404, like a missing organisation.
+  getSubscription = async (
+    scope: AdminScope,
+    tenantId: string,
+  ): Promise<TenantSubscription> => {
+    if (!scope.isPlatform && tenantId !== scope.tenantId) {
+      throw new NotFoundException(ORGANISATION_NOT_FOUND_MESSAGE);
+    }
     const [row] = await subscriptionsRepository.listTenantSubscriptions(
       this.databaseService,
       tenantId,
@@ -58,11 +69,12 @@ export class SubscriptionsService {
 
   upsertSubscription = async (
     actor: AuthenticatedUser,
+    scope: AdminScope,
     tenantId: string,
     dto: UpsertSubscriptionDto,
   ): Promise<TenantSubscription> => {
     assertConsistentSubscription(dto);
-    const before = await this.getSubscription(tenantId);
+    const before = await this.getSubscription(scope, tenantId);
     await runAuditedChange(
       this.databaseService,
       actor,
@@ -93,6 +105,6 @@ export class SubscriptionsService {
         };
       },
     );
-    return this.getSubscription(tenantId);
+    return this.getSubscription(scope, tenantId);
   };
 }

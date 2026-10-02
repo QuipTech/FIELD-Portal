@@ -50,6 +50,19 @@ export class DatabaseService implements OnModuleDestroy {
       return work(client);
     });
 
+  // withTenant plus app.user_id, so database triggers know who made the
+  // change (status history, notifications skip the actor).
+  withActor = <T>(
+    actor: { tenantId: string; userId: string },
+    work: (client: PoolClient) => Promise<T>,
+  ) =>
+    this.withTenant(actor.tenantId, async (client) => {
+      await client.query("SELECT set_config('app.user_id', $1, true)", [
+        actor.userId,
+      ]);
+      return work(client);
+    });
+
   onModuleDestroy() {
     return this.pool.end();
   }

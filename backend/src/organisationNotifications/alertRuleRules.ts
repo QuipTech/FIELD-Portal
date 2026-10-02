@@ -109,6 +109,7 @@ export const toAlertRule = (
     audiences: row.audiences as AlertAudience[],
     channels,
     isEnabled: row.is_enabled,
+    cooldownMinutes: row.cooldown_minutes,
     triggerLabel:
       findTriggerType(row.trigger_type)?.describe(params) ?? row.trigger_type,
     notifyLabel: labelsFor(row.audiences, ALERT_AUDIENCES).join(' + ') || '—',

@@ -1,12 +1,12 @@
 import { PoolClient } from 'pg';
-import { NewAlertRule } from './defaultAlertRules';
+import { DEFAULT_COOLDOWN_MINUTES, NewAlertRule } from './defaultAlertRules';
 import { UpdateChannelsDto } from './dto/updateChannelsDto';
 import { AlertRuleRow, ChannelSettingsRow } from './types/notificationRows';
 
 // Every query runs inside withTenant(): RLS scopes it to the tenant, and
 // tenant_id is also matched explicitly.
 const RULE_COLUMNS = `id, name, trigger_type, trigger_params, audiences, channels,
-  is_enabled, created_at, updated_at`;
+  is_enabled, cooldown_minutes, created_at, updated_at`;
 
 // True the first time — i.e. when the organisation's defaults should be
 // created. The primary key makes this safe against two first visits.
@@ -75,8 +75,8 @@ export const insertAlertRule = async (
   const { rule } = params;
   const result = await client.query<AlertRuleRow>(
     `INSERT INTO alert_rules (tenant_id, name, trigger_type, trigger_params, audiences,
-       channels, is_enabled, created_by, sort_order)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8,
+       channels, is_enabled, created_by, cooldown_minutes, sort_order)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,
        (SELECT COALESCE(max(sort_order), 0) + 1 FROM alert_rules WHERE tenant_id = $1))
      RETURNING ${RULE_COLUMNS}`,
     [
@@ -88,6 +88,7 @@ export const insertAlertRule = async (
       rule.channels,
       rule.isEnabled,
       params.createdBy,
+      rule.cooldownMinutes ?? DEFAULT_COOLDOWN_MINUTES,
     ],
   );
   return result.rows[0];
@@ -102,7 +103,7 @@ export const replaceAlertRule = async (
   const result = await client.query<AlertRuleRow>(
     `UPDATE alert_rules
      SET name = $3, trigger_type = $4, trigger_params = $5, audiences = $6,
-         channels = $7, is_enabled = $8
+         channels = $7, is_enabled = $8, cooldown_minutes = $9
      WHERE id = $2 AND tenant_id = $1 AND deleted_at IS NULL
      RETURNING ${RULE_COLUMNS}`,
     [
@@ -114,6 +115,7 @@ export const replaceAlertRule = async (
       rule.audiences,
       rule.channels,
       rule.isEnabled,
+      rule.cooldownMinutes ?? DEFAULT_COOLDOWN_MINUTES,
     ],
   );
   return result.rows[0];

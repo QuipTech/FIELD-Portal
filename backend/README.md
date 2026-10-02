@@ -55,6 +55,11 @@ backend/
 │   ├── supportCases/         ← /support-cases REST + Socket.IO gateway (live case chat)
 │   ├── machineFleet/         ← GET/POST /machines (the Machines list), GET /machine-catalog
 │   ├── knowledgeLibrary/     ← GET /knowledge/library — the Knowledge screen's search
+│   ├── bedrock/              ← BedrockModule: Claude on Bedrock (streaming, retries, Sonnet/Haiku routing)
+│   ├── aiAssistant/          ← /ai — POST /ai/ask (SSE answers), threads; saves messages + citations
+│   ├── dashboard/            ← GET /dashboard — the Dashboard screen's figures in one request
+│   ├── notifications/        ← /notifications — the bell: list, unread count, mark read
+│   ├── adminOverview/        ← GET /admin/overview — the admin portal's Overview (scoped like other admin screens)
 │   ├── dataGovernance/       ← dataSchemas.config.ts: the platform/app/billing split (page + DB test)
 │   ├── adminDataRetention/   ← /admin/settings/data-retention + nightly AI log purge job
 │   ├── billing/              ← the ONLY Stripe code: webhook → app.subscriptions/entitlements
@@ -407,6 +412,93 @@ and `/auth/me` then work as before):
     unless it already has a reviewer, and `unreviewed` releases it.
   Prompt and review changes are audited (`ai_prompt_version`,
   `ai_review_item`) in the same transaction, like roles.
+- Admin access (migrations `0055`, `0056`; `src/auth/adminScope`): the
+  **Owner** role is the platform administrator. It holds `platform.manage`
+  (a trigger keeps that permission on Owner only) and every admin screen
+  shows and manages every organisation: users, audit log, AI usage and
+  review queue, roles, subscriptions, the shared knowledge and machine
+  libraries, AI prompts and document reviews. Self-serve signups get
+  Customer, so Owner is only ever granted deliberately.
+  Default roles (`roles.is_default`, migration `0062`: Owner, Customer,
+  Technical Manager, Field Technician, Knowledge Manager) can't be renamed
+  or deleted (trigger); roles an Owner adds can be deleted once no user
+  holds them. The admin SQL
+  functions take `p_tenant_id` (NULL = every organisation, which the
+  backend passes only for `platform.manage`; an organisation id narrows a
+  list, e.g. the Users screen's Organisation filter).
+- Users (`src/adminUsers`): `GET /admin/users?search=&role=&organisationId=`
+  (organisationId narrows the Owner's list to one organisation),
+  `GET /admin/organisations` (filter / invite options),
+  `POST /admin/users/invitations` `{ email, firstName, lastName, roleId,
+  organisationId? }`. Inviting creates the Cognito user (Cognito emails a
+  temporary password; the portal's /set-password screen replaces it on
+  first sign-in), then the FIELD account as `invited` with its role
+  (`admin_invite_user`, migration `0059`); if saving fails the Cognito user
+  is removed. The role must be a system role or one of
+  that organisation's. The first sign-in makes the account `active`.
+  Needs `cognito-idp:AdminCreateUser` on the user pool.
+  `PATCH /admin/users/:userId/role` `{ roleId }` gives the user exactly that
+  role (`admin_set_user_role`, migration `0061`): a system role or their
+  organisation's own; never your own account, and never removing the last
+  active Owner. Audited.
+- Organisation-scoped admin data (migration `0057`): machine models
+  (`machine_models.tenant_id`, NULL = shared catalog), organisation
+  documents and organisation roles (`roles.tenant_id`) exist alongside the
+  shared ones; registering a machine offers shared + own models, and an
+  organisation role can't reuse a system role's name (trigger), since role
+  names gate access.
+- Dashboard (`src/dashboard`, any signed-in user): `GET /dashboard` returns
+  open cases (by priority, and how many are past their SLA target —
+  `SUPPORT_SLA_HOURS_P1/P2/P3`, from case creation), machines down,
+  history entries this week (all / mine, weeks start Monday UTC), fleet
+  uptime for the last 8 weeks, recent activity (cases, history entries,
+  the caller's AI threads, new live documents incl. the shared library),
+  and "my machines" (registered, logged on, raised cases for or asked the
+  assistant about; down first).
+  - Uptime = share of tracked machine-time not `down` (`service_due`
+    counts as up). Every status change is recorded by a trigger on
+    `machines` into `machine_status_events` (migration `0053`); tracking
+    starts when that migration runs, so earlier weeks report `null`.
+  - `PATCH /machines/:machineId/status` `{ status }` (`machine.manage`)
+    changes a machine's status, audited with before/after. Audited changes
+    set `app.user_id` so the trigger records who made the change.
+- Notifications (`src/notifications`, any signed-in user, own rows only):
+  `GET /notifications?unreadOnly=&limit=&before=` (newest first;
+  `nextBefore` pages), `GET /notifications/unread-count` (the bell polls
+  it), `POST /notifications/:id/read`, `POST /notifications/read-all`.
+  Rows are written only by triggers (migration `0054`): replies and
+  assignee/status/priority changes on cases you reported or are assigned
+  to, machines you've worked on going down / service due, your flagged AI
+  answers being resolved/escalated, and documents going live in Knowledge
+  (shared-library documents notify every organisation). The actor is
+  never notified — their own rows' author, else `app.user_id`, which
+  `DatabaseService.withActor()` sets (use it for writes that should be
+  attributed). field_app can only read notifications and set `read_at`.
+- AI assistant (`src/aiAssistant` + `src/bedrock`, needs `ai.use`):
+  - `POST /ai/ask` `{ question, conversationId?, machineId?, image?:
+    { mediaType, data } }` — `data` is base64 (JPEG/PNG/WebP/GIF, ≤ ~3.75 MB;
+    this route alone accepts 6 MB JSON bodies). Retrieves the closest live
+    chunks (knowledge search), adds the machine and its last 5 history
+    entries, then streams `text/event-stream`: `start` `{ conversationId,
+    sources }` → `delta` `{ text }`… → `done` `{ userMessageId,
+    assistantMessageId, citedIndexes, stopReason }` or `error`
+    `{ message }`. Unknown thread/machine and validation fail as normal
+    JSON errors before the stream opens.
+  - Only a completed answer is saved (one transaction): `ai_conversations`
+    (new threads get the id sent in `start`), the question and answer in
+    `ai_messages` (`model_used`, `prompt_version` = `vN` or `built-in`),
+    every retrieved chunk in `ai_source_references` (prompt order = the
+    `[n]` in the answer), `ai_usage_log` (tokens + estimated cost), and an
+    `ai_review_items` row (`no_source`) when the answer cites nothing.
+  - `GET /ai/conversations` — the caller's own threads, newest first (50);
+    `GET /ai/conversations/:id` — its messages with sources.
+  - System prompt: the live `ai_prompt_versions` row, else the built-in
+    `TECHNICAL_ASSISTANT_PROMPT` (`src/bedrock/technicalAssistantPrompt.ts`).
+  - Model: Haiku (`BEDROCK_LIGHT_MODEL_ID`) when there is no photo and the
+    question, retrieved context and thread are under the
+    `BEDROCK_LIGHT_*` thresholds; Sonnet (`BEDROCK_ANSWER_MODEL_ID`)
+    otherwise. Throttling/5xx are retried with backoff until the first
+    text is sent; errors reach the portal only as generic messages.
 - Every session's `user` (`/auth/sync`, `/auth/refresh`) and
   `GET /auth/me` carry `roles` and `permissions` — the permission codes
   the user's roles grant (`userAccess.repository.ts`). `/auth/me` re-reads
@@ -618,7 +710,8 @@ archived, and only the caller's organisation + the shared library
 - `COGNITO_CLIENT_ID` — the portal's Cognito app client (the ID token audience)
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` — only when not running under
   an IAM role; need `cognito-idp:ListUsers` and `cognito-idp:AdminDeleteUser`
-  on the user pool (account deletion), plus the S3 permissions under "File storage"
+  on the user pool (account deletion) and `cognito-idp:AdminCreateUser`
+  (Users → Invite user), plus the S3 permissions under "File storage"
 - `S3_PORTAL_STORAGE_BUCKET` — the private S3 bucket for documents, photos
   and avatars (optional; file endpoints answer 503 without it)
 - `AWS_REGION` — that bucket's region
@@ -640,5 +733,17 @@ archived, and only the caller's organisation + the shared library
 - `DATA_EXPORT_WORKER_ENABLED` (default on; needs S3) — "My data" exports
 - `BEDROCK_BACKGROUND_MODEL_ID` — Claude inference profile for background
   work (default `au.anthropic.claude-haiku-4-5-20251001-v1:0`)
+- `BEDROCK_LIGHT_MODEL_ID` — model for simple assistant questions
+  (default `BEDROCK_BACKGROUND_MODEL_ID`, i.e. Haiku 4.5)
+- `BEDROCK_LIGHT_ROUTING_ENABLED` — `false` sends every question to
+  `BEDROCK_ANSWER_MODEL_ID` (default on)
+- `BEDROCK_LIGHT_MAX_QUESTION_CHARS` (200), `BEDROCK_LIGHT_MAX_CONTEXT_CHARS`
+  (4000), `BEDROCK_LIGHT_MAX_HISTORY_MESSAGES` (4) — all must hold for Haiku
+- `BEDROCK_ANSWER_MAX_TOKENS` — answer length ceiling (default 4096)
+- `SUPPORT_SLA_HOURS_P1` (4), `SUPPORT_SLA_HOURS_P2` (24),
+  `SUPPORT_SLA_HOURS_P3` (72) — support case response targets; an open case
+  past its target counts as breaching SLA on the dashboard
+- The AWS identity needs `bedrock:InvokeModelWithResponseStream` on both
+  answer inference profiles (and their foundation models) for the assistant
 
 See `.env.example` for the full list.

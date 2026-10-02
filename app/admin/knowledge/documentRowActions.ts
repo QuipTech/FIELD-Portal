@@ -33,7 +33,14 @@ const ROW_ACTIONS: Record<DocumentRowAction, RowActionMeta> = {
   },
 };
 
-export const availableRowActions = (document: KnowledgeDocument) =>
+// Approving and rejecting is a QuipTech (Owner) decision.
+const REVIEW_ACTIONS: DocumentRowAction[] = ["approve", "reject"];
+
+// A document the admin can't change (the shared library, for an Owner)
+// only offers Download; review actions need canReview as well.
+export const availableRowActions = (document: KnowledgeDocument, canReview: boolean) =>
   (Object.entries(ROW_ACTIONS) as [DocumentRowAction, RowActionMeta][])
     .filter(([, meta]) => meta.states.includes(document.state))
+    .filter(([action]) => (document.isEditable ?? false) || action === "download")
+    .filter(([action]) => canReview || !REVIEW_ACTIONS.includes(action))
     .map(([action, meta]) => ({ action, ...meta }));

@@ -5,5 +5,7 @@ import { AuditLogService } from './auditLog.service';
 @Module({
   controllers: [AdminAuditLogController],
   providers: [AuditLogService],
+  // The admin Overview shows the latest events.
+  exports: [AuditLogService],
 })
 export class AdminAuditLogModule {}

@@ -1,9 +1,8 @@
 import { StatCard } from "@/components/ui/statCard";
 import type { AiUsageOverview } from "@/lib/types/aiConfiguration";
+import { formatAiCost } from "@/lib/format/aiCostLabel";
 
 const formatCount = (value: number) => value.toLocaleString("en-AU");
-const formatDollars = (value: number, digits: number) =>
-  `$${value.toLocaleString("en-AU", { minimumFractionDigits: digits, maximumFractionDigits: digits })}`;
 
 const describeChange = (changePercent: number | null) => {
   if (changePercent === null) return "No queries in the prior period";
@@ -30,8 +29,8 @@ export const UsageStatCards = ({ usage }: { usage: AiUsageOverview }) => {
       />
       <StatCard
         label="Avg. cost / query"
-        value={formatDollars(usage.avgCostPerQuery, 3)}
-        caption={`${formatDollars(usage.totalCost, 0)} total this period`}
+        value={formatAiCost(usage.avgCostPerQuery)}
+        caption={`${formatAiCost(usage.totalCost)} total AI cost this period`}
         icon="card"
         tone="default"
       />

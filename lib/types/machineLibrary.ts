@@ -2,6 +2,11 @@ export interface MachineModelSummary {
   id: string;
   manufacturerName: string;
   name: string;
+  // null when it's shared by every organisation; otherwise the owning org.
+  organisation: { id: string; name: string } | null;
+  // Whether the signed-in admin may change it (the Owner: anything;
+  // an organisation-scoped admin: only their own organisation's).
+  isEditable: boolean;
   // "<manufacturer> <model>", e.g. "CAT 793F".
   displayName: string;
   category: string | null;

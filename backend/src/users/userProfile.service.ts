@@ -16,6 +16,8 @@ export interface UserProfile {
   firstName: string;
   lastName: string;
   avatarUrl: string | null;
+  // E.164, used for SMS alerts.
+  phoneNumber: string | null;
 }
 
 @Injectable()
@@ -27,6 +29,18 @@ export class UserProfileService {
     private readonly storageService: StorageService,
   ) {}
 
+  getProfile = async (actor: AuthenticatedUser): Promise<UserProfile> => {
+    const row = await this.databaseService.withTenant(
+      actor.tenantId,
+      (client) =>
+        userProfileRepository.findUserProfile(client, {
+          userId: actor.userId,
+          tenantId: actor.tenantId,
+        }),
+    );
+    return this.toProfile(this.assertFound(row));
+  };
+
   updateProfile = async (
     actor: AuthenticatedUser,
     dto: UpdateProfileDto,
@@ -34,7 +48,7 @@ export class UserProfileService {
     const row = await this.databaseService.withTenant(
       actor.tenantId,
       (client) =>
-        userProfileRepository.updateUserName(client, {
+        userProfileRepository.updateUserProfile(client, {
           userId: actor.userId,
           tenantId: actor.tenantId,
           ...dto,
@@ -101,5 +115,6 @@ export class UserProfileService {
     firstName: row.first_name,
     lastName: row.last_name,
     avatarUrl: await resolveAvatarUrl(this.storageService, row),
+    phoneNumber: row.phone_number,
   });
 }

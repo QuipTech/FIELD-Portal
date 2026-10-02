@@ -10,6 +10,9 @@ export interface AlertRule {
   audiences: string[];
   channels: AlertChannel[];
   isEnabled: boolean;
+  // How long before the rule may alert the same person about the same
+  // machine or case again.
+  cooldownMinutes: number;
   triggerLabel: string;
   notifyLabel: string;
   channelLabel: string;
@@ -50,4 +53,18 @@ export interface AlertRulePayload {
   audiences: string[];
   channels: AlertChannel[];
   isEnabled: boolean;
+  cooldownMinutes: number;
+}
+
+// What each channel did with a Send test; null when the caller couldn't
+// be notified.
+export type TestDeliveryChannel = "in_app" | AlertChannel;
+
+export interface SendTestResult {
+  userId: string;
+  isNotified: boolean;
+  deliveries: {
+    channel: TestDeliveryChannel;
+    result: { status: "sent" | "failed" | "skipped"; error?: string };
+  }[];
 }

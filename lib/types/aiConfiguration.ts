@@ -6,14 +6,20 @@ export interface AiUsageOverview {
   changePercent: number | null;
   activeUsers: number;
   totalUsers: number;
+  // Assistant answers plus otherUsage.
   totalCost: number;
+  assistantCost: number;
   avgCostPerQuery: number;
   averageQueriesPerDay: number;
   flaggedInPeriod: number;
   unreviewedCount: number;
   queriesPerDay: { date: string; count: number }[];
   usageByOrganisation: { organisationId: string; name: string; queries: number; sharePercent: number }[];
+  // Bedrock calls that aren't answers.
+  otherUsage: { source: AiUsageSource; calls: number; tokens: number; cost: number }[];
 }
+
+export type AiUsageSource = "prompt_test" | "indexing" | "search";
 
 export interface AiPlatformInfo {
   provider: string;

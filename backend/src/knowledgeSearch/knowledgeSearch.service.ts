@@ -5,6 +5,10 @@ import {
   BedrockEmbedderService,
   toVectorLiteral,
 } from '../knowledgeIndexing/embedding/bedrockEmbedder.service';
+import {
+  BEDROCK_SETUP_ERRORS,
+  bedrockErrorName,
+} from '../bedrock/retryBedrockCall';
 import * as knowledgeSearchRepository from './knowledgeSearch.repository';
 
 export interface KnowledgeMatch {
@@ -33,7 +37,9 @@ export class KnowledgeSearchService {
     query: string,
     limit: number,
   ): Promise<KnowledgeMatch[]> => {
-    const queryVector = toVectorLiteral(await this.embedQuery(query));
+    const queryVector = toVectorLiteral(
+      await this.embedQuery(query, actor.tenantId),
+    );
     const rows = await knowledgeSearchRepository.searchLiveChunks(
       this.databaseService,
       {
@@ -56,19 +62,14 @@ export class KnowledgeSearchService {
 
   // Setup problems (no Bedrock access, model not in this region) become a
   // clear 503 instead of a generic 500.
-  private embedQuery = async (query: string): Promise<number[]> => {
+  private embedQuery = async (
+    query: string,
+    tenantId: string,
+  ): Promise<number[]> => {
     try {
-      return await this.embedder.embed(query);
+      return await this.embedder.embedSearchQuery(query, tenantId);
     } catch (error) {
-      const name = (error as { name?: string }).name ?? '';
-      if (
-        [
-          'AccessDeniedException',
-          'UnrecognizedClientException',
-          'ValidationException',
-          'ResourceNotFoundException',
-        ].includes(name)
-      ) {
+      if (BEDROCK_SETUP_ERRORS.includes(bedrockErrorName(error))) {
         throw new ServiceUnavailableException(
           'AI search isn’t set up: no access to the Bedrock embedding model.',
         );

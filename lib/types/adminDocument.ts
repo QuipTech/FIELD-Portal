@@ -19,6 +19,10 @@ export interface KnowledgeDocument {
   id: string;
   // True for the QuipTech library every organisation shares.
   isShared: boolean;
+  // The owning organisation; null for the shared library.
+  organisationName: string | null;
+  // Admin Knowledge screen: whether the signed-in admin may change it.
+  isEditable?: boolean;
   title: string;
   // Usually a KnowledgeDocumentType; older items may hold other types.
   type: string;

@@ -1,8 +1,11 @@
 import { PoolClient } from 'pg';
 
-export const createSharedUpload = async (
+// tenantId null creates a shared-library document; otherwise that
+// organisation's own (admin_create_knowledge_upload, migration 0057).
+export const createKnowledgeUpload = async (
   client: PoolClient,
   params: {
+    tenantId: string | null;
     itemId: string;
     documentId: string;
     versionId: string;
@@ -17,8 +20,9 @@ export const createSharedUpload = async (
   },
 ): Promise<void> => {
   await client.query(
-    `SELECT admin_create_knowledge_upload($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+    `SELECT admin_create_knowledge_upload($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
     [
+      params.tenantId,
       params.itemId,
       params.documentId,
       params.versionId,
@@ -34,7 +38,7 @@ export const createSharedUpload = async (
   );
 };
 
-export const finishSharedUpload = async (
+export const finishKnowledgeUpload = async (
   client: PoolClient,
   params: { versionId: string; succeeded: boolean },
 ): Promise<boolean> => {

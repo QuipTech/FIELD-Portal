@@ -54,20 +54,23 @@ export const linkCognitoIdentity = async (
   await client.query(
     `UPDATE users
      SET cognito_sub = $2, auth_provider = $3, last_login_at = now(),
-         avatar_url = COALESCE($4, avatar_url)
+         avatar_url = COALESCE($4, avatar_url),
+         status = CASE WHEN status = 'invited' THEN 'active' ELSE status END
      WHERE id = $1`,
     [params.userId, params.cognitoSub, params.authProvider, params.pictureUrl],
   );
 };
 
-// Google photo URLs can change, so every sign-in refreshes the saved one.
+// Google photo URLs can change, so every sign-in refreshes the saved one;
+// an invited user becomes active on their first sign-in.
 export const recordCognitoSignIn = async (
   client: PoolClient,
   params: { userId: string; pictureUrl: string | null },
 ): Promise<void> => {
   await client.query(
     `UPDATE users
-     SET last_login_at = now(), avatar_url = COALESCE($2, avatar_url)
+     SET last_login_at = now(), avatar_url = COALESCE($2, avatar_url),
+         status = CASE WHEN status = 'invited' THEN 'active' ELSE status END
      WHERE id = $1`,
     [params.userId, params.pictureUrl],
   );

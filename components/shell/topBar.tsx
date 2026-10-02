@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { ThemeToggleButton } from "./themeToggleButton";
 import { UserMenu, type UserMenuItem } from "./userMenu";
+import { NotificationBell } from "./notificationBell";
 
 interface TopBarProps {
   children?: ReactNode;
@@ -35,6 +36,8 @@ export const TopBar = ({
       {children}
       <div className="ml-auto flex items-center gap-3">
         {actions}
+        {/* Every page with a top bar is signed in, so the bell is always here. */}
+        <NotificationBell />
         {showThemeToggle && <ThemeToggleButton />}
         {showUserMenu && (
           <UserMenu initials={userInitials} name={userName} roleLabel={userRoleLabel} items={userMenuItems} />

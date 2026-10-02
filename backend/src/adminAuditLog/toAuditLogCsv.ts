@@ -1,4 +1,5 @@
 import { AuditLogEvent } from './types/auditLogResponse';
+import { toCsvText } from '../common/utils/toCsvText';
 
 const CSV_HEADER = [
   'Time (UTC)',
@@ -15,16 +16,8 @@ const SOURCE_LABELS: Record<string, string> = {
   system: 'System',
 };
 
-// Quotes a cell when needed. A leading =, +, -, @, tab or CR would be run
-// as a formula by Excel/Sheets, so such cells are prefixed with ' — the
-// log contains user-typed names and titles.
-export const toCsvCell = (value: string): string => {
-  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
-  return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
-};
-
 export const toAuditLogCsv = (events: AuditLogEvent[]): string =>
-  [
+  toCsvText([
     CSV_HEADER,
     ...events.map((event) => [
       event.occurredAt,
@@ -34,6 +27,4 @@ export const toAuditLogCsv = (events: AuditLogEvent[]): string =>
       event.target,
       event.source ? SOURCE_LABELS[event.source] : '',
     ]),
-  ]
-    .map((row) => row.map(toCsvCell).join(','))
-    .join('\r\n') + '\r\n';
+  ]);

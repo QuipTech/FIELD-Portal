@@ -25,6 +25,7 @@ const toNewRule = (dto: AlertRuleDto): NewAlertRule => ({
   audiences: dto.audiences,
   channels: dto.channels,
   isEnabled: dto.isEnabled,
+  cooldownMinutes: dto.cooldownMinutes,
 });
 
 // Creating, editing, switching and deleting the organisation's alert
@@ -118,6 +119,7 @@ export class AlertRulesService {
           audiences: rule.audiences,
           channels: rule.channels,
           isEnabled: rule.isEnabled,
+          cooldownMinutes: rule.cooldownMinutes,
         };
         return {
           result: rule,

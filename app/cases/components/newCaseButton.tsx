@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Icon } from "@/components/icons/icon";
 import { PermissionButton } from "@/components/auth/permissionButton";
 import { PERMISSIONS } from "@/lib/auth/permissionCodes";
-import { NewCaseModal } from "./newCaseModal";
+import { NewCaseModal } from "@/components/supportCases/newCaseModal";
 
 export const NewCaseButton = () => {
   const [isOpen, setIsOpen] = useState(false);

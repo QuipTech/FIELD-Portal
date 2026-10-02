@@ -9,40 +9,56 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwtAuthGuard';
-import { RequireRolesGuard } from '../auth/guards/requireRoles.guard';
-import { RequireRoles } from '../auth/decorators/requireRoles.decorator';
+import { RequirePermissionsGuard } from '../auth/guards/requirePermissions.guard';
+import { RequirePermissions } from '../auth/decorators/requirePermissions.decorator';
 import { CurrentUser } from '../auth/decorators/currentUser.decorator';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
-import { OWNER_ROLE_NAME } from '../auth/systemRoleNames';
+import { PLATFORM_PERMISSION_CODE } from '../auth/systemRoleNames';
+import { AdminScopeGuard } from '../auth/adminScope/adminScope.guard';
+import { CurrentAdminScope } from '../auth/adminScope/currentAdminScope.decorator';
+import { AdminScope } from '../auth/adminScope/adminScope';
 import { SubscriptionsService } from './subscriptions.service';
 import { ListSubscriptionsQueryDto } from './dto/listSubscriptionsQueryDto';
 import { UpsertSubscriptionDto } from './dto/upsertSubscriptionDto';
 
-// Every organisation's subscription — Owner only. Organisations are
-// addressed by tenant id; each has at most one subscription.
+// Subscriptions: the Owner sees and sets every organisation's. Organisations are addressed by tenant id;
+// each has at most one subscription.
 @Controller('admin/subscriptions')
-@UseGuards(JwtAuthGuard, RequireRolesGuard)
-@RequireRoles(OWNER_ROLE_NAME)
+@UseGuards(JwtAuthGuard, AdminScopeGuard)
 export class AdminSubscriptionsController {
   constructor(private readonly subscriptionsService: SubscriptionsService) {}
 
   @Get()
-  list(@Query() query: ListSubscriptionsQueryDto) {
-    return this.subscriptionsService.listSubscriptions(query);
+  list(
+    @CurrentAdminScope() scope: AdminScope,
+    @Query() query: ListSubscriptionsQueryDto,
+  ) {
+    return this.subscriptionsService.listSubscriptions(scope, query);
   }
 
   @Get(':tenantId')
-  get(@Param('tenantId', ParseUUIDPipe) tenantId: string) {
-    return this.subscriptionsService.getSubscription(tenantId);
+  get(
+    @CurrentAdminScope() scope: AdminScope,
+    @Param('tenantId', ParseUUIDPipe) tenantId: string,
+  ) {
+    return this.subscriptionsService.getSubscription(scope, tenantId);
   }
 
-  // Sets up or replaces the whole subscription.
+  // Sets up or replaces the whole subscription. Owner only.
   @Put(':tenantId')
+  @UseGuards(RequirePermissionsGuard)
+  @RequirePermissions(PLATFORM_PERMISSION_CODE)
   upsert(
     @CurrentUser() actor: AuthenticatedUser,
+    @CurrentAdminScope() scope: AdminScope,
     @Param('tenantId', ParseUUIDPipe) tenantId: string,
     @Body() dto: UpsertSubscriptionDto,
   ) {
-    return this.subscriptionsService.upsertSubscription(actor, tenantId, dto);
+    return this.subscriptionsService.upsertSubscription(
+      actor,
+      scope,
+      tenantId,
+      dto,
+    );
   }
 }

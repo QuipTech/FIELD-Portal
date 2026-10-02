@@ -9,11 +9,17 @@ export interface UserProfile {
   lastName: string;
   // A 15-minute signed URL for an uploaded avatar, else the Google photo.
   avatarUrl: string | null;
+  // E.164 (+61412345678); where P1 alert texts go.
+  phoneNumber: string | null;
 }
 
+export const getProfileRequest = (accessToken: string): Promise<UserProfile> =>
+  apiRequest<UserProfile>("/users/me", { headers: { Authorization: `Bearer ${accessToken}` } });
+
+// phoneNumber: omit to keep it, null to remove it.
 export const updateProfileRequest = (
   accessToken: string,
-  profile: { firstName: string; lastName: string },
+  profile: { firstName: string; lastName: string; phoneNumber?: string | null },
 ): Promise<UserProfile> =>
   apiRequest<UserProfile>("/users/me", {
     method: "PATCH",

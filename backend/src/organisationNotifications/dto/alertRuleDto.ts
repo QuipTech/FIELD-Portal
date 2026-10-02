@@ -6,10 +6,13 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsInt,
   IsObject,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
+  Min,
   MinLength,
 } from 'class-validator';
 import { trimString } from '../../common/utils/trimTransforms';
@@ -19,6 +22,7 @@ import {
   AlertAudience,
   AlertChannel,
 } from '../alertTriggerCatalog';
+import { DEFAULT_COOLDOWN_MINUTES } from '../defaultAlertRules';
 
 // The whole rule, for create and replace. triggerParams is checked against
 // the trigger catalog in alertRuleRules.ts.
@@ -54,6 +58,13 @@ export class AlertRuleDto {
   @IsOptional()
   @IsBoolean()
   isEnabled: boolean = true;
+
+  // 0 alerts every time the condition is found; up to a week.
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10080)
+  cooldownMinutes: number = DEFAULT_COOLDOWN_MINUTES;
 }
 
 export class SetAlertRuleEnabledDto {

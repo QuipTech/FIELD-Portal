@@ -21,8 +21,9 @@ export const syncStoredProfile = (profile: UserProfile): void => {
   });
 };
 
-export const saveProfileName = async (fullName: string): Promise<UserProfile> => {
-  const profile = await updateProfileRequest(requireAccessToken(), splitFullName(fullName));
+// phoneNumber: E.164, null to remove it, or undefined to leave it as is.
+export const saveProfile = async (fullName: string, phoneNumber?: string | null): Promise<UserProfile> => {
+  const profile = await updateProfileRequest(requireAccessToken(), { ...splitFullName(fullName), phoneNumber });
   syncStoredProfile(profile);
   return profile;
 };

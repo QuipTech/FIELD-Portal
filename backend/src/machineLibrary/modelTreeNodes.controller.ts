@@ -9,63 +9,73 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwtAuthGuard';
-import { RequireRolesGuard } from '../auth/guards/requireRoles.guard';
-import { RequireRoles } from '../auth/decorators/requireRoles.decorator';
 import { CurrentUser } from '../auth/decorators/currentUser.decorator';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
-import { OWNER_ROLE_NAME } from '../auth/systemRoleNames';
+import { AdminScopeGuard } from '../auth/adminScope/adminScope.guard';
+import { CurrentAdminScope } from '../auth/adminScope/currentAdminScope.decorator';
+import { AdminScope } from '../auth/adminScope/adminScope';
 import { ModelTreeService } from './modelTree.service';
 import { TreeNodeNameDto } from './dto/treeNodeNameDto';
 
-// Edits to one system or component of a model's tree — Owner only. Each
-// route responds with the owning model's refreshed tree.
+// Edits to one system or component of a model's tree, by anyone who may
+// change that model (the Owner: any). Each route responds
+// with the owning model's refreshed tree.
 @Controller('admin')
-@UseGuards(JwtAuthGuard, RequireRolesGuard)
-@RequireRoles(OWNER_ROLE_NAME)
+@UseGuards(JwtAuthGuard, AdminScopeGuard)
 export class ModelTreeNodesController {
   constructor(private readonly modelTreeService: ModelTreeService) {}
 
   @Patch('modelSystems/:systemId')
   renameSystem(
+    @CurrentAdminScope() scope: AdminScope,
     @CurrentUser() actor: AuthenticatedUser,
     @Param('systemId', ParseUUIDPipe) systemId: string,
     @Body() dto: TreeNodeNameDto,
   ) {
-    return this.modelTreeService.renameSystem(actor, systemId, dto.name);
+    return this.modelTreeService.renameSystem(actor, scope, systemId, dto.name);
   }
 
   // Also removes the system's components.
   @Delete('modelSystems/:systemId')
   deleteSystem(
+    @CurrentAdminScope() scope: AdminScope,
     @CurrentUser() actor: AuthenticatedUser,
     @Param('systemId', ParseUUIDPipe) systemId: string,
   ) {
-    return this.modelTreeService.deleteSystem(actor, systemId);
+    return this.modelTreeService.deleteSystem(actor, scope, systemId);
   }
 
   @Post('modelSystems/:systemId/components')
   addComponent(
+    @CurrentAdminScope() scope: AdminScope,
     @CurrentUser() actor: AuthenticatedUser,
     @Param('systemId', ParseUUIDPipe) systemId: string,
     @Body() dto: TreeNodeNameDto,
   ) {
-    return this.modelTreeService.addComponent(actor, systemId, dto.name);
+    return this.modelTreeService.addComponent(actor, scope, systemId, dto.name);
   }
 
   @Patch('modelComponents/:componentId')
   renameComponent(
+    @CurrentAdminScope() scope: AdminScope,
     @CurrentUser() actor: AuthenticatedUser,
     @Param('componentId', ParseUUIDPipe) componentId: string,
     @Body() dto: TreeNodeNameDto,
   ) {
-    return this.modelTreeService.renameComponent(actor, componentId, dto.name);
+    return this.modelTreeService.renameComponent(
+      actor,
+      scope,
+      componentId,
+      dto.name,
+    );
   }
 
   @Delete('modelComponents/:componentId')
   deleteComponent(
+    @CurrentAdminScope() scope: AdminScope,
     @CurrentUser() actor: AuthenticatedUser,
     @Param('componentId', ParseUUIDPipe) componentId: string,
   ) {
-    return this.modelTreeService.deleteComponent(actor, componentId);
+    return this.modelTreeService.deleteComponent(actor, scope, componentId);
   }
 }

@@ -55,6 +55,10 @@ const LoginPage = () => {
         router.push("/auth/callback");
         return;
       }
+      if (outcome === "newPasswordRequired") {
+        router.push(`/set-password?email=${encodeURIComponent(trimmedEmail)}`);
+        return;
+      }
       // Signed up but never verified: send a fresh code (the first may have
       // expired) and finish on the code screen.
       const verifyUrl = `/verify-email?email=${encodeURIComponent(trimmedEmail)}`;

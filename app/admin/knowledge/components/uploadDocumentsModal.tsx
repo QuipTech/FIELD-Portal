@@ -4,6 +4,8 @@ import { useState, type FormEvent } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { usePermissions } from "@/lib/auth/usePermissions";
+import { PERMISSIONS } from "@/lib/auth/permissionCodes";
 import { findKnowledgeFileProblem, titleFromFileName } from "@/lib/format/knowledgeUploadFile";
 import { knowledgeDocumentTypes, type KnowledgeDocumentType } from "@/lib/types/adminDocument";
 import type { PendingUpload } from "../useKnowledgeUploads";
@@ -16,6 +18,7 @@ interface UploadDocumentsModalProps {
 
 // Files that break the upload rules are listed with the reason and left out.
 export const UploadDocumentsModal = ({ files, onUpload, onClose }: UploadDocumentsModalProps) => {
+  const { can } = usePermissions();
   const [type, setType] = useState<KnowledgeDocumentType>("manual");
   const [pending, setPending] = useState<PendingUpload[]>(() =>
     files.filter((file) => !findKnowledgeFileProblem(file)).map((file) => ({ file, title: titleFromFileName(file.name) })),
@@ -64,7 +67,10 @@ export const UploadDocumentsModal = ({ files, onUpload, onClose }: UploadDocumen
           </span>
         ))}
         <span className="text-xs text-mutedGray">
-          Shared with every organisation once indexed. Files go straight to secure storage.
+          {can(PERMISSIONS.managePlatform)
+            ? "Shared with every organisation once indexed."
+            : "Available to your organisation once indexed."}{" "}
+          Files go straight to secure storage.
         </span>
         <div className="flex">
           <Button type="button" variant="ghost" onClick={onClose}>

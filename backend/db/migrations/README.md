@@ -49,6 +49,9 @@ session (set per-request by `DatabaseService.withTenant`).
 | `0050` | An admin edit of a subscription makes it manually managed (`source = 'manual'`, clears `stripe_status`), so a Stripe-cancelled row doesn't keep entitlements off |
 | `0051` | Support cases — `case_number` (from 1001), `priority`, `category`, `created_by` (reporter, SET NULL), `resolved_at`; status/priority/category checks |
 | `0052` | Machines list — `machines.site`, `operating_hours`; `status` becomes the operating status (`running`/`down`/`service_due`, was `active`) |
+| `0063` | `ai_platform_usage_log` — Bedrock usage outside answers (prompt tests, indexing, search) |
+| `0064` | Reports — `admin_report_*` functions for the CSV exports, `scheduled_reports` |
+| `0065` | Alert delivery — `alert_rules.cooldown_minutes`, `notifications.rule_id`/`entity_key` and kind `alert`, `notification_deliveries`, `pg_notify` on new notifications, SECURITY DEFINER `alert_*` functions for the rule engine |
 
 ## Two forward references, resolved across files
 

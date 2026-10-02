@@ -75,7 +75,7 @@ export class KnowledgeLibraryService {
         searchMode: 'browse',
       };
     }
-    const queryVector = await this.embedQuery(search);
+    const queryVector = await this.embedQuery(search, tenantId);
     if (queryVector) {
       return {
         rows: await libraryRepository.semanticSearchKnowledge(
@@ -99,10 +99,15 @@ export class KnowledgeLibraryService {
   // Null when the embedding model can't be used (not set up, no access,
   // network); the caller then searches by keyword instead. After a failure
   // it isn't retried for a while, so searches don't each wait on it.
-  private embedQuery = async (query: string): Promise<string | null> => {
+  private embedQuery = async (
+    query: string,
+    tenantId: string,
+  ): Promise<string | null> => {
     if (Date.now() < this.semanticRetryAt) return null;
     try {
-      return toVectorLiteral(await this.embedder.embed(query));
+      return toVectorLiteral(
+        await this.embedder.embedSearchQuery(query, tenantId),
+      );
     } catch (error) {
       this.semanticRetryAt = Date.now() + SEMANTIC_RETRY_DELAY_MS;
       this.logger.warn(

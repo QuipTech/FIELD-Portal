@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { AdminScope } from '../auth/adminScope/adminScope';
 import { StorageService } from '../storage/storage.service';
 import { resolveAvatarUrl } from '../users/resolveAvatarUrl';
 import * as adminUsersRepository from './adminUsers.repository';
@@ -34,10 +35,17 @@ export class AdminUsersService {
   ) {}
 
   listUsers = async (
+    scope: AdminScope,
     query: ListAdminUsersQueryDto,
   ): Promise<AdminUserListResponse> => {
+    // Narrows a platform-wide list to one organisation; never widens.
+    const listScope =
+      scope.isPlatform && query.organisationId
+        ? { ...scope, tenantId: query.organisationId }
+        : scope;
     const rows = await adminUsersRepository.listAdminUsers(
       this.databaseService,
+      listScope,
       {
         search: query.search,
         role: query.role,

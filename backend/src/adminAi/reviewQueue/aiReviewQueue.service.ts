@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
+import { AdminScope } from '../../auth/adminScope/adminScope';
 import { AuthenticatedUser } from '../../auth/types/authenticatedUser';
 import { runAuditedChange } from '../../common/audit/runAuditedChange';
 import * as aiReviewQueueRepository from './aiReviewQueue.repository';
@@ -10,22 +11,24 @@ import { ReviewQueueItem, ReviewQueuePage } from '../types/adminAiResponse';
 
 const ITEM_NOT_FOUND_MESSAGE = 'Review item not found.';
 
-// Conversations flagged for admin review, across every organisation.
+// Answers flagged for review: the caller's organisation's, or every
+// organisation's for the Owner (AdminScope).
 @Injectable()
 export class AiReviewQueueService {
   constructor(private readonly databaseService: DatabaseService) {}
 
   listItems = async (
+    scope: AdminScope,
     query: ListReviewQueueQueryDto,
   ): Promise<ReviewQueuePage> => {
     const [rows, statusRows] = await Promise.all([
-      aiReviewQueueRepository.listReviewItems(this.databaseService, {
+      aiReviewQueueRepository.listReviewItems(this.databaseService, scope, {
         status: query.status,
         reviewerId: query.reviewerId,
         limit: query.pageSize,
         offset: (query.page - 1) * query.pageSize,
       }),
-      aiReviewQueueRepository.countReviewStatuses(this.databaseService),
+      aiReviewQueueRepository.countReviewStatuses(this.databaseService, scope),
     ]);
     return {
       items: rows.map(toReviewQueueItem),
@@ -38,9 +41,10 @@ export class AiReviewQueueService {
     };
   };
 
-  listReviewers = async () => {
+  listReviewers = async (scope: AdminScope) => {
     const rows = await aiReviewQueueRepository.listReviewers(
       this.databaseService,
+      scope,
     );
     return rows.map((row) => ({
       id: row.id,
@@ -49,9 +53,13 @@ export class AiReviewQueueService {
     }));
   };
 
-  getItem = async (itemId: string): Promise<ReviewQueueItem> => {
+  getItem = async (
+    scope: AdminScope,
+    itemId: string,
+  ): Promise<ReviewQueueItem> => {
     const [row] = await aiReviewQueueRepository.listReviewItems(
       this.databaseService,
+      scope,
       {
         itemId,
         limit: 1,
@@ -64,10 +72,11 @@ export class AiReviewQueueService {
 
   updateItem = async (
     actor: AuthenticatedUser,
+    scope: AdminScope,
     itemId: string,
     dto: UpdateReviewItemDto,
   ): Promise<ReviewQueueItem> => {
-    const before = await this.getItem(itemId);
+    const before = await this.getItem(scope, itemId);
     const next = resolveReviewAssignment(
       { status: before.status, reviewerId: before.reviewer?.id ?? null },
       dto.status,
@@ -80,6 +89,7 @@ export class AiReviewQueueService {
       async (client) => {
         const isUpdated = await aiReviewQueueRepository.updateReviewItem(
           client,
+          scope,
           {
             itemId,
             ...next,
@@ -105,6 +115,6 @@ export class AiReviewQueueService {
         };
       },
     );
-    return this.getItem(itemId);
+    return this.getItem(scope, itemId);
   };
 }

@@ -3,7 +3,11 @@
 import { useEffect, useState } from "react";
 import { requireAccessToken } from "@/lib/api/requireAccessToken";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
-import { createMachineModelRequest, listMachineModelsRequest } from "@/lib/api/machineLibraryApi";
+import {
+  createMachineModelRequest,
+  deleteMachineModelRequest,
+  listMachineModelsRequest,
+} from "@/lib/api/machineLibraryApi";
 import type { CreateMachineModelPayload, MachineModelSummary } from "@/lib/types/machineLibrary";
 
 const LOAD_FAILED_MESSAGE = "Couldn't load machine models. Please try again.";
@@ -49,7 +53,16 @@ export const useMachineModels = () => {
     setSelectedModelId(created.id);
   };
 
-  const updateSystemsCount = (modelId: string, systemsCount: number) =>
+  // Rejects with the API's error (e.g. machines still use the model) so the
+  // confirm dialog can show it.
+  const deleteModel = async (modelId: string) => {
+    await deleteMachineModelRequest(requireAccessToken(), modelId);
+    const remaining = models.filter((model) => model.id !== modelId);
+    setModels(remaining);
+    setSelectedModelId((current) => (current === modelId ? (remaining[0]?.id ?? null) : current));
+  };
+
+  const updateSystemsCount =(modelId: string, systemsCount: number) =>
     setModels((current) => current.map((model) => (model.id === modelId ? { ...model, systemsCount } : model)));
 
   return {
@@ -61,6 +74,7 @@ export const useMachineModels = () => {
     isLoading,
     loadError,
     createModel,
+    deleteModel,
     updateSystemsCount,
   };
 };

@@ -3,9 +3,11 @@ import { DatabaseService } from '../database/database.service';
 import { UpsertSubscriptionDto } from './dto/upsertSubscriptionDto';
 import { TenantSubscriptionRow } from './types/subscriptionRows';
 
+// tenantId null lists every organisation; otherwise
+// just that one.
 export const listTenantSubscriptions = async (
   databaseService: DatabaseService,
-  tenantId: string | null = null,
+  tenantId: string | null,
 ): Promise<TenantSubscriptionRow[]> => {
   const result = await databaseService.query<TenantSubscriptionRow>(
     `SELECT * FROM admin_list_tenant_subscriptions($1)`,

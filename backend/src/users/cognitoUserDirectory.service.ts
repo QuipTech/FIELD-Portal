@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
+  AdminCreateUserCommand,
   AdminDeleteUserCommand,
   CognitoIdentityProviderClient,
   ListUsersCommand,
@@ -20,8 +21,9 @@ const buildListUsersFilter = (
 
 // Admin access to the Cognito user pool (COGNITO_USER_POOL_ID). Credentials
 // come from the AWS SDK default chain (IAM role, or AWS_ACCESS_KEY_ID /
-// AWS_SECRET_ACCESS_KEY) and need cognito-idp:ListUsers and
-// cognito-idp:AdminDeleteUser on this user pool.
+// AWS_SECRET_ACCESS_KEY) and need cognito-idp:ListUsers,
+// cognito-idp:AdminDeleteUser and (for invitations)
+// cognito-idp:AdminCreateUser on this user pool.
 @Injectable()
 export class CognitoUserDirectoryService {
   private readonly userPoolId: string;
@@ -47,6 +49,36 @@ export class CognitoUserDirectoryService {
       }),
     );
     return response.Users ?? [];
+  };
+
+  // Creates the person in the pool with a verified email; Cognito emails
+  // them a temporary password, which they replace on first sign-in.
+  // Resolves to the new user's sub and username.
+  createInvitedUser = async (params: {
+    email: string;
+    firstName: string;
+    lastName: string;
+  }): Promise<{ sub: string; username: string }> => {
+    const response = await this.client.send(
+      new AdminCreateUserCommand({
+        UserPoolId: this.userPoolId,
+        Username: params.email,
+        DesiredDeliveryMediums: ['EMAIL'],
+        UserAttributes: [
+          { Name: 'email', Value: params.email },
+          { Name: 'email_verified', Value: 'true' },
+          { Name: 'given_name', Value: params.firstName },
+          { Name: 'family_name', Value: params.lastName },
+        ],
+      }),
+    );
+    const sub = response.User?.Attributes?.find(
+      (attribute) => attribute.Name === 'sub',
+    )?.Value;
+    if (!sub || !response.User?.Username) {
+      throw new Error('Cognito created the user without a sub.');
+    }
+    return { sub, username: response.User.Username };
   };
 
   deleteUser = async (username: string): Promise<void> => {

@@ -23,7 +23,7 @@ const describeChannels = (channels: DeliveryChannels) =>
   ).join(' · ');
 
 // The signed-in admin's own organisation's notification settings.
-// Configuration only — nothing is sent yet.
+// The rule engine (src/alertEngine) evaluates what's saved here.
 @Injectable()
 export class NotificationSettingsService {
   constructor(private readonly databaseService: DatabaseService) {}
