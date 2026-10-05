@@ -38,6 +38,7 @@
     "@nestjs/platform-express": "^10.0.0",
     "@nestjs/platform-socket.io": "^10.4.22",
     "@nestjs/schedule": "^4.1.2",
+    "@nestjs/throttler": "^6.5.0",
     "@nestjs/websockets": "^10.4.22",
     "aws-jwt-verify": "^5.2.1",
     "class-transformer": "^0.5.1",

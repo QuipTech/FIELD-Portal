@@ -11,6 +11,13 @@ const MIME_LINE_LENGTH = 76;
 const encodeHeaderText = (text: string) =>
   `=?UTF-8?B?${Buffer.from(text, 'utf8').toString('base64')}?=`;
 
+// Reply-To carries a user-typed address: only a bare address with no
+// whitespace, brackets or quotes reaches the header, so it can't add one.
+const SAFE_ADDRESS = /^[^\s<>"',;]+@[^\s<>"',;]+$/;
+
+const replyToHeader = (replyTo: string | undefined): string[] =>
+  replyTo && SAFE_ADDRESS.test(replyTo) ? [`Reply-To: ${replyTo}`] : [];
+
 const toBase64Lines = (content: string) =>
   (
     Buffer.from(content, 'utf8')
@@ -64,6 +71,7 @@ export const buildRawEmail = (
   return [
     `From: ${encodeHeaderText(sender.name)} <${sender.address}>`,
     `To: ${email.to}`,
+    ...replyToHeader(email.replyTo),
     `Subject: ${encodeHeaderText(email.subject)}`,
     'MIME-Version: 1.0',
     `Content-Type: multipart/mixed; boundary="${boundary}"`,

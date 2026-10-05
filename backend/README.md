@@ -57,6 +57,7 @@ backend/
 │   ├── knowledgeLibrary/     ← GET /knowledge/library — the Knowledge screen's search
 │   ├── bedrock/              ← BedrockModule: Claude on Bedrock (streaming, retries, Sonnet/Haiku routing)
 │   ├── aiAssistant/          ← /ai — POST /ai/ask (SSE answers), threads; saves messages + citations
+│   ├── demoRequests/         ← POST /public/demo-requests (marketing site) + /admin/demo-requests (Owner only)
 │   ├── dashboard/            ← GET /dashboard — the Dashboard screen's figures in one request
 │   ├── notifications/        ← /notifications — the bell: list, unread count, mark read
 │   ├── adminOverview/        ← GET /admin/overview — the admin portal's Overview (scoped like other admin screens)

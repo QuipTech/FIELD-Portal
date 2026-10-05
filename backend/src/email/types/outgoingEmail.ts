@@ -11,6 +11,8 @@ export interface OutgoingEmail {
   text: string;
   html?: string;
   attachment?: EmailAttachment;
+  // A bare address (e.g. a demo requester's), so replies go to them.
+  replyTo?: string;
 }
 
 // messageId is null when sending is switched off (logged instead).

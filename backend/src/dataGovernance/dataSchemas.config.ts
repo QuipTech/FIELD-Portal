@@ -14,7 +14,15 @@ export interface DataSchema {
   level: SchemaVisibilityLevel;
   // Every table in the schema (the test checks there are no others).
   tables: string[];
+  // Tables locked down further than the schema's level (e.g. sales leads
+  // in platform, which tenants must not read).
+  tableLevels?: Record<string, SchemaVisibilityLevel>;
 }
+
+export const tableVisibilityLevel = (
+  schema: DataSchema,
+  table: string,
+): SchemaVisibilityLevel => schema.tableLevels?.[table] ?? schema.level;
 
 export const VISIBILITY_LABELS: Record<SchemaVisibilityLevel, string> = {
   all_tenants_read_only: 'Read-only, all tenants',
@@ -25,9 +33,11 @@ export const VISIBILITY_LABELS: Record<SchemaVisibilityLevel, string> = {
 export const DATA_SCHEMAS: DataSchema[] = [
   {
     name: 'platform',
-    contents: 'Plan catalogue, feature definitions',
+    contents:
+      'Plan catalogue, feature definitions; demo requests (service role only)',
     level: 'all_tenants_read_only',
-    tables: ['features', 'plan_features', 'plans'],
+    tables: ['demo_requests', 'features', 'plan_features', 'plans'],
+    tableLevels: { demo_requests: 'service_role_only' },
   },
   {
     name: 'app',

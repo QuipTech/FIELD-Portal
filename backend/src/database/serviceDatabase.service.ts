@@ -5,8 +5,9 @@ import { buildPoolConfig } from './buildPoolConfig';
 
 // A second pool, connected as the service role (field_service): the only
 // role that can write the platform/app schemas or touch billing at all
-// (migration 0046). Use it only from the billing module and background
-// jobs — request handling stays on DatabaseService (the tenant role).
+// (migration 0046). Use it only from the billing module, background jobs
+// and demo requests (platform-wide leads no tenant may read, 0066) —
+// other request handling stays on DatabaseService (the tenant role).
 @Injectable()
 export class ServiceDatabaseService implements OnModuleDestroy {
   private readonly logger = new Logger(ServiceDatabaseService.name);

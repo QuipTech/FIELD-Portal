@@ -1,15 +1,8 @@
+import { escapeHtml } from '../common/utils/escapeHtml';
 import { AlertMessage } from './types/alertTypes';
 
 const DEFAULT_ACCENT = '#4F39F6';
 const HEX_COLOR = /^#[0-9a-f]{3}([0-9a-f]{3})?$/i;
-
-const escapeHtml = (text: string) =>
-  text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 
 // Branding colours are admin-typed, so only a plain hex colour reaches
 // the style attribute.

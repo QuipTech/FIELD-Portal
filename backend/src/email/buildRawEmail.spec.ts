@@ -60,4 +60,33 @@ describe('buildRawEmail', () => {
     expect(message).toContain('Content-Type: text/plain; charset=UTF-8');
     expect(message).toContain('Content-Type: text/html; charset=UTF-8');
   });
+
+  it('sets Reply-To to a bare address', () => {
+    const message = buildRawEmail(
+      {
+        to: 'team@example.com',
+        subject: 'Demo',
+        text: 'Hi',
+        replyTo: 'jo@acme.com',
+      },
+      SENDER,
+      'b1',
+    );
+    expect(message).toMatch(/^Reply-To: jo@acme\.com\r$/m);
+  });
+
+  it('drops a Reply-To that could add headers', () => {
+    const message = buildRawEmail(
+      {
+        to: 'team@example.com',
+        subject: 'Demo',
+        text: 'Hi',
+        replyTo: 'jo@acme.com\r\nBcc: attacker@example.com',
+      },
+      SENDER,
+      'b1',
+    );
+    expect(message).not.toMatch(/^Reply-To:/m);
+    expect(message).not.toMatch(/^Bcc:/m);
+  });
 });

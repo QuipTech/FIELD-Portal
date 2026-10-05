@@ -34,6 +34,7 @@ import { AiAssistantModule } from './aiAssistant/aiAssistant.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AdminOverviewModule } from './adminOverview/adminOverview.module';
+import { DemoRequestsModule } from './demoRequests/demoRequests.module';
 import { RequestSourceMiddleware } from './common/requestSource/requestSource.middleware';
 
 @Module({
@@ -74,6 +75,7 @@ import { RequestSourceMiddleware } from './common/requestSource/requestSource.mi
     DashboardModule,
     NotificationsModule,
     AdminOverviewModule,
+    DemoRequestsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

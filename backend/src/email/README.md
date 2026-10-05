@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Sends email with Amazon SES for the whole API: alert notifications (`src/alertEngine`) and scheduled reports (`src/adminReports`). One `EmailService.sendEmail` takes a recipient, subject, plain text and optionally HTML and one attachment, and sends it as a raw MIME message. With `NOTIFICATIONS_ENABLED` not set to `true` it logs what it would send instead.
+Sends email with Amazon SES for the whole API: alert notifications (`src/alertEngine`), scheduled reports (`src/adminReports`) and demo requests (`src/demoRequests`). One `EmailService.sendEmail` takes a recipient, subject, plain text and optionally HTML, one attachment and a Reply-To address, and sends it as a raw MIME message. With `NOTIFICATIONS_ENABLED` not set to `true` it logs what it would send instead.
 
 ## Folder structure
 

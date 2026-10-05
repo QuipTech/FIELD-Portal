@@ -6,6 +6,7 @@ import {
   DATA_SCHEMAS,
   SERVICE_ROLE,
   TENANT_ROLE,
+  tableVisibilityLevel,
 } from '../src/dataGovernance/dataSchemas.config';
 
 // Runs against a real database (npm run test:db): DATABASE_URL, else the
@@ -117,7 +118,11 @@ describe('schemas match dataSchemas.config.ts', () => {
   it.each(
     DATA_SCHEMAS.flatMap((schema) =>
       schema.tables.map(
-        (table) => [`${schema.name}.${table}`, schema.level] as const,
+        (table) =>
+          [
+            `${schema.name}.${table}`,
+            tableVisibilityLevel(schema, table),
+          ] as const,
       ),
     ),
   )('%s grants match its visibility level', async (qualified, level) => {
@@ -194,6 +199,15 @@ describe('tenant role (field_app)', () => {
     const plans = await client.query('SELECT code FROM platform.plans');
     expect(plans.rowCount).toBeGreaterThan(0);
     await expectRefused(`UPDATE platform.plans SET name = 'x'`);
+  });
+
+  it('cannot read or add demo requests (sales leads)', async () => {
+    await asTenantRole(tenantA);
+    await expectRefused('SELECT 1 FROM platform.demo_requests LIMIT 1');
+    await expectRefused(
+      `INSERT INTO platform.demo_requests (email, first_name, last_name, company, country)
+       VALUES ('a@example.com', 'A', 'B', 'C', 'AU')`,
+    );
   });
 
   it('cannot change or delete audit log entries, or delete config snapshots', async () => {

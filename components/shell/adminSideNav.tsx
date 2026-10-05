@@ -3,12 +3,16 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon, type IconName } from "../icons/icon";
+import { usePermissions } from "@/lib/auth/usePermissions";
+import { PERMISSIONS, type PermissionCode } from "@/lib/auth/permissionCodes";
 import { LogoutButton } from "./logoutButton";
 
 interface AdminNavLink {
   href: string;
   label: string;
   icon: IconName;
+  // Hidden from anyone without it.
+  permission?: PermissionCode;
 }
 
 const links: AdminNavLink[] = [
@@ -20,6 +24,7 @@ const links: AdminNavLink[] = [
   { href: "/admin/ai-configuration", label: "AI configuration", icon: "sliders" },
   { href: "/admin/audit-log", label: "Audit log", icon: "file" },
   { href: "/admin/subscriptions", label: "Subscriptions", icon: "card" },
+  { href: "/admin/demo-requests", label: "Demo requests", icon: "mail", permission: PERMISSIONS.managePlatform },
 ];
 
 const NavItem = ({ href, label, icon, active }: AdminNavLink & { active: boolean }) => (
@@ -36,10 +41,12 @@ const NavItem = ({ href, label, icon, active }: AdminNavLink & { active: boolean
 
 export const AdminSideNav = () => {
   const pathname = usePathname();
+  const { can } = usePermissions();
+  const visibleLinks = links.filter((link) => !link.permission || can(link.permission));
 
   return (
     <div className="flex w-[216px] flex-none flex-col gap-0.5 rounded-r-[18px] bg-gradient-to-b from-brandDeep to-[#221C52] p-3">
-      {links.map((link) => (
+      {visibleLinks.map((link) => (
         <NavItem key={link.href} {...link} active={pathname === link.href} />
       ))}
       <div className="mt-auto flex flex-col gap-0.5 border-t border-white/[0.16] pt-2.5">

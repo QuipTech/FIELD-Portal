@@ -52,6 +52,7 @@ session (set per-request by `DatabaseService.withTenant`).
 | `0063` | `ai_platform_usage_log` — Bedrock usage outside answers (prompt tests, indexing, search) |
 | `0064` | Reports — `admin_report_*` functions for the CSV exports, `scheduled_reports` |
 | `0065` | Alert delivery — `alert_rules.cooldown_minutes`, `notifications.rule_id`/`entity_key` and kind `alert`, `notification_deliveries`, `pg_notify` on new notifications, SECURITY DEFINER `alert_*` functions for the rule engine |
+| `0066` | Demo requests — `platform.demo_requests` (marketing-site demo form: contact details, follow-up status + notes, team/confirmation email sent times, IP); service role only, no tenant access |
 
 ## Two forward references, resolved across files
 
