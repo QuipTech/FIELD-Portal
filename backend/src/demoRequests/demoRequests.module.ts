@@ -5,7 +5,6 @@ import { PublicDemoRequestsController } from './publicDemoRequests.controller';
 import { AdminDemoRequestsController } from './adminDemoRequests.controller';
 import { DemoRequestsService } from './demoRequests.service';
 import { DemoRequestEmailsService } from './demoRequestEmails.service';
-import { TurnstileVerifierService } from './turnstileVerifier.service';
 import { DemoRequestsConfig } from './demoRequestsConfig';
 import { DEMO_REQUEST_THROTTLER } from './demoRequestsThrottle';
 
@@ -18,7 +17,6 @@ import { DEMO_REQUEST_THROTTLER } from './demoRequestsThrottle';
     DemoRequestsConfig,
     DemoRequestsService,
     DemoRequestEmailsService,
-    TurnstileVerifierService,
   ],
 })
 export class DemoRequestsModule {}

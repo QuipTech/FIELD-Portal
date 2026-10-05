@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Injectable,
   Logger,
   NotFoundException,
@@ -7,12 +6,12 @@ import {
 } from '@nestjs/common';
 import { ServiceDatabaseService } from '../database/serviceDatabase.service';
 import * as demoRequestsRepository from './demoRequests.repository';
-import { TurnstileVerifierService } from './turnstileVerifier.service';
 import {
   DemoEmailOutcome,
   DemoRequestEmailsService,
 } from './demoRequestEmails.service';
 import { toDemoRequest } from './demoRequestMapper';
+import { NewDemoRequest } from './demoRequests.repository';
 import { CreateDemoRequestDto } from './dto/createDemoRequestDto';
 import { ListDemoRequestsQueryDto } from './dto/listDemoRequestsQueryDto';
 import { UpdateDemoRequestDto } from './dto/updateDemoRequestDto';
@@ -22,10 +21,8 @@ import {
   DemoRequestPage,
 } from './types/demoRequestResponse';
 
-const ACCEPTED: DemoRequestAccepted = { success: true };
-const VERIFICATION_FAILED_MESSAGE =
-  "We couldn't verify you're human. Please refresh the page and try again.";
-const VERIFICATION_UNAVAILABLE_MESSAGE =
+const ACCEPTED: DemoRequestAccepted = { ok: true };
+const TRY_AGAIN_LATER_MESSAGE =
   "We couldn't send your request just now. Please try again in a few minutes.";
 const NOT_FOUND_MESSAGE = 'Demo request not found.';
 
@@ -35,43 +32,39 @@ export class DemoRequestsService {
 
   constructor(
     private readonly serviceDatabase: ServiceDatabaseService,
-    private readonly turnstileVerifier: TurnstileVerifierService,
     private readonly demoRequestEmails: DemoRequestEmailsService,
   ) {}
 
   // Public form. Saves first; the emails go out in the background, so the
-  // response never waits for (or fails because of) SES.
+  // response never waits for (or fails because of) SES. Only if saving
+  // fails does it wait on the team email, which is then the only record.
   submit = async (
     dto: CreateDemoRequestDto,
     ipAddress: string | null,
+    userAgent: string | null,
   ): Promise<DemoRequestAccepted> => {
     if (dto.website) {
       this.logger.warn(`Honeypot filled (ip ${ipAddress}): request dropped.`);
       return ACCEPTED;
     }
-    const verification = await this.turnstileVerifier.verify(
-      dto.turnstileToken,
+    const newRequest: NewDemoRequest = {
+      email: dto.email,
+      firstName: dto.firstName,
+      lastName: dto.lastName,
+      company: dto.company,
+      country: dto.country,
+      phone: dto.phone ?? null,
+      message: dto.message ?? null,
       ipAddress,
-    );
-    if (verification === 'invalid') {
-      throw new BadRequestException(VERIFICATION_FAILED_MESSAGE);
-    }
-    if (verification === 'unavailable') {
-      throw new ServiceUnavailableException(VERIFICATION_UNAVAILABLE_MESSAGE);
-    }
-    const saved = await demoRequestsRepository.insertDemoRequest(
-      this.serviceDatabase,
-      {
-        email: dto.email,
-        firstName: dto.firstName,
-        lastName: dto.lastName,
-        company: dto.company,
-        country: dto.country,
-        phone: dto.phone ?? null,
-        message: dto.message ?? null,
-        ipAddress,
-      },
-    );
+      userAgent,
+    };
+    const saved = await demoRequestsRepository
+      .insertDemoRequest(this.serviceDatabase, newRequest)
+      .catch((error: Error) => {
+        this.logger.error(`Demo request not saved: ${error.message}`);
+        return null;
+      });
+    if (!saved) return this.notifyTeamOfUnsaved(newRequest);
     void this.demoRequestEmails
       .sendPending(saved)
       .catch((error: Error) =>
@@ -120,6 +113,23 @@ export class DemoRequestsService {
       await this.requireRow(requestId),
     );
     return { ...outcome, request: await this.get(requestId) };
+  };
+
+  private notifyTeamOfUnsaved = async (
+    request: NewDemoRequest,
+  ): Promise<DemoRequestAccepted> => {
+    const sent = await this.demoRequestEmails.sendUnsavedTeamEmail({
+      email: request.email,
+      first_name: request.firstName,
+      last_name: request.lastName,
+      company: request.company,
+      country: request.country,
+      phone: request.phone,
+      message: request.message,
+      created_at: new Date(),
+    });
+    if (!sent) throw new ServiceUnavailableException(TRY_AGAIN_LATER_MESSAGE);
+    return ACCEPTED;
   };
 
   private requireRow = async (requestId: string) => {

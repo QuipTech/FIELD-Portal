@@ -15,6 +15,7 @@ export const toDemoRequest = (row: DemoRequestRow): DemoRequest => ({
   teamEmailSentAt: row.team_email_sent_at?.toISOString() ?? null,
   userEmailSentAt: row.user_email_sent_at?.toISOString() ?? null,
   ipAddress: row.ip_address,
+  userAgent: row.user_agent,
   createdAt: row.created_at.toISOString(),
   updatedAt: row.updated_at.toISOString(),
 });

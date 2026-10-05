@@ -5,7 +5,10 @@ import { ServiceDatabaseService } from '../database/serviceDatabase.service';
 import { DemoRequestsConfig } from './demoRequestsConfig';
 import { EmailKind, markEmailSent } from './demoRequests.repository';
 import { DemoRequestRow } from './types/demoRequestRows';
-import { buildTeamNotificationEmail } from './emails/teamNotificationEmail';
+import {
+  DemoRequestDetails,
+  buildTeamNotificationEmail,
+} from './emails/teamNotificationEmail';
 import { buildRequesterConfirmationEmail } from './emails/requesterConfirmationEmail';
 
 export interface DemoEmailOutcome {
@@ -36,23 +39,41 @@ export class DemoRequestEmailsService {
     return { teamEmailSent, userEmailSent };
   };
 
+  // Last resort when the request couldn't be saved: the team email then
+  // carries the only copy, so the caller fails the request if it's false.
+  sendUnsavedTeamEmail = async (
+    details: DemoRequestDetails,
+  ): Promise<boolean> => {
+    const emails = this.teamEmails(details, null, 'unsaved request');
+    if (!emails.length) return false;
+    const results = await this.sendEach('Unsaved demo request', 'team', emails);
+    return results.every(Boolean);
+  };
+
   private sendTeamEmail = (request: DemoRequestRow): Promise<boolean> => {
+    const emails = this.teamEmails(
+      request,
+      this.config.requestUrl(request.id),
+      `demo request ${request.id}`,
+    );
+    if (!emails.length) return Promise.resolve(false);
+    return this.sendAll(request.id, 'team', emails);
+  };
+
+  private teamEmails = (
+    details: DemoRequestDetails,
+    requestUrl: string | null,
+    label: string,
+  ): OutgoingEmail[] => {
     const { notifyEmails } = this.config;
     if (!notifyEmails.length) {
       this.logger.warn(
-        `DEMO_NOTIFY_EMAIL is not set: no team email for demo request ${request.id}.`,
+        `DEMO_REQUEST_NOTIFY_TO is not set: no team email for ${label}.`,
       );
-      return Promise.resolve(false);
+      return [];
     }
-    const email = buildTeamNotificationEmail(
-      request,
-      this.config.requestUrl(request.id),
-    );
-    return this.sendAll(
-      request.id,
-      'team',
-      notifyEmails.map((to) => ({ ...email, to, replyTo: request.email })),
-    );
+    const email = buildTeamNotificationEmail(details, requestUrl);
+    return notifyEmails.map((to) => ({ ...email, to, replyTo: details.email }));
   };
 
   private sendUserEmail = (request: DemoRequestRow): Promise<boolean> =>
@@ -67,21 +88,12 @@ export class DemoRequestEmailsService {
     kind: EmailKind,
     emails: OutgoingEmail[],
   ): Promise<boolean> => {
-    const results = await Promise.allSettled(
-      emails.map((email) => this.emailService.sendEmail(email)),
+    const results = await this.sendEach(
+      `Demo request ${requestId}`,
+      kind,
+      emails,
     );
-    const failures = results.flatMap((result) =>
-      result.status === 'rejected' ? [result.reason as Error] : [],
-    );
-    failures.forEach((error) =>
-      this.logger.error(
-        `Demo request ${requestId}: ${kind} email failed: ${error?.message ?? error}`,
-      ),
-    );
-    const allSent = results.every(
-      (result) => result.status === 'fulfilled' && result.value.messageId,
-    );
-    if (!allSent) return false;
+    if (!results.every(Boolean)) return false;
     try {
       await markEmailSent(this.serviceDatabase, requestId, kind);
       return true;
@@ -91,5 +103,25 @@ export class DemoRequestEmailsService {
       );
       return false;
     }
+  };
+
+  // true per email SES accepted; a logged-only send (NOTIFICATIONS_ENABLED
+  // off) has no message id, so it counts as not sent.
+  private sendEach = async (
+    label: string,
+    kind: EmailKind,
+    emails: OutgoingEmail[],
+  ): Promise<boolean[]> => {
+    const results = await Promise.allSettled(
+      emails.map((email) => this.emailService.sendEmail(email)),
+    );
+    return results.map((result) => {
+      if (result.status === 'fulfilled') return Boolean(result.value.messageId);
+      const error = result.reason as Error;
+      this.logger.error(
+        `${label}: ${kind} email failed: ${error?.message ?? error}`,
+      );
+      return false;
+    });
   };
 }

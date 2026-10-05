@@ -9,7 +9,7 @@ import { ListDemoRequestsQueryDto } from './dto/listDemoRequestsQueryDto';
 
 const COLUMNS = `id, email, first_name, last_name, company, country, phone,
   message, status, notes, team_email_sent_at, user_email_sent_at,
-  ip_address, created_at, updated_at`;
+  ip_address, user_agent, created_at, updated_at`;
 
 export type EmailKind = 'team' | 'user';
 
@@ -27,6 +27,7 @@ export interface NewDemoRequest {
   phone: string | null;
   message: string | null;
   ipAddress: string | null;
+  userAgent: string | null;
 }
 
 export const insertDemoRequest = async (
@@ -35,8 +36,9 @@ export const insertDemoRequest = async (
 ): Promise<DemoRequestRow> => {
   const result = await database.query<DemoRequestRow>(
     `INSERT INTO platform.demo_requests
-       (email, first_name, last_name, company, country, phone, message, ip_address)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       (email, first_name, last_name, company, country, phone, message,
+        ip_address, user_agent)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING ${COLUMNS}`,
     [
       request.email,
@@ -47,6 +49,7 @@ export const insertDemoRequest = async (
       request.phone,
       request.message,
       request.ipAddress,
+      request.userAgent,
     ],
   );
   return result.rows[0];

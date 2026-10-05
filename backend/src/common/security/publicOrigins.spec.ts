@@ -16,7 +16,7 @@ describe('corsOptionsForRequest', () => {
   });
 
   it('allows only the marketing site on /public/*, without credentials', () => {
-    process.env.PUBLIC_CORS_ORIGINS =
+    process.env.CORS_ALLOWED_ORIGINS =
       'https://quiptechfield.com.au, https://www.quiptechfield.com.au';
     process.env.PORTAL_ORIGIN = 'https://portal.example';
     expect(optionsFor('/public/demo-requests')).toEqual({
@@ -24,7 +24,8 @@ describe('corsOptionsForRequest', () => {
         'https://quiptechfield.com.au',
         'https://www.quiptechfield.com.au',
       ],
-      methods: ['POST'],
+      methods: ['POST', 'OPTIONS'],
+      allowedHeaders: ['Content-Type'],
       credentials: false,
     });
   });
@@ -40,7 +41,16 @@ describe('corsOptionsForRequest', () => {
     }
   });
 
+  it('still reads the earlier PUBLIC_CORS_ORIGINS name', () => {
+    delete process.env.CORS_ALLOWED_ORIGINS;
+    process.env.PUBLIC_CORS_ORIGINS = 'https://quiptechfield.com.au';
+    expect(optionsFor('/public/demo-requests').origin).toEqual([
+      'https://quiptechfield.com.au',
+    ]);
+  });
+
   it('defaults to the local landing app in development', () => {
+    delete process.env.CORS_ALLOWED_ORIGINS;
     delete process.env.PUBLIC_CORS_ORIGINS;
     expect(optionsFor('/public/demo-requests').origin).toEqual([
       'http://localhost:3000',

@@ -1,17 +1,10 @@
-import {
-  BadRequestException,
-  ServiceUnavailableException,
-} from '@nestjs/common';
+import { ServiceUnavailableException } from '@nestjs/common';
 import { EmailService } from '../email/email.service';
 import { ServiceDatabaseService } from '../database/serviceDatabase.service';
 import * as repository from './demoRequests.repository';
 import { DemoRequestsService } from './demoRequests.service';
 import { DemoRequestEmailsService } from './demoRequestEmails.service';
 import { DemoRequestsConfig } from './demoRequestsConfig';
-import {
-  TurnstileResult,
-  TurnstileVerifierService,
-} from './turnstileVerifier.service';
 import { CreateDemoRequestDto } from './dto/createDemoRequestDto';
 import { DemoRequestRow } from './types/demoRequestRows';
 
@@ -32,6 +25,7 @@ const ROW: DemoRequestRow = {
   team_email_sent_at: null,
   user_email_sent_at: null,
   ip_address: '203.0.113.9',
+  user_agent: 'Mozilla/5.0',
   created_at: new Date('2026-10-04T01:00:00Z'),
   updated_at: new Date('2026-10-04T01:00:00Z'),
 };
@@ -42,7 +36,6 @@ const DTO = {
   lastName: ROW.last_name,
   company: ROW.company,
   country: ROW.country,
-  turnstileToken: 'token',
 } as CreateDemoRequestDto;
 
 const config = {
@@ -55,25 +48,17 @@ const config = {
 const flushBackgroundWork = () =>
   new Promise((resolve) => setImmediate(resolve));
 
-const setup = (options: {
-  turnstile?: TurnstileResult;
-  sendEmail?: jest.Mock;
-}) => {
+const setup = (options: { sendEmail?: jest.Mock }) => {
   const sendEmail =
     options.sendEmail ?? jest.fn().mockResolvedValue({ messageId: 'ses-1' });
-  const verify = jest.fn().mockResolvedValue(options.turnstile ?? 'valid');
   const database = {} as ServiceDatabaseService;
   const emails = new DemoRequestEmailsService(
     { sendEmail } as unknown as EmailService,
     database,
     config,
   );
-  const service = new DemoRequestsService(
-    database,
-    { verify } as unknown as TurnstileVerifierService,
-    emails,
-  );
-  return { service, sendEmail, verify };
+  const service = new DemoRequestsService(database, emails);
+  return { service, sendEmail };
 };
 
 describe('DemoRequestsService.submit', () => {
@@ -85,12 +70,18 @@ describe('DemoRequestsService.submit', () => {
 
   it('saves, then emails the team (Reply-To the requester) and the requester', async () => {
     const { service, sendEmail } = setup({});
-    await expect(service.submit(DTO, '203.0.113.9')).resolves.toEqual({
-      success: true,
+    await expect(
+      service.submit(DTO, '203.0.113.9', 'Mozilla/5.0'),
+    ).resolves.toEqual({
+      ok: true,
     });
     expect(mockedRepository.insertDemoRequest).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ email: ROW.email, ipAddress: '203.0.113.9' }),
+      expect.objectContaining({
+        email: ROW.email,
+        ipAddress: '203.0.113.9',
+        userAgent: 'Mozilla/5.0',
+      }),
     );
     await flushBackgroundWork();
     const sent = sendEmail.mock.calls.map(([email]) => email);
@@ -111,39 +102,25 @@ describe('DemoRequestsService.submit', () => {
   });
 
   it('honeypot: reports success but saves and sends nothing', async () => {
-    const { service, sendEmail, verify } = setup({});
+    const { service, sendEmail } = setup({});
     await expect(
       service.submit(
         { ...DTO, website: 'http://spam.example' },
         '198.51.100.1',
+        null,
       ),
-    ).resolves.toEqual({ success: true });
+    ).resolves.toEqual({ ok: true });
     await flushBackgroundWork();
-    expect(verify).not.toHaveBeenCalled();
     expect(mockedRepository.insertDemoRequest).not.toHaveBeenCalled();
     expect(sendEmail).not.toHaveBeenCalled();
-  });
-
-  it('refuses an invalid Turnstile token without saving', async () => {
-    const { service } = setup({ turnstile: 'invalid' });
-    await expect(service.submit(DTO, null)).rejects.toBeInstanceOf(
-      BadRequestException,
-    );
-    expect(mockedRepository.insertDemoRequest).not.toHaveBeenCalled();
-  });
-
-  it('refuses (try again later) when Turnstile cannot be checked', async () => {
-    const { service } = setup({ turnstile: 'unavailable' });
-    await expect(service.submit(DTO, null)).rejects.toBeInstanceOf(
-      ServiceUnavailableException,
-    );
-    expect(mockedRepository.insertDemoRequest).not.toHaveBeenCalled();
   });
 
   it('still succeeds when SES fails, leaving both sent times empty', async () => {
     const sendEmail = jest.fn().mockRejectedValue(new Error('SES throttled'));
     const { service } = setup({ sendEmail });
-    await expect(service.submit(DTO, null)).resolves.toEqual({ success: true });
+    await expect(service.submit(DTO, null, null)).resolves.toEqual({
+      ok: true,
+    });
     await flushBackgroundWork();
     expect(mockedRepository.insertDemoRequest).toHaveBeenCalledTimes(1);
     expect(sendEmail).toHaveBeenCalled();
@@ -153,9 +130,40 @@ describe('DemoRequestsService.submit', () => {
   it('does not count a logged-only email (NOTIFICATIONS_ENABLED off) as sent', async () => {
     const sendEmail = jest.fn().mockResolvedValue({ messageId: null });
     const { service } = setup({ sendEmail });
-    await service.submit(DTO, null);
+    await service.submit(DTO, null, null);
     await flushBackgroundWork();
     expect(mockedRepository.markEmailSent).not.toHaveBeenCalled();
+  });
+});
+
+describe('DemoRequestsService.submit when saving fails', () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+    mockedRepository.insertDemoRequest.mockRejectedValue(
+      new Error('connection refused'),
+    );
+  });
+
+  it('still succeeds if the team email (the only record) goes out', async () => {
+    const { service, sendEmail } = setup({});
+    await expect(service.submit(DTO, null, null)).resolves.toEqual({
+      ok: true,
+    });
+    const sent = sendEmail.mock.calls.map(([email]) => email);
+    expect(sent).toHaveLength(2);
+    expect(sent[0]).toMatchObject({
+      to: 'sales@quiptech.example',
+      replyTo: ROW.email,
+    });
+    expect(sent[0].text).toContain('could not be saved');
+  });
+
+  it('answers 503 when SES is down too', async () => {
+    const sendEmail = jest.fn().mockRejectedValue(new Error('SES down'));
+    const { service } = setup({ sendEmail });
+    await expect(service.submit(DTO, null, null)).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
   });
 });
 

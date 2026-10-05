@@ -38,6 +38,7 @@ export const DemoRequestDetails = ({ request }: { request: DemoRequest }) => (
       <DetailRow label="Country">{request.country}</DetailRow>
       <DetailRow label="Received">{formatShortDateTime(request.createdAt)}</DetailRow>
       <DetailRow label="IP address">{request.ipAddress ?? "—"}</DetailRow>
+      <DetailRow label="Browser">{request.userAgent ?? "—"}</DetailRow>
       <DetailRow label="Message">
         {request.message ? <span className="whitespace-pre-line">{request.message}</span> : "—"}
       </DetailRow>

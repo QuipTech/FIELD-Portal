@@ -49,11 +49,10 @@ const FORM = {
   lastName: 'Bloggs',
   company: 'Acme',
   country: 'Australia',
-  turnstileToken: 'token',
 };
 
 const service = {
-  submit: jest.fn().mockResolvedValue({ success: true }),
+  submit: jest.fn().mockResolvedValue({ ok: true }),
   list: jest
     .fn()
     .mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 25 }),
@@ -102,36 +101,52 @@ const asUser = (userId: string) => {
   return { 'X-Test-User': userId };
 };
 
+// Every request here comes from the same IP, so they all count toward its
+// limit of 5; the 429 test relies on that and runs last.
 describe('POST /public/demo-requests', () => {
-  it('returns only { success: true }', async () => {
-    const response = await request(app.getHttpServer())
+  const post = () =>
+    request(app.getHttpServer())
       .post('/public/demo-requests')
-      .send(FORM)
-      .expect(200);
-    expect(response.body).toEqual({ success: true });
+      .set('User-Agent', 'jest-agent');
+
+  it('answers 201 { ok: true }, passing the IP and User-Agent on', async () => {
+    const response = await post().send(FORM).expect(201);
+    expect(response.body).toEqual({ ok: true });
+    expect(service.submit).toHaveBeenCalledWith(
+      expect.objectContaining({ email: FORM.email }),
+      expect.any(String),
+      'jest-agent',
+    );
   });
 
-  it('refuses invalid input with 400 before reaching the service', async () => {
+  it('refuses an invalid email with a message people can read', async () => {
     service.submit.mockClear();
-    await request(app.getHttpServer())
-      .post('/public/demo-requests')
-      .send({ ...FORM, email: 'not-an-email', extra: 'x' })
+    const response = await post()
+      .send({ ...FORM, email: 'not-an-email' })
+      .expect(400);
+    expect(response.body.message).toEqual(['Enter a valid email address.']);
+    expect(service.submit).not.toHaveBeenCalled();
+  });
+
+  it('refuses unknown fields', async () => {
+    service.submit.mockClear();
+    await post()
+      .send({ ...FORM, extra: 'x' })
       .expect(400);
     expect(service.submit).not.toHaveBeenCalled();
   });
 
-  it('allows 5 requests per IP per hour, then answers 429', async () => {
-    // The two tests above already used 2 of this IP's 5.
-    for (let attempt = 3; attempt <= 5; attempt += 1) {
-      await request(app.getHttpServer())
-        .post('/public/demo-requests')
-        .send(FORM)
-        .expect(200);
-    }
-    await request(app.getHttpServer())
-      .post('/public/demo-requests')
-      .send(FORM)
-      .expect(429);
+  it('refuses a turnstileToken, which is no longer part of the form', async () => {
+    service.submit.mockClear();
+    await post()
+      .send({ ...FORM, turnstileToken: 'token' })
+      .expect(400);
+    expect(service.submit).not.toHaveBeenCalled();
+  });
+
+  it('allows 5 requests per IP per 10 minutes, then answers 429', async () => {
+    await post().send(FORM).expect(201);
+    await post().send(FORM).expect(429);
   });
 });
 

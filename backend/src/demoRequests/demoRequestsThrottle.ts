@@ -3,6 +3,6 @@
 // memory, so with several instances the limit applies per instance.
 export const DEMO_REQUEST_THROTTLER = {
   name: 'demoRequests',
-  ttl: 60 * 60 * 1000,
+  ttl: 10 * 60 * 1000,
   limit: 5,
 };

@@ -16,6 +16,7 @@ export interface DemoRequest {
   teamEmailSentAt: string | null;
   userEmailSentAt: string | null;
   ipAddress: string | null;
+  userAgent: string | null;
   createdAt: string;
   updatedAt: string;
 }

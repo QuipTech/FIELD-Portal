@@ -15,6 +15,7 @@ export interface DemoRequest {
   teamEmailSentAt: string | null;
   userEmailSentAt: string | null;
   ipAddress: string | null;
+  userAgent: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -26,7 +27,7 @@ export interface DemoRequestPage {
   pageSize: number;
 }
 
-// The only thing the public endpoint ever returns.
+// The only thing the public endpoint ever returns (with 201).
 export interface DemoRequestAccepted {
-  success: true;
+  ok: true;
 }

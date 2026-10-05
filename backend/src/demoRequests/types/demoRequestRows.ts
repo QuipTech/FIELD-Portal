@@ -15,6 +15,7 @@ export interface DemoRequestRow {
   team_email_sent_at: Date | null;
   user_email_sent_at: Date | null;
   ip_address: string | null;
+  user_agent: string | null;
   created_at: Date;
   updated_at: Date;
 }

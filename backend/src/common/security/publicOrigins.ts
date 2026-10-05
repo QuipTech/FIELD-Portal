@@ -8,9 +8,14 @@ import { getPortalOrigins } from './portalOrigins';
 // in. Only these get its origins; every other route keeps PORTAL_ORIGIN.
 export const PUBLIC_ROUTE_PREFIX = '/public/';
 
-// Comma-separated. Dev default: the landing app on localhost:3000.
+// Comma-separated CORS_ALLOWED_ORIGINS (PUBLIC_CORS_ORIGINS, its earlier
+// name, still works). Dev default: the landing app on localhost:3000.
 export const getPublicOrigins = (): string[] =>
-  (process.env.PUBLIC_CORS_ORIGINS ?? 'http://localhost:3000')
+  (
+    process.env.CORS_ALLOWED_ORIGINS ??
+    process.env.PUBLIC_CORS_ORIGINS ??
+    'http://localhost:3000'
+  )
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
@@ -25,7 +30,12 @@ export const corsOptionsForRequest: CorsOptionsDelegate<{ url?: string }> = (
   callback,
 ) => {
   const options: CorsOptions = isPublicRoute(request.url)
-    ? { origin: getPublicOrigins(), methods: ['POST'], credentials: false }
+    ? {
+        origin: getPublicOrigins(),
+        methods: ['POST', 'OPTIONS'],
+        allowedHeaders: ['Content-Type'],
+        credentials: false,
+      }
     : { origin: getPortalOrigins(), credentials: true };
   callback(null, options);
 };
