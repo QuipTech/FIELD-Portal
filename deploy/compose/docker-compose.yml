@@ -1,0 +1,73 @@
+# One environment (staging or production) per EC2 host. Values come from
+# ${APP_ROOT}/release.env, written by deployRelease.sh on each deploy.
+name: field-portal
+
+x-logging: &defaultLogging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  api:
+    image: ${API_IMAGE:?API_IMAGE is required}
+    restart: unless-stopped
+    env_file: ${APP_ROOT:?APP_ROOT is required}/api.env
+    environment:
+      NODE_ENV: ${FIELD_ENVIRONMENT:?FIELD_ENVIRONMENT is required}
+      PORT: "4001"
+      # Caddy is the only hop in front of the API.
+      TRUST_PROXY_HOPS: "1"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:4001/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging: *defaultLogging
+
+  portal:
+    image: ${PORTAL_IMAGE:?PORTAL_IMAGE is required}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3001/login"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    logging: *defaultLogging
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      PORTAL_DOMAIN: ${PORTAL_DOMAIN:?PORTAL_DOMAIN is required}
+      API_DOMAIN: ${API_DOMAIN:?API_DOMAIN is required}
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL is required}
+    volumes:
+      - ../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddyData:/data
+      - caddyConfig:/config
+    depends_on:
+      api:
+        condition: service_healthy
+      portal:
+        condition: service_healthy
+    logging: *defaultLogging
+
+  # Not started by `up`; deployRelease.sh runs it once per deploy.
+  migrate:
+    image: ${API_IMAGE:?API_IMAGE is required}
+    profiles: ["tools"]
+    env_file: ${APP_ROOT:?APP_ROOT is required}/migrations.env
+    command: ["sh", "db/applyMigrations.sh"]
+    logging: *defaultLogging
+
+volumes:
+  # Holds the Let's Encrypt certificates — must survive redeploys.
+  caddyData:
+  caddyConfig:

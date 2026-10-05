@@ -1,0 +1,72 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "EcrPullPortalImages",
+      "Effect": "Allow",
+      "Action": ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"],
+      "Resource": [
+        "arn:aws:ecr:ap-southeast-2:<ACCOUNT_ID>:repository/field-portal-web",
+        "arn:aws:ecr:ap-southeast-2:<ACCOUNT_ID>:repository/field-portal-api"
+      ]
+    },
+    {
+      "Sid": "EcrLogin",
+      "Effect": "Allow",
+      "Action": "ecr:GetAuthorizationToken",
+      "Resource": "*"
+    },
+    {
+      "Sid": "ReadOwnEnvironmentSecrets",
+      "Effect": "Allow",
+      "Action": "ssm:GetParameter",
+      "Resource": "arn:aws:ssm:ap-southeast-2:<ACCOUNT_ID>:parameter/field-portal/<ENVIRONMENT>/*"
+    },
+    {
+      "Sid": "ReadOwnEnvironmentDeployBundles",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::<DEPLOY_BUCKET>/releases/<ENVIRONMENT>/*"
+    },
+    {
+      "Sid": "PortalFileStorage",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::<STORAGE_BUCKET>/*"
+    },
+    {
+      "Sid": "PortalFileStorageList",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::<STORAGE_BUCKET>"
+    },
+    {
+      "Sid": "BedrockModels",
+      "Effect": "Allow",
+      "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "TextractOcr",
+      "Effect": "Allow",
+      "Action": ["textract:StartDocumentTextDetection", "textract:GetDocumentTextDetection"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "EmailAndSms",
+      "Effect": "Allow",
+      "Action": ["ses:SendEmail", "ses:SendRawEmail", "sns:Publish"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "CognitoUserManagement",
+      "Effect": "Allow",
+      "Action": [
+        "cognito-idp:ListUsers",
+        "cognito-idp:AdminCreateUser",
+        "cognito-idp:AdminDeleteUser"
+      ],
+      "Resource": "arn:aws:cognito-idp:ap-southeast-2:<ACCOUNT_ID>:userpool/<COGNITO_USER_POOL_ID>"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+# Context for portal.Dockerfile (repository root). Env files are excluded
+# so a developer's .env.local can never leak into, or override, a build.
+**/node_modules
+.next
+.git
+.github
+backend
+deploy
+certs
+.env*
+*.pem
+*.p8
+*.cert
+*.tsbuildinfo
+next-env.d.ts
+coverage
+**/.DS_Store

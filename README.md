@@ -27,6 +27,15 @@ npm run dev
 
 Runs on **http://localhost:3001** (not 3000), so it can run side by side with the landing app.
 
+## Deployment
+
+Staging (`dev` branch → `https://staging.<domain>`) and production (`main`
+→ `https://app.<domain>`) run on Amazon EC2 and are deployed by
+`.github/workflows/deployPortal.yml`. Setup and operations are covered in
+[`deploy/README.md`](deploy/README.md). The production build uses
+`output: "standalone"` (`next.config.js`) so the Docker image can run
+without the full `node_modules`.
+
 ## Key conventions specific to this app
 
 - Independent app with its own `package.json` — not part of a monorepo/workspace with the landing page.

@@ -1,0 +1,149 @@
+# Builds the portal (Next.js) and API (NestJS) images, pushes them to ECR,
+# and rolls them out to the environment's EC2 host over SSM.
+#   push to dev  → staging    (https://staging.<domain>)
+#   push to main → production (https://app.<domain>)
+# Settings are repository variables (Settings → Secrets and variables →
+# Actions → Variables); see deploy/README.md for the full list.
+name: Deploy Portal
+
+on:
+  push:
+    branches: [dev, main]
+  # Redeploys the selected branch (dev or main) to its own environment.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  resolveConfig:
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.config.outputs.ENVIRONMENT }}
+      awsRegion: ${{ steps.config.outputs.AWS_REGION }}
+      awsDeployRoleArn: ${{ steps.config.outputs.AWS_DEPLOY_ROLE_ARN }}
+      deployBucket: ${{ steps.config.outputs.DEPLOY_BUCKET }}
+      ec2InstanceId: ${{ steps.config.outputs.EC2_INSTANCE_ID }}
+      portalDomain: ${{ steps.config.outputs.PORTAL_DOMAIN }}
+      apiDomain: ${{ steps.config.outputs.API_DOMAIN }}
+      acmeEmail: ${{ steps.config.outputs.ACME_EMAIL }}
+      cognitoUserPoolId: ${{ steps.config.outputs.NEXT_PUBLIC_COGNITO_USER_POOL_ID }}
+      cognitoClientId: ${{ steps.config.outputs.NEXT_PUBLIC_COGNITO_CLIENT_ID }}
+      cognitoDomain: ${{ steps.config.outputs.NEXT_PUBLIC_COGNITO_DOMAIN }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: config
+        env:
+          BRANCH: ${{ github.ref_name }}
+          VARS_JSON: ${{ toJSON(vars) }}
+        run: bash deploy/scripts/resolveDeployConfig.sh
+
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+
+  buildImages:
+    needs: [resolveConfig, verify]
+    runs-on: ubuntu-latest
+    env:
+      FIELD_ENVIRONMENT: ${{ needs.resolveConfig.outputs.environment }}
+    outputs:
+      portalImage: ${{ steps.tags.outputs.portalImage }}
+      apiImage: ${{ steps.tags.outputs.apiImage }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ needs.resolveConfig.outputs.awsDeployRoleArn }}
+          aws-region: ${{ needs.resolveConfig.outputs.awsRegion }}
+          # The image URIs are passed to the deploy job as outputs; a masked
+          # account ID would make GitHub drop them.
+          mask-aws-account-id: false
+      - id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - id: tags
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          TAG: ${{ needs.resolveConfig.outputs.environment }}-${{ github.sha }}
+        run: |
+          echo "portalImage=$REGISTRY/field-portal-web:$TAG" >> "$GITHUB_OUTPUT"
+          echo "apiImage=$REGISTRY/field-portal-api:$TAG" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: deploy/docker/api.Dockerfile
+          push: true
+          tags: ${{ steps.tags.outputs.apiImage }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,scope=api,mode=max
+      - name: Build and push portal image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/docker/portal.Dockerfile
+          push: true
+          tags: ${{ steps.tags.outputs.portalImage }}
+          build-args: |
+            NEXT_PUBLIC_API_BASE_URL=https://${{ needs.resolveConfig.outputs.apiDomain }}
+            NEXT_PUBLIC_COGNITO_USER_POOL_ID=${{ needs.resolveConfig.outputs.cognitoUserPoolId }}
+            NEXT_PUBLIC_COGNITO_CLIENT_ID=${{ needs.resolveConfig.outputs.cognitoClientId }}
+            NEXT_PUBLIC_COGNITO_DOMAIN=${{ needs.resolveConfig.outputs.cognitoDomain }}
+          cache-from: type=gha,scope=portal-${{ needs.resolveConfig.outputs.environment }}
+          cache-to: type=gha,scope=portal-${{ needs.resolveConfig.outputs.environment }},mode=max
+
+  deploy:
+    needs: [resolveConfig, buildImages]
+    runs-on: ubuntu-latest
+    # Never run two rollouts against the same host at once.
+    concurrency:
+      group: deploy-${{ needs.resolveConfig.outputs.environment }}
+      cancel-in-progress: false
+    env:
+      FIELD_ENVIRONMENT: ${{ needs.resolveConfig.outputs.environment }}
+      RELEASE_ID: ${{ github.sha }}-${{ github.run_attempt }}
+      AWS_REGION: ${{ needs.resolveConfig.outputs.awsRegion }}
+      PORTAL_DOMAIN: ${{ needs.resolveConfig.outputs.portalDomain }}
+      API_DOMAIN: ${{ needs.resolveConfig.outputs.apiDomain }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ needs.resolveConfig.outputs.awsDeployRoleArn }}
+          aws-region: ${{ needs.resolveConfig.outputs.awsRegion }}
+      - name: Upload deploy bundle
+        id: bundle
+        env:
+          DEPLOY_BUCKET: ${{ needs.resolveConfig.outputs.deployBucket }}
+        run: |
+          uri="s3://$DEPLOY_BUCKET/releases/$FIELD_ENVIRONMENT/$RELEASE_ID.tgz"
+          tar -czf deployBundle.tgz deploy
+          aws s3 cp --quiet deployBundle.tgz "$uri"
+          echo "uri=$uri" >> "$GITHUB_OUTPUT"
+      - name: Roll out on EC2
+        env:
+          EC2_INSTANCE_ID: ${{ needs.resolveConfig.outputs.ec2InstanceId }}
+          BUNDLE_S3_URI: ${{ steps.bundle.outputs.uri }}
+          PORTAL_IMAGE: ${{ needs.buildImages.outputs.portalImage }}
+          API_IMAGE: ${{ needs.buildImages.outputs.apiImage }}
+          ACME_EMAIL: ${{ needs.resolveConfig.outputs.acmeEmail }}
+        run: bash deploy/scripts/triggerRemoteDeploy.sh
+      - name: Smoke test
+        run: |
+          curl -fsS --retry 6 --retry-delay 10 --retry-all-errors -o /dev/null "https://$API_DOMAIN/"
+          curl -fsS --retry 6 --retry-delay 10 --retry-all-errors -o /dev/null "https://$PORTAL_DOMAIN/login"
+          echo "Live: https://$PORTAL_DOMAIN" >> "$GITHUB_STEP_SUMMARY"

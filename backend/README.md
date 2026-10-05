@@ -115,7 +115,9 @@ for f in db/migrations/*.sql; do psql "$DATABASE_URL" -f "$f"; done
 ```
 
 Swap `.env.development` for `.env.staging` / `.env.production` to target the
-other databases. Every migration is idempotent (`IF NOT EXISTS`, `ON
+other databases. Deploys to staging and production do this automatically
+with `db/applyMigrations.sh` (same loop, stops on the first error, uses
+`MIGRATION_DATABASE_URL`). See `deploy/README.md`. Every migration is idempotent (`IF NOT EXISTS`, `ON
 CONFLICT DO NOTHING`, guarded `DO $$ … $$` blocks), so re-running the whole
 set is safe.
 
