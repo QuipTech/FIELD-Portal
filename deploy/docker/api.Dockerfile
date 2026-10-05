@@ -9,8 +9,10 @@ RUN npm run build && npm prune --omit=dev
 
 FROM node:22-alpine AS runtime
 WORKDIR /app
-# psql runs db/applyMigrations.sh during each deploy.
-RUN apk add --no-cache postgresql-client
+# psql runs db/applyMigrations.sh during each deploy. certs/ is created up
+# front because ADD --chmod would otherwise apply 644 to the folder too,
+# leaving it untraversable for the node user.
+RUN apk add --no-cache postgresql-client && mkdir -p certs
 # certs/ is gitignored, so CI pulls AWS's public RDS CA bundle directly
 # (buildPoolConfig.ts and psql both verify RDS against it).
 ADD --chmod=644 https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem certs/rdsGlobalBundle.pem
