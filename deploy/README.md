@@ -50,8 +50,8 @@ deploy/
    host, which runs `deployRelease.sh`. That script:
    - reads `/field-portal/<env>/api-env` and `/field-portal/<env>/migrations-env`
      from Parameter Store into `/opt/field-portal/*.env` (mode 600)
-   - pulls the images, then runs `backend/db/applyMigrations.sh` (all
-     migrations are safe to re-run)
+   - pulls the images, then runs `backend/db/applyMigrations.sh` (only
+     migrations not yet recorded in `schema_migrations`)
    - restarts the containers and waits until their health checks pass
    - if anything fails, prints container logs into the Actions output
 5. A smoke test calls both public URLs.

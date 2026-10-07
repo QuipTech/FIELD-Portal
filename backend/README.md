@@ -116,10 +116,13 @@ for f in db/migrations/*.sql; do psql "$DATABASE_URL" -f "$f"; done
 
 Swap `.env.development` for `.env.staging` / `.env.production` to target the
 other databases. Deploys to staging and production do this automatically
-with `db/applyMigrations.sh` (same loop, stops on the first error, uses
-`MIGRATION_DATABASE_URL`). See `deploy/README.md`. Every migration is idempotent (`IF NOT EXISTS`, `ON
-CONFLICT DO NOTHING`, guarded `DO $$ … $$` blocks), so re-running the whole
-set is safe.
+with `db/applyMigrations.sh` (stops on the first error, uses
+`MIGRATION_DATABASE_URL`). See `deploy/README.md`. Each migration records its
+version in `schema_migrations`, and the script skips versions already there.
+Re-running an applied migration is **not** always safe: a later file may drop
+and recreate a function with a different signature (e.g.
+`auth_lookup_user_by_email` in `0003` → `0026` → `0032`), and the earlier
+file would then fail.
 
 **Before deploying past local dev**, rotate the placeholder password created
 in `0002_extensions_and_app_role.sql`:
