@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Runs in GitHub Actions. Maps the branch to an environment (dev → staging,
-# main → production) and picks that environment's settings from the
+# Runs in GitHub Actions. Maps the branch to an environment (staging-dev →
+# staging, main → production) and picks that environment's settings from the
 # repository variables: <ENV>_<NAME> (e.g. STAGING_EC2_INSTANCE_ID) wins,
 # otherwise the shared <NAME> is used. Fails fast if any setting is missing.
 # Host and domains have no shared fallback, so production can never
@@ -16,9 +16,9 @@ SHAREABLE_SETTINGS=(AWS_REGION AWS_DEPLOY_ROLE_ARN DEPLOY_BUCKET ACME_EMAIL
 
 case "$BRANCH" in
   main) environment=production ;;
-  dev) environment=staging ;;
+  staging-dev) environment=staging ;;
   *)
-    echo "::error::Only dev (staging) and main (production) deploy; got '$BRANCH'"
+    echo "::error::Only staging-dev (staging) and main (production) deploy; got '$BRANCH'"
     exit 1
     ;;
 esac

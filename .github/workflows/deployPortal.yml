@@ -1,15 +1,16 @@
 # Builds the portal (Next.js) and API (NestJS) images, pushes them to ECR,
 # and rolls them out to the environment's EC2 host over SSM.
-#   push to dev  → staging    (https://staging.<domain>)
-#   push to main → production (https://app.<domain>)
+#   push to staging-dev → staging    (https://staging.<domain>)
+#   push to main        → production (https://app.<domain>)
+# Pushes to dev (or any other branch) never deploy.
 # Settings are repository variables (Settings → Secrets and variables →
 # Actions → Variables); see deploy/README.md for the full list.
 name: Deploy Portal
 
 on:
   push:
-    branches: [dev, main]
-  # Redeploys the selected branch (dev or main) to its own environment.
+    branches: [staging-dev, main]
+  # Redeploys the selected branch (staging-dev or main) to its own environment.
   workflow_dispatch:
 
 permissions:

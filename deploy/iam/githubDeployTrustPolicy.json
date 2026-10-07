@@ -11,7 +11,7 @@
         "StringEquals": {
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
           "token.actions.githubusercontent.com:sub": [
-            "repo:QuipTech@327797260/FIELD-Portal@1382599766:ref:refs/heads/dev",
+            "repo:QuipTech@327797260/FIELD-Portal@1382599766:ref:refs/heads/staging-dev",
             "repo:QuipTech@327797260/FIELD-Portal@1382599766:ref:refs/heads/main"
           ]
         }

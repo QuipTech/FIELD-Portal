@@ -10,10 +10,14 @@ or SSH key is needed. On the host, Docker Compose runs `portal`, `api` and
 **Caddy**, which terminates HTTPS and issues Let's Encrypt certificates
 automatically.
 
-| Environment | Git branch | Portal URL                | API URL                       |
-| ----------- | ---------- | ------------------------- | ----------------------------- |
-| staging     | `dev`      | `https://staging.<domain>` | `https://staging-api.<domain>` |
-| production  | `main`     | `https://app.<domain>`     | `https://api.<domain>`         |
+| Environment | Git branch    | Portal URL                 | API URL                        |
+| ----------- | ------------- | -------------------------- | ------------------------------ |
+| staging     | `staging-dev` | `https://staging.<domain>` | `https://staging-api.<domain>` |
+| production  | `main`        | `https://app.<domain>`     | `https://api.<domain>`         |
+
+`dev` is the day-to-day integration branch and never deploys. Merge `dev`
+into `staging-dev` to release to staging, and `staging-dev` into `main` to
+release to production.
 
 The API gets its own hostname because Socket.IO reads its namespace
 (`/support-cases`, `/notifications`) from the URL path, so the API can't sit
@@ -39,8 +43,9 @@ deploy/
 
 ## How a deploy runs
 
-1. A push to `dev` (staging) or `main` (production) starts the workflow. To
-   redeploy without a new commit, use **Actions → Deploy Portal → Run
+1. A push to `staging-dev` (staging) or `main` (production) starts the
+   workflow. Pushes to `dev` never deploy. To redeploy without a new
+   commit, use **Actions → Deploy Portal → Run
    workflow** and pick the branch.
 2. **verify** runs the backend's unit tests and build.
 3. **buildImages** builds `field-portal-api` and `field-portal-web`, tagged
@@ -147,8 +152,8 @@ deploy onto the staging server.
 \* Any shared variable can be overridden for one environment by adding the
 prefixed name, e.g. `PRODUCTION_NEXT_PUBLIC_COGNITO_CLIENT_ID`.
 
-The AWS deploy role only trusts pushes and manual runs on `dev` and `main`
-(`iam/githubDeployTrustPolicy.json`). There is no approval step before
+The AWS deploy role only trusts pushes and manual runs on `staging-dev` and
+`main` (`iam/githubDeployTrustPolicy.json`). There is no approval step before
 production deploys, so whoever can push or merge to `main` deploys
 production. Protect `main` with a pull-request rule if the GitHub plan allows
 it.
