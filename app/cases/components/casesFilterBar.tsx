@@ -1,29 +1,28 @@
 import { Input } from "@/components/ui/input";
-import { CASE_PRIORITIES } from "@/lib/format/caseLabels";
-import type { CasePriority, CaseStatus, CaseStatusFilter, SupportCaseFilters, SupportCaseOptions } from "@/lib/types/supportCase";
 import { FilterChipSelect } from "@/components/ui/filterChipSelect";
+import { CASE_PRIORITIES, CUSTOMER_CASE_STATUS_LABELS } from "@/lib/format/caseLabels";
+import type { CasePriority, CaseStatus, CaseStatusFilter, SupportCaseFilters } from "@/lib/types/supportCase";
 
 interface CasesFilterBarProps {
   filters: SupportCaseFilters;
   statusCounts: Record<CaseStatus, number> | null;
-  options: SupportCaseOptions | null;
   onChange: <K extends keyof SupportCaseFilters>(key: K, value: SupportCaseFilters[K]) => void;
 }
 
 const withCount = (label: string, count: number | undefined) => (count === undefined ? label : `${label} · ${count}`);
 
-export const CasesFilterBar = ({ filters, statusCounts, options, onChange }: CasesFilterBarProps) => {
+const LISTED_STATUSES: CaseStatus[] = ["new", "open", "waiting_on_customer", "resolved", "closed"];
+
+export const CasesFilterBar = ({ filters, statusCounts, onChange }: CasesFilterBarProps) => {
   const counts = statusCounts ?? undefined;
+  const activeCount = counts && counts.new + counts.open + counts.waiting_on_customer;
   const statusOptions: { value: CaseStatusFilter; label: string }[] = [
-    { value: "active", label: withCount("Open", counts && counts.open + counts.in_progress) },
-    { value: "in_progress", label: withCount("In progress", counts?.in_progress) },
-    { value: "resolved", label: withCount("Resolved", counts?.resolved) },
+    { value: "active", label: withCount("Active", activeCount) },
+    ...LISTED_STATUSES.map((status) => ({
+      value: status,
+      label: withCount(CUSTOMER_CASE_STATUS_LABELS[status], counts?.[status]),
+    })),
     { value: "all", label: "All cases" },
-  ];
-  const assigneeOptions = [
-    { value: "", label: "Assignee" },
-    { value: "unassigned", label: "Unassigned" },
-    ...(options?.assignees.map((person) => ({ value: person.id, label: person.name })) ?? []),
   ];
 
   return (
@@ -41,13 +40,6 @@ export const CasesFilterBar = ({ filters, statusCounts, options, onChange }: Cas
         options={[{ value: "", label: "Priority" }, ...CASE_PRIORITIES]}
         onChange={(value) => onChange("priority", value as CasePriority | "")}
         isActive={filters.priority !== ""}
-      />
-      <FilterChipSelect
-        label="Assignee"
-        value={filters.assignee}
-        options={assigneeOptions}
-        onChange={(value) => onChange("assignee", value)}
-        isActive={filters.assignee !== ""}
       />
       <Input
         icon="search"

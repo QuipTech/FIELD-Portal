@@ -1,24 +1,34 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
-import { touchCase } from './supportCases.repository';
-import { insertCaseMessage, listCaseMessages } from './caseMessages.repository';
+import { IncomingFile } from '../storage/types/storedFile';
+import { listCaseMessages } from './caseMessages.repository';
+import { listCaseEvents } from './caseEvents.repository';
+import {
+  countUnreadCasesForCustomer,
+  markCaseRead,
+} from './caseReads.repository';
 import { requireSupportCase } from './requireSupportCase';
-import { CaseEventsPublisher } from './caseEventsPublisher';
-import { toCaseMessage, toSupportCase } from './supportCaseMapper';
+import { postMessageToCase } from './postMessageToCase';
+import { CaseAttachmentsService } from './caseAttachments.service';
+import { CaseAnnouncer } from './caseAnnouncer.service';
+import { toCaseEvent } from './supportCaseMapper';
 import { PostCaseMessageDto } from './dto/postCaseMessageDto';
-import { CaseMessage } from './types/supportCaseResponse';
+import {
+  CaseAttachment,
+  CaseEvent,
+  CaseMessage,
+} from './types/supportCaseResponse';
 
-const CASE_RESOLVED_MESSAGE =
-  'This case is resolved. Reopen it before replying.';
-
-// A case's chat. Messages are saved over REST, then pushed to everyone who
-// has the case open through the Socket.IO gateway.
+// A case's thread as the customer sees it: everything in their own
+// organisation, never an internal note. Messages are saved over REST,
+// then pushed to everyone who has the case open.
 @Injectable()
 export class CaseMessagesService {
   constructor(
     private readonly databaseService: DatabaseService,
-    private readonly caseEventsPublisher: CaseEventsPublisher,
+    private readonly caseAttachmentsService: CaseAttachmentsService,
+    private readonly caseAnnouncer: CaseAnnouncer,
   ) {}
 
   listMessages = async (
@@ -31,12 +41,30 @@ export class CaseMessagesService {
         actor.tenantId,
         caseNumber,
       );
-      const rows = await listCaseMessages(
+      const rows = await listCaseMessages(client, {
+        tenantId: actor.tenantId,
+        caseId: supportCase.id,
+        includeInternal: false,
+      });
+      return this.caseAttachmentsService.toMessages(
         client,
         actor.tenantId,
-        supportCase.id,
+        rows,
       );
-      return rows.map(toCaseMessage);
+    });
+
+  listEvents = async (
+    actor: AuthenticatedUser,
+    caseNumber: number,
+  ): Promise<CaseEvent[]> =>
+    this.databaseService.withTenant(actor.tenantId, async (client) => {
+      const supportCase = await requireSupportCase(
+        client,
+        actor.tenantId,
+        caseNumber,
+      );
+      const rows = await listCaseEvents(client, actor.tenantId, supportCase.id);
+      return rows.map(toCaseEvent);
     });
 
   postMessage = async (
@@ -44,41 +72,77 @@ export class CaseMessagesService {
     caseNumber: number,
     dto: PostCaseMessageDto,
   ): Promise<CaseMessage> => {
-    const { message, supportCase } = await this.databaseService.withActor(
+    const { posted, message } = await this.databaseService.withActor(
       actor,
       async (client) => {
-        const existing = await requireSupportCase(
+        const supportCase = await requireSupportCase(
           client,
           actor.tenantId,
           caseNumber,
         );
-        if (existing.status === 'resolved') {
-          throw new ConflictException(CASE_RESOLVED_MESSAGE);
-        }
-        const row = await insertCaseMessage(client, {
+        const result = await postMessageToCase(client, {
           tenantId: actor.tenantId,
-          caseId: existing.id,
+          supportCase,
           authorId: actor.userId,
+          authorRole: 'customer',
           body: dto.body,
+          isInternal: false,
+          attachmentIds: dto.attachmentIds ?? [],
         });
-        await touchCase(client, actor.tenantId, existing.id);
-        const touched = await requireSupportCase(
+        await markCaseRead(client, {
+          tenantId: actor.tenantId,
+          caseId: supportCase.id,
+          userId: actor.userId,
+        });
+        const [withAttachments] = await this.caseAttachmentsService.toMessages(
           client,
           actor.tenantId,
-          caseNumber,
+          [result.message],
         );
-        return { message: toCaseMessage(row), supportCase: touched };
+        return { posted: result, message: withAttachments };
       },
     );
-    this.caseEventsPublisher.publishMessage(
-      actor.tenantId,
-      caseNumber,
-      message,
-    );
-    this.caseEventsPublisher.publishCaseUpdated(
-      actor.tenantId,
-      toSupportCase(supportCase),
-    );
+    this.caseAnnouncer.announceMessage(actor.tenantId, posted, message);
     return message;
   };
+
+  // Before the message (or the case) that carries it exists.
+  uploadAttachment = async (
+    actor: AuthenticatedUser,
+    file: IncomingFile | undefined,
+  ): Promise<CaseAttachment> =>
+    this.databaseService.withActor(actor, (client) =>
+      this.caseAttachmentsService.upload(client, {
+        tenantId: actor.tenantId,
+        caseId: null,
+        uploaderId: actor.userId,
+        file,
+      }),
+    );
+
+  markRead = async (
+    actor: AuthenticatedUser,
+    caseNumber: number,
+  ): Promise<void> =>
+    this.databaseService.withTenant(actor.tenantId, async (client) => {
+      const supportCase = await requireSupportCase(
+        client,
+        actor.tenantId,
+        caseNumber,
+      );
+      await markCaseRead(client, {
+        tenantId: actor.tenantId,
+        caseId: supportCase.id,
+        userId: actor.userId,
+      });
+    });
+
+  countUnread = async (actor: AuthenticatedUser): Promise<{ count: number }> =>
+    this.databaseService.withTenant(actor.tenantId, async (client) => ({
+      count: await countUnreadCasesForCustomer(
+        client,
+        actor.tenantId,
+        actor.userId,
+      ),
+    }));
 }

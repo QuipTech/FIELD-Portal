@@ -1,7 +1,6 @@
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import { Client } from 'pg';
 import { buildPoolConfig } from '../src/database/buildPoolConfig';
+import { readDatabaseUrl } from './dbTestConnection';
 import {
   DATA_SCHEMAS,
   SERVICE_ROLE,
@@ -9,27 +8,12 @@ import {
   tableVisibilityLevel,
 } from '../src/dataGovernance/dataSchemas.config';
 
-// Runs against a real database (npm run test:db): DATABASE_URL, else the
-// one in .env.$DB_TEST_ENV (default development — Jest sets NODE_ENV to
-// "test", so it can't be used), as the migration owner so it can
-// create fixtures and SET ROLE to the tenant and service roles. Every test
-// runs inside a transaction that is rolled back — nothing is left behind.
+// Runs against a real database (npm run test:db, see dbTestConnection) as
+// the migration owner, so it can create fixtures and SET ROLE to the
+// tenant and service roles. Every test runs inside a transaction that is
+// rolled back — nothing is left behind.
 
 const PERMISSION_DENIED = '42501';
-
-const readDatabaseUrl = (): string => {
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
-  const envFile = join(
-    __dirname,
-    '..',
-    `.env.${process.env.DB_TEST_ENV ?? 'development'}`,
-  );
-  const line = readFileSync(envFile, 'utf8')
-    .split('\n')
-    .find((entry) => entry.startsWith('DATABASE_URL='));
-  if (!line) throw new Error(`DATABASE_URL not found in ${envFile}`);
-  return line.slice('DATABASE_URL='.length).replace(/^["']|["']$/g, '');
-};
 
 const client = new Client(buildPoolConfig(readDatabaseUrl()));
 let tenantA: string;

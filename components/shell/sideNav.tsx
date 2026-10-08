@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Icon, type IconName } from "../icons/icon";
 import { LogoutButton } from "./logoutButton";
+import { NavUnreadBadge } from "./navUnreadBadge";
+import { useUnreadCaseCount } from "@/lib/hooks/useUnreadCaseCount";
 
 interface NavLink {
   href: string;
@@ -20,7 +22,7 @@ const primaryLinks: NavLink[] = [
   { href: "/cases", label: "Support cases", icon: "life" },
 ];
 
-const NavItem = ({ href, label, icon, active }: NavLink & { active: boolean }) => (
+const NavItem = ({ href, label, icon, active, badgeCount = 0 }: NavLink & { active: boolean; badgeCount?: number }) => (
   <Link
     href={href}
     className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-[15px] transition-colors ${
@@ -29,12 +31,16 @@ const NavItem = ({ href, label, icon, active }: NavLink & { active: boolean }) =
   >
     <Icon name={icon} className={active ? "stroke-white" : "stroke-white/60"} />
     <span className="truncate">{label}</span>
+    {label && <NavUnreadBadge count={badgeCount} />}
   </Link>
 );
+
+const CASES_HREF = "/cases";
 
 export const SideNav = () => {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const unreadCaseCount = useUnreadCaseCount("customer");
 
   return (
     <div
@@ -54,6 +60,7 @@ export const SideNav = () => {
           {...link}
           label={collapsed ? "" : link.label}
           active={pathname.startsWith(link.href)}
+          badgeCount={link.href === CASES_HREF ? unreadCaseCount : 0}
         />
       ))}
       <div className="mt-auto flex flex-col gap-0.5 border-t border-white/[0.16] pt-2.5">

@@ -8,9 +8,11 @@ import {
 import { describeCaseSla } from './describeCaseSla';
 
 const STATUS_LABELS: Record<string, string> = {
+  new: 'New',
   open: 'Open',
-  in_progress: 'In progress',
+  waiting_on_customer: 'Waiting on customer',
   resolved: 'Resolved',
+  closed: 'Closed',
 };
 
 const formatHours = (hours: number) => (Math.round(hours * 10) / 10).toString();

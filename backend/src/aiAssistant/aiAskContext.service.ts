@@ -5,6 +5,7 @@ import { DatabaseService } from '../database/database.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { KnowledgeSearchService } from '../knowledgeSearch/knowledgeSearch.service';
 import * as machineHistoryRepository from '../machineHistory/machineHistory.repository';
+import * as historyEntriesRepository from '../machineHistory/historyEntries.repository';
 import { MachineRow } from '../machineHistory/types/machineHistoryRows';
 import { BUILT_IN_PROMPT_VERSION } from '../bedrock/technicalAssistantPrompt';
 import {
@@ -141,18 +142,13 @@ export class AiAskContextService {
       machineId,
     );
     if (!row) throw new NotFoundException(MACHINE_NOT_FOUND_MESSAGE);
-    const entries = await machineHistoryRepository.listHistoryEntries(
+    const entries = await historyEntriesRepository.listHistoryEntries(
       client,
       tenantId,
       machineId,
+      { limit: RECENT_HISTORY_ENTRIES },
     );
-    return {
-      row,
-      context: formatMachineContext(
-        row,
-        entries.slice(0, RECENT_HISTORY_ENTRIES),
-      ),
-    };
+    return { row, context: formatMachineContext(row, entries) };
   };
 
   // The machine's make and model steer retrieval toward its manuals.

@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
-import { SavedToast } from "./savedToast";
+import { SavedToast } from "@/components/ui/savedToast";
 
 interface AiLogRetentionCardProps {
   months: number;

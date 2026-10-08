@@ -7,11 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { useApiResource } from "@/lib/hooks/useApiResource";
+import { useCaseAttachmentUploads } from "@/lib/hooks/useCaseAttachmentUploads";
 import { requireAccessToken } from "@/lib/api/requireAccessToken";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import { createSupportCaseRequest, getSupportCaseOptionsRequest } from "@/lib/api/supportCasesApi";
 import { CASE_CATEGORIES, CASE_PRIORITIES } from "@/lib/format/caseLabels";
 import type { NewSupportCase } from "@/lib/types/supportCase";
+import { CaseAttachmentPicker } from "./caseAttachmentPicker";
 
 const fieldLabelClasses = "text-xs font-medium uppercase tracking-wide text-mutedGray";
 const selectClasses = "h-10 rounded-lg border border-borderGrayStrong bg-surface px-3 text-[15px] text-ink";
@@ -24,14 +26,16 @@ interface NewCaseModalProps {
   initialDraft?: Partial<NewSupportCase>;
 }
 
-// Raises a case and opens it, where the chat continues.
+// Raises a case and opens it, where the chat continues. Photos and files
+// upload as they're picked and go with the description, the first message.
 export const NewCaseModal = ({ onClose, initialDraft }: NewCaseModalProps) => {
   const router = useRouter();
   const options = useApiResource(getSupportCaseOptionsRequest, [], "Couldn't load your machines.");
   const [draft, setDraft] = useState<NewSupportCase>({ ...EMPTY_CASE, ...initialDraft });
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const canSubmit = draft.subject.trim().length >= 3 && draft.description.trim().length > 0;
+  const uploads = useCaseAttachmentUploads("customer", null);
+  const canSubmit = draft.subject.trim().length >= 3 && draft.description.trim().length > 0 && !uploads.isUploading;
 
   const update = <K extends keyof NewSupportCase>(key: K, value: NewSupportCase[K]) =>
     setDraft((current) => ({ ...current, [key]: value }));
@@ -43,6 +47,7 @@ export const NewCaseModal = ({ onClose, initialDraft }: NewCaseModalProps) => {
       const created = await createSupportCaseRequest(requireAccessToken(), {
         ...draft,
         machineId: draft.machineId || undefined,
+        attachmentIds: uploads.attachmentIds,
       });
       router.push(`/cases/${created.caseNumber}`);
     } catch (error) {
@@ -120,6 +125,12 @@ export const NewCaseModal = ({ onClose, initialDraft }: NewCaseModalProps) => {
             className="resize-none rounded-lg border border-borderGrayStrong bg-surface p-3 text-[15px] text-ink outline-none placeholder:text-mutedGray"
           />
         </label>
+        <CaseAttachmentPicker
+          uploads={uploads.uploads}
+          onAdd={uploads.addFiles}
+          onRemove={uploads.remove}
+          disabled={isSaving}
+        />
         {saveError && <span className="text-xs text-danger">{saveError}</span>}
         <div className="flex">
           <Button variant="ghost" onClick={onClose} disabled={isSaving}>

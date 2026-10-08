@@ -6,7 +6,8 @@ import {
   CaseStatus,
 } from '../types/supportCaseResponse';
 
-// Only the fields sent change. assigneeId: null unassigns.
+// Only the fields sent change. assigneeId: null unassigns. Who may change
+// what is caseAccessPolicy's assertCanPatchCase.
 export class UpdateSupportCaseDto {
   @IsOptional()
   @IsIn(CASE_STATUSES)

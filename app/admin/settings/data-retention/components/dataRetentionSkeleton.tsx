@@ -1,6 +1,4 @@
-const Bar = ({ className }: { className: string }) => (
-  <div className={`animate-pulse rounded-md bg-slate-100 ${className}`} />
-);
+import { SkeletonBar as Bar } from "@/components/ui/skeletonBar";
 
 // Placeholder rows shaped like the loaded page.
 export const DataRetentionSkeleton = () => {

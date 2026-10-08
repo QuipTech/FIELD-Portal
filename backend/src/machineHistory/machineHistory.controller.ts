@@ -8,6 +8,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -23,6 +24,7 @@ import { IncomingFile } from '../storage/types/storedFile';
 import { MachineHistoryService } from './machineHistory.service';
 import { MachinePhotosService } from './machinePhotos.service';
 import { CreateHistoryEntryDto } from './dto/createHistoryEntryDto';
+import { ListHistoryQueryDto } from './dto/listHistoryQueryDto';
 
 // A machine's technical history and its photos, always within the
 // caller's own organisation (tenantId from the JWT).
@@ -48,8 +50,19 @@ export class MachineHistoryController {
   listHistory(
     @CurrentUser() user: AuthenticatedUser,
     @Param('machineId', ParseUUIDPipe) machineId: string,
+    @Query() query: ListHistoryQueryDto,
   ) {
-    return this.machineHistoryService.listHistory(user, machineId);
+    return this.machineHistoryService.listHistory(user, machineId, query);
+  }
+
+  // Everyone who has written on this machine's history (author filter).
+  @Get('history/authors')
+  @RequirePermissions('machine.view')
+  listAuthors(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('machineId', ParseUUIDPipe) machineId: string,
+  ) {
+    return this.machineHistoryService.listAuthors(user, machineId);
   }
 
   @Post('history')

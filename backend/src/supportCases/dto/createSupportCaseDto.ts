@@ -8,6 +8,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { AttachmentIdsField } from './attachmentIdsField';
 import {
   CASE_CATEGORIES,
   CASE_PRIORITIES,
@@ -15,7 +16,7 @@ import {
   CasePriority,
 } from '../types/supportCaseResponse';
 
-export class CreateSupportCaseDto {
+export class CreateSupportCaseDto extends AttachmentIdsField {
   @Transform(trimString)
   @IsString()
   @MinLength(3)
@@ -32,7 +33,7 @@ export class CreateSupportCaseDto {
   @IsUUID()
   machineId?: string;
 
-  // Becomes the case's first message.
+  // Kept on the case, and its first message (with the attachments).
   @Transform(trimString)
   @IsString()
   @MinLength(1)

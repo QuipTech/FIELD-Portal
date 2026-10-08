@@ -8,21 +8,26 @@ import {
   WebSocketGateway,
 } from '@nestjs/websockets';
 import { Namespace, Socket } from 'socket.io';
-import { DatabaseService } from '../database/database.service';
-import { findCaseByNumber } from './supportCases.repository';
 import {
+  agentRoom,
   CASE_EVENTS,
   CaseEventsPublisher,
   caseRoom,
+  caseStaffRoom,
+  SUPPORT_ADMINS_ROOM,
   tenantRoom,
 } from './caseEventsPublisher';
 import {
   CaseSocketAuthenticator,
   CaseSocketUser,
 } from './caseSocketAuthenticator';
+import { CaseAccessService } from './caseAccess.service';
+import { isSupportAdmin, SUPPORT_AGENT_PERMISSION } from './caseAccessPolicy';
 
 interface CaseRoomRequest {
   caseNumber?: unknown;
+  // Typing an internal note: only staff are told.
+  isInternal?: unknown;
 }
 
 type RoomAck = { ok: true } | { ok: false; error: string };
@@ -33,14 +38,16 @@ const toCaseNumber = (body: CaseRoomRequest | undefined): number | null => {
 };
 
 const UNAUTHORIZED_MESSAGE = 'unauthorized';
+const UNKNOWN_CASE_MESSAGE = 'Unknown case.';
 
 const socketUser = (socket: Socket) =>
   socket.data.user as CaseSocketUser | undefined;
 
-// Live support-case chat at /support-cases (Socket.IO). On connect every
-// portal joins its organisation's room (list updates); `case:join` adds a
-// case's room (its messages, changes and typing). Messages themselves are
-// sent over REST — this only delivers them.
+// Live support-case chat at /support-cases (Socket.IO). On connect a
+// portal joins its organisation's room (cases list), and staff the queue
+// rooms. `case:join` adds a case's room — and, for its staff, the
+// staff-only room where internal notes go — after the same access check
+// as the REST routes. Messages are sent over REST; this only delivers.
 @WebSocketGateway({ namespace: '/support-cases' })
 export class CaseRealtimeGateway implements OnGatewayInit, OnGatewayConnection {
   private readonly logger = new Logger(CaseRealtimeGateway.name);
@@ -48,7 +55,7 @@ export class CaseRealtimeGateway implements OnGatewayInit, OnGatewayConnection {
   constructor(
     private readonly caseSocketAuthenticator: CaseSocketAuthenticator,
     private readonly caseEventsPublisher: CaseEventsPublisher,
-    private readonly databaseService: DatabaseService,
+    private readonly caseAccessService: CaseAccessService,
   ) {}
 
   // The token is checked in middleware, before the connection is accepted:
@@ -73,7 +80,13 @@ export class CaseRealtimeGateway implements OnGatewayInit, OnGatewayConnection {
 
   handleConnection = async (socket: Socket) => {
     const user = socketUser(socket);
-    if (user) await socket.join(tenantRoom(user.tenantId));
+    if (!user) return;
+    const rooms = [tenantRoom(user.tenantId)];
+    if (isSupportAdmin(user.permissions)) rooms.push(SUPPORT_ADMINS_ROOM);
+    if (user.permissions.includes(SUPPORT_AGENT_PERMISSION)) {
+      rooms.push(agentRoom(user.userId));
+    }
+    await socket.join(rooms);
   };
 
   // Handlers are methods, not arrow properties: Nest's message and
@@ -86,14 +99,15 @@ export class CaseRealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     const user = socketUser(socket);
     const caseNumber = toCaseNumber(body);
     if (!user || caseNumber === null) {
-      return { ok: false, error: 'Unknown case.' };
+      return { ok: false, error: UNKNOWN_CASE_MESSAGE };
     }
-    const found = await this.databaseService.withTenant(
-      user.tenantId,
-      (client) => findCaseByNumber(client, user.tenantId, caseNumber),
+    const access = await this.caseAccessService.resolveAccess(user, caseNumber);
+    if (!access) return { ok: false, error: UNKNOWN_CASE_MESSAGE };
+    await socket.join(
+      access.role === 'customer'
+        ? [caseRoom(caseNumber)]
+        : [caseRoom(caseNumber), caseStaffRoom(caseNumber)],
     );
-    if (!found) return { ok: false, error: 'Unknown case.' };
-    await socket.join(caseRoom(user.tenantId, caseNumber));
     return { ok: true };
   }
 
@@ -102,15 +116,15 @@ export class CaseRealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     @ConnectedSocket() socket: Socket,
     @MessageBody() body: CaseRoomRequest,
   ): Promise<RoomAck> {
-    const user = socketUser(socket);
     const caseNumber = toCaseNumber(body);
-    if (user && caseNumber !== null) {
-      await socket.leave(caseRoom(user.tenantId, caseNumber));
+    if (caseNumber !== null) {
+      await socket.leave(caseRoom(caseNumber));
+      await socket.leave(caseStaffRoom(caseNumber));
     }
     return { ok: true };
   }
 
-  // Only reaches sockets already in the case's room, i.e. same tenant.
+  // Only reaches sockets already in the room, i.e. allowed on the case.
   @SubscribeMessage('case:typing')
   announceTyping(
     @ConnectedSocket() socket: Socket,
@@ -119,7 +133,10 @@ export class CaseRealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     const user = socketUser(socket);
     const caseNumber = toCaseNumber(body);
     if (!user || caseNumber === null) return;
-    const room = caseRoom(user.tenantId, caseNumber);
+    const room =
+      body?.isInternal === true
+        ? caseStaffRoom(caseNumber)
+        : caseRoom(caseNumber);
     if (!socket.rooms.has(room)) return;
     socket.to(room).emit(CASE_EVENTS.typing, {
       caseNumber,

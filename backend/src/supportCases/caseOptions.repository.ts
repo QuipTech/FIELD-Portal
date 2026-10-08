@@ -1,34 +1,10 @@
 import { PoolClient } from 'pg';
 
-export interface AssigneeRow {
-  id: string;
-  first_name: string;
-  last_name: string;
-}
-
 export interface MachineOptionRow {
   id: string;
   label: string;
   model_name: string | null;
 }
-
-// Active users in the organisation whose roles grant support.manage.
-export const listAssignableUsers = async (
-  client: PoolClient,
-  tenantId: string,
-): Promise<AssigneeRow[]> => {
-  const result = await client.query<AssigneeRow>(
-    `SELECT DISTINCT u.id, u.first_name, u.last_name FROM users u
-     JOIN user_roles ur ON ur.user_id = u.id
-     JOIN roles r ON r.id = ur.role_id AND r.deleted_at IS NULL
-     JOIN role_permissions rp ON rp.role_id = r.id
-     JOIN permissions p ON p.id = rp.permission_id AND p.code = 'support.manage'
-     WHERE u.tenant_id = $1 AND u.deleted_at IS NULL AND u.status = 'active'
-     ORDER BY u.first_name, u.last_name`,
-    [tenantId],
-  );
-  return result.rows;
-};
 
 export const listMachineOptions = async (
   client: PoolClient,

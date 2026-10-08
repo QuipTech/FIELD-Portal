@@ -4,6 +4,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { expiresInSeconds, toAttachmentDisposition } from './signedUrlHelpers';
 import {
   AVATAR_RULE,
+  CASE_ATTACHMENT_RULE,
   DOCUMENT_RULE,
   LOGO_RULE,
   PHOTO_RULE,
@@ -12,6 +13,7 @@ import {
 import {
   buildAvatarKey,
   buildBrandingLogoKey,
+  buildCaseAttachmentKey,
   buildDataExportKey,
   buildDocumentKey,
   buildMachinePhotoKey,
@@ -22,7 +24,8 @@ import { IncomingFile, SignedUrl, StoredFile } from './types/storedFile';
 
 const DOWNLOAD_URL_TTL_SECONDS = 15 * 60;
 
-// Tenant-owned files: documents/, photos/, avatars/, branding/, exports/
+// Tenant-owned files: documents/, photos/, avatars/, branding/, exports/,
+// cases/
 // under {tenantId}/.
 // The bucket is private: clients only ever get short-lived signed URLs,
 // and the database stores object keys. (Shared-library files:
@@ -76,6 +79,20 @@ export class StorageService {
     const { extension, contentType } = validateIncomingFile(file, LOGO_RULE);
     return this.storeFile(
       buildBrandingLogoKey(tenantId, extension),
+      file!,
+      contentType,
+    );
+  };
+
+  // tenantId is the case's organisation, also when staff upload.
+  uploadCaseAttachment = (
+    file: IncomingFile | undefined,
+    tenantId: string,
+    caseId: string | null,
+  ): Promise<StoredFile> => {
+    const { contentType } = validateIncomingFile(file, CASE_ATTACHMENT_RULE);
+    return this.storeFile(
+      buildCaseAttachmentKey(tenantId, caseId, file!.originalname),
       file!,
       contentType,
     );

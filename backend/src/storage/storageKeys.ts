@@ -8,6 +8,7 @@ export const STORAGE_FOLDERS = [
   'avatars',
   'branding',
   'exports',
+  'cases',
 ] as const;
 
 // The shared knowledge library (tenant_id IS NULL) lives beside tenant
@@ -55,6 +56,15 @@ export const buildAvatarKey = (
 // in place of the new one; the previous object is deleted after saving.
 export const buildBrandingLogoKey = (tenantId: string, extension: string) =>
   `branding/${tenantId}/logo-${randomUUID()}.${extension}`;
+
+// A support case attachment. caseId is null for an upload made before
+// its case exists (the New case form).
+export const buildCaseAttachmentKey = (
+  tenantId: string,
+  caseId: string | null,
+  fileName: string,
+) =>
+  `cases/${tenantId}/${caseId ?? 'pending'}/${randomUUID()}-${toSafeFileName(fileName)}`;
 
 // One file per export request ("My data" → Export my data).
 export const buildDataExportKey = (

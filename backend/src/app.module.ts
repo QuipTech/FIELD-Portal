@@ -12,6 +12,7 @@ import { StorageModule } from './storage/storage.module';
 import { KnowledgeIndexingModule } from './knowledgeIndexing/knowledgeIndexing.module';
 import { DocumentsModule } from './documents/documents.module';
 import { MachineHistoryModule } from './machineHistory/machineHistory.module';
+import { MachineConfigurationModule } from './machineConfiguration/machineConfiguration.module';
 import { KnowledgeSearchModule } from './knowledgeSearch/knowledgeSearch.module';
 import { MachineLibraryModule } from './machineLibrary/machineLibrary.module';
 import { AdminAiModule } from './adminAi/adminAi.module';
@@ -54,6 +55,7 @@ import { RequestSourceMiddleware } from './common/requestSource/requestSource.mi
     AdminKnowledgeModule,
     DocumentsModule,
     MachineHistoryModule,
+    MachineConfigurationModule,
     KnowledgeSearchModule,
     MachineLibraryModule,
     AdminAiModule,

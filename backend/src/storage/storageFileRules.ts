@@ -50,6 +50,13 @@ export const LOGO_RULE: FileRule = {
   },
 };
 
+// Support case attachments: photos of the fault, or a document.
+export const CASE_ATTACHMENT_RULE: FileRule = {
+  label: 'photos (JPG, PNG, HEIC) or PDF/Word documents',
+  maxBytes: 20 * MB,
+  contentTypes: { ...PHOTO_RULE.contentTypes, ...DOCUMENT_RULE.contentTypes },
+};
+
 const startsWith = (buffer: Buffer, bytes: number[], offset = 0) =>
   bytes.every((byte, index) => buffer[offset + index] === byte);
 

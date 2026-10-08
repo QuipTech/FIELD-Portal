@@ -1,12 +1,13 @@
 export type CaseCategory = "alarm" | "leak" | "documentation" | "ai_answer" | "wear" | "data" | "other";
-export type CaseStatus = "open" | "in_progress" | "resolved";
+export type CaseStatus = "new" | "open" | "waiting_on_customer" | "resolved" | "closed";
 export type CasePriority = "P1" | "P2" | "P3";
-// "active" = open or in progress.
+// "active" = new, open or waiting on the customer.
 export type CaseStatusFilter = "active" | CaseStatus | "all";
 
 export interface CasePerson {
   id: string;
   name: string;
+  avatarUrl: string | null;
 }
 
 export interface CaseMachine {
@@ -20,6 +21,7 @@ export interface SupportCase {
   id: string;
   caseNumber: number;
   subject: string;
+  description: string | null;
   category: CaseCategory;
   status: CaseStatus;
   priority: CasePriority;
@@ -30,6 +32,10 @@ export interface SupportCase {
   createdAt: string;
   updatedAt: string;
   resolvedAt: string | null;
+  closedAt: string | null;
+  slaDueAt: string | null;
+  // Set while waiting on the customer: the SLA clock stopped then.
+  slaPausedAt: string | null;
 }
 
 export interface SupportCaseList {
@@ -41,13 +47,10 @@ export interface SupportCaseList {
 export interface SupportCaseFilters {
   status: CaseStatusFilter;
   priority: CasePriority | "";
-  // A user id, "unassigned", or "" for anyone.
-  assignee: string;
   search: string;
 }
 
 export interface SupportCaseOptions {
-  assignees: CasePerson[];
   machines: CaseMachine[];
 }
 
@@ -57,8 +60,10 @@ export interface NewSupportCase {
   priority: CasePriority;
   machineId?: string;
   description: string;
+  attachmentIds?: string[];
 }
 
+// Staff only (PATCH /admin/cases/:n). Only the fields sent change.
 export interface SupportCaseChanges {
   status?: CaseStatus;
   priority?: CasePriority;

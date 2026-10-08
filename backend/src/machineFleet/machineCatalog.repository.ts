@@ -82,8 +82,9 @@ export const insertMachine = async (
 ): Promise<string> => {
   const result = await client.query<{ id: string }>(
     `INSERT INTO machines (tenant_id, created_by, manufacturer_id, model_id, serial_number,
-                           asset_number, site, operating_hours, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+                           asset_number, site, operating_hours, operating_hours_read_at, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::integer, CASE WHEN $8::integer IS NULL THEN NULL ELSE now() END, $9)
+     RETURNING id`,
     [
       params.tenantId,
       params.createdBy,
