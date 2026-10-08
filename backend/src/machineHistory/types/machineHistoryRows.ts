@@ -11,6 +11,15 @@ export interface MachineRow {
   model_name: string;
 }
 
+export interface MachineDetailRow extends MachineRow {
+  operating_hours_read_at: Date | null;
+  owner_id: string | null;
+  owner_first_name: string | null;
+  owner_last_name: string | null;
+  owner_avatar_url: string | null;
+  open_case_count: number;
+}
+
 export interface PhotoRow {
   id: string;
   storage_key: string;
@@ -29,6 +38,16 @@ export interface HistoryEntryRow {
   author_id: string | null;
   author_first_name: string | null;
   author_last_name: string | null;
+  component_id: string | null;
+  component_name: string | null;
+  system_name: string | null;
+  operating_hours: number | null;
+  // numeric comes back from pg as a string.
+  downtime_hours: string | null;
   // Live (not soft-deleted) photos, oldest first, as JSON from json_agg.
   photos: PhotoRow[];
+}
+
+export interface GalleryPhotoRow extends PhotoRow {
+  caption: string | null;
 }

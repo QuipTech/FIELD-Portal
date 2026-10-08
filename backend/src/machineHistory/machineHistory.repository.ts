@@ -2,7 +2,7 @@ import { PoolClient } from 'pg';
 import { MACHINE_LABEL_SQL } from '../machineFleet/machineFleet.repository';
 import { StoredFile } from '../storage/types/storedFile';
 import {
-  HistoryEntryRow,
+  MachineDetailRow,
   MachineRow,
   PhotoRow,
 } from './types/machineHistoryRows';
@@ -28,67 +28,30 @@ export const findMachine = async (
   return result.rows[0] ?? null;
 };
 
-export const listHistoryEntries = async (
+// findMachine plus what the detail header shows: hour-meter read time,
+// owner (whoever registered it) and the count of open/in-progress cases.
+export const findMachineDetail = async (
   client: PoolClient,
   tenantId: string,
   machineId: string,
-): Promise<HistoryEntryRow[]> => {
-  const result = await client.query<HistoryEntryRow>(
-    `SELECT e.id, e.entry_type, e.description, e.is_amendment, e.created_at,
-            u.id AS author_id, u.first_name AS author_first_name, u.last_name AS author_last_name,
-            COALESCE((
-              SELECT json_agg(json_build_object(
-                       'id', a.id, 'storage_key', a.storage_key, 'file_name', a.file_name,
-                       'content_type', a.content_type, 'size_bytes', a.size_bytes,
-                       'created_at', a.created_at) ORDER BY a.created_at)
-              FROM technical_attachments a
-              WHERE a.history_entry_id = e.id AND a.tenant_id = $2
-                AND a.file_type = 'photo' AND a.deleted_at IS NULL
-                AND a.storage_key IS NOT NULL
-            ), '[]'::json) AS photos
-     FROM technical_history_entries e
-     LEFT JOIN users u ON u.id = e.created_by
-     WHERE e.machine_id = $1 AND e.tenant_id = $2 AND e.deleted_at IS NULL
-     ORDER BY e.created_at DESC`,
+): Promise<MachineDetailRow | null> => {
+  const result = await client.query<MachineDetailRow>(
+    `SELECT m.id, m.serial_number, m.fleet_number, m.status,
+            ${MACHINE_LABEL_SQL} AS label, m.site, m.operating_hours, m.operating_hours_read_at,
+            mf.name AS manufacturer_name, mm.name AS model_name,
+            u.id AS owner_id, u.first_name AS owner_first_name, u.last_name AS owner_last_name,
+            u.avatar_url AS owner_avatar_url,
+            (SELECT count(*)::int FROM support_cases sc
+             WHERE sc.machine_id = m.id AND sc.tenant_id = $2 AND sc.deleted_at IS NULL
+               AND sc.status IN ('open', 'in_progress')) AS open_case_count
+     FROM machines m
+     JOIN machine_manufacturers mf ON mf.id = m.manufacturer_id
+     JOIN machine_models mm ON mm.id = m.model_id
+     LEFT JOIN users u ON u.id = m.created_by
+     WHERE m.id = $1 AND m.tenant_id = $2 AND m.deleted_at IS NULL`,
     [machineId, tenantId],
   );
-  return result.rows;
-};
-
-export const insertHistoryEntry = async (
-  client: PoolClient,
-  params: {
-    tenantId: string;
-    machineId: string;
-    userId: string;
-    entryType: string;
-    description: string;
-  },
-): Promise<string> => {
-  const result = await client.query<{ id: string }>(
-    `INSERT INTO technical_history_entries (tenant_id, machine_id, entry_type, description, created_by)
-     VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-    [
-      params.tenantId,
-      params.machineId,
-      params.entryType,
-      params.description,
-      params.userId,
-    ],
-  );
-  return result.rows[0].id;
-};
-
-export const historyEntryExists = async (
-  client: PoolClient,
-  params: { tenantId: string; machineId: string; entryId: string },
-): Promise<boolean> => {
-  const result = await client.query(
-    `SELECT 1 FROM technical_history_entries
-     WHERE id = $1 AND machine_id = $2 AND tenant_id = $3 AND deleted_at IS NULL`,
-    [params.entryId, params.machineId, params.tenantId],
-  );
-  return (result.rowCount ?? 0) > 0;
+  return result.rows[0] ?? null;
 };
 
 export const insertPhotoAttachment = async (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Icon, type IconName } from "../icons/icon";
 
@@ -15,6 +15,8 @@ interface ActionMenuProps {
   // Names the thing the menu acts on, for screen readers.
   label: string;
   items: ActionMenuItem[];
+  // A labelled button (content + classes) in place of the "⋯" icon.
+  trigger?: { content: ReactNode; className: string };
 }
 
 const MENU_GAP_PX = 4;
@@ -37,7 +39,7 @@ const placeMenu = (button: HTMLElement, menu: HTMLElement): CSSProperties => {
 // A "⋯" button that opens a small menu of actions. The menu renders in a
 // portal on <body>, so tables and cards that clip their overflow can't hide
 // it. Closes on selection, an outside click, Escape, scrolling or resizing.
-export const ActionMenu = ({ label, items }: ActionMenuProps) => {
+export const ActionMenu = ({ label, items, trigger }: ActionMenuProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [menuStyle, setMenuStyle] = useState<CSSProperties>({ position: "fixed", visibility: "hidden" });
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -78,16 +80,19 @@ export const ActionMenu = ({ label, items }: ActionMenuProps) => {
       <button
         ref={buttonRef}
         type="button"
-        aria-label={`Actions for ${label}`}
+        aria-label={trigger ? undefined : `Actions for ${label}`}
         aria-haspopup="menu"
         aria-expanded={isOpen}
         onClick={() => {
           setMenuStyle({ position: "fixed", visibility: "hidden" });
           setIsOpen((open) => !open);
         }}
-        className="flex h-[34px] w-[34px] items-center justify-center rounded-lg text-lg leading-none text-bodyGray hover:bg-fillGray"
+        className={
+          trigger?.className ??
+          "flex h-[34px] w-[34px] items-center justify-center rounded-lg text-lg leading-none text-bodyGray hover:bg-fillGray"
+        }
       >
-        ⋯
+        {trigger?.content ?? "⋯"}
       </button>
       {isOpen &&
         createPortal(

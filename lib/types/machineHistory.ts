@@ -15,6 +15,20 @@ export interface MachineSummary {
   status: string;
 }
 
+export interface MachineDetailResponse extends MachineSummary {
+  hoursReadAt: string | null;
+  owner: { id: string; name: string; avatarUrl: string | null } | null;
+  openCaseCount: number;
+}
+
+export interface GalleryPhotoResponse {
+  id: string;
+  caption: string | null;
+  contentType: string | null;
+  uploadedAt: string;
+  signedUrl: string;
+}
+
 export interface MachinePhoto {
   id: string;
   fileName: string | null;
@@ -32,6 +46,9 @@ export interface LiveHistoryEntry {
   isAmendment: boolean;
   createdAt: string;
   author: { id: string; name: string } | null;
+  component: { id: string; name: string; systemName: string } | null;
+  operatingHours: number | null;
+  downtimeHours: number | null;
   photos: MachinePhoto[];
 }
 

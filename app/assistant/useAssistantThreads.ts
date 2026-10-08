@@ -6,6 +6,7 @@ import { requireAccessToken } from "@/lib/api/requireAccessToken";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import { getAssistantThreadRequest, listAssistantThreadsRequest } from "@/lib/api/aiAssistantApi";
 import type { AssistantThreadSummary, ChatEntry } from "@/lib/types/aiAssistant";
+import { readAssistantLaunchParams } from "./readAssistantLaunchParams";
 
 export interface AssistantThreadsState {
   threads: AssistantThreadSummary[];
@@ -68,11 +69,13 @@ export const useAssistantThreads = (): AssistantThreadsState => {
     [reload],
   );
 
-  // /assistant?thread=<id> (e.g. from the dashboard) opens that thread;
+  // /assistant?thread=<id> (e.g. from the dashboard) opens that thread
+  // (a ?machine= launch starts a new one instead);
   // read from location rather than useSearchParams to keep the page static.
   useEffect(() => {
     if (hasOpenedInitialThreadRef.current || !threadList.data) return;
     hasOpenedInitialThreadRef.current = true;
+    if (readAssistantLaunchParams().machineId) return;
     const requestedId = new URLSearchParams(window.location.search).get("thread");
     const initial = threadList.data.find((thread) => thread.id === requestedId) ?? threadList.data[0];
     if (initial) void openThread(initial);

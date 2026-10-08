@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/shell/appShell";
 import { TopBar } from "@/components/shell/topBar";
 import { Icon } from "@/components/icons/icon";
@@ -14,6 +14,7 @@ import type { AssistantSource } from "@/lib/types/aiAssistant";
 import { useAssistantThreads } from "../useAssistantThreads";
 import { useAskAssistant } from "../useAskAssistant";
 import { openSourceDocument } from "../assistantSources";
+import { readAssistantLaunchParams } from "../readAssistantLaunchParams";
 import { ThreadsRail } from "./threadsRail";
 import { ChatMessageList } from "./chatMessageList";
 import { ChatComposer } from "./chatComposer";
@@ -26,6 +27,13 @@ export const AssistantWorkspace = () => {
   const machines = useApiResource((token) => listMachinesRequest(token, EMPTY_MACHINE_FILTERS, ""), [], "Couldn't load machines.");
   const [newThreadMachineId, setNewThreadMachineId] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [launchPrompt, setLaunchPrompt] = useState("");
+
+  useEffect(() => {
+    const { machineId, prompt } = readAssistantLaunchParams();
+    if (machineId) setNewThreadMachineId(machineId);
+    if (prompt) setLaunchPrompt(prompt);
+  }, []);
   const { activeThread } = threads;
   const newThreadMachine = machines.data?.items.find((machine) => machine.id === newThreadMachineId);
   const contextMachine = activeThread
@@ -109,7 +117,12 @@ export const AssistantWorkspace = () => {
             error={threads.messagesError}
             onOpenSource={openSource}
           />
-          <ChatComposer onAsk={asker.ask} isAnswering={asker.isAnswering} hasMachineContext={contextMachine !== null} />
+          <ChatComposer
+            onAsk={asker.ask}
+            isAnswering={asker.isAnswering}
+            hasMachineContext={contextMachine !== null}
+            prefill={launchPrompt}
+          />
           <p className="text-xs text-mutedGray">Answers always cite sources; no source = no answer.</p>
         </main>
       </div>

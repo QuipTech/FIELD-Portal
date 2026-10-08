@@ -4,11 +4,12 @@ import { useState } from "react";
 import { Icon } from "@/components/icons/icon";
 import { Button } from "@/components/ui/button";
 import { PermissionButton } from "@/components/auth/permissionButton";
-import { LiveAddEntryModal } from "@/components/machines/liveAddEntryModal";
+import { HistoryEntryModal } from "@/components/machines/historyEntryModal";
 import { NewCaseModal } from "@/components/supportCases/newCaseModal";
 import { PERMISSIONS } from "@/lib/auth/permissionCodes";
-import { requireAccessToken } from "@/lib/api/requireAccessToken";
-import { createHistoryEntryRequest } from "@/lib/api/machineHistoryApi";
+import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
+import { machineDetailService } from "@/lib/api/machineDetail/machineDetailService";
+import { useComponentOptions } from "@/lib/machineDetail/useComponentOptions";
 import type { AssistantMachine, AssistantMessage, AssistantSource } from "@/lib/types/aiAssistant";
 import { describeSource } from "../assistantSources";
 
@@ -32,6 +33,7 @@ const withSources = (text: string, sources: AssistantSource[]) =>
 export const AnswerActions = ({ message, citedSources, question, machine, onOpenSource }: AnswerActionsProps) => {
   const [openForm, setOpenForm] = useState<"entry" | "case" | null>(null);
   const firstSource = citedSources.find((source) => source.documentId);
+  const componentOptions = useComponentOptions(machineDetailService, machine?.id ?? null, openForm === "entry");
 
   return (
     <div className="flex flex-wrap gap-2">
@@ -55,12 +57,16 @@ export const AnswerActions = ({ message, citedSources, question, machine, onOpen
         Raise case
       </PermissionButton>
       {openForm === "entry" && machine && (
-        <LiveAddEntryModal
+        <HistoryEntryModal
           machineLabel={machine.label}
+          componentOptions={componentOptions}
+          defaultHours={null}
           initialDescription={withSources(message.content, citedSources)}
-          onCreate={async (entry) => {
-            await createHistoryEntryRequest(requireAccessToken(), machine.id, entry);
+          onSubmit={async (entry) => {
+            await machineDetailService.createHistoryEntry(machine.id, entry);
+            setOpenForm(null);
           }}
+          toErrorMessage={(error) => toApiErrorMessage(error, "Couldn't save the entry. Please try again.")}
           onClose={() => setOpenForm(null)}
         />
       )}

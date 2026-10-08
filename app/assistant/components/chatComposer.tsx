@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Icon } from "@/components/icons/icon";
 import { usePermissions } from "@/lib/auth/usePermissions";
 import { PERMISSIONS, describeMissingPermission } from "@/lib/auth/permissionCodes";
@@ -14,13 +14,18 @@ interface ChatComposerProps {
   onAsk: (question: string, photo: AttachedPhoto | null) => Promise<boolean>;
   isAnswering: boolean;
   hasMachineContext: boolean;
+  // Typed into the box (not sent), e.g. a question from a machine screen.
+  prefill?: string;
 }
 
 const iconButtonClasses =
   "flex h-9 w-9 flex-none items-center justify-center rounded-lg text-slate-400 hover:bg-fillGray hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50";
 
-export const ChatComposer = ({ onAsk, isAnswering, hasMachineContext }: ChatComposerProps) => {
+export const ChatComposer = ({ onAsk, isAnswering, hasMachineContext, prefill = "" }: ChatComposerProps) => {
   const [draft, setDraft] = useState("");
+  useEffect(() => {
+    if (prefill) setDraft(prefill);
+  }, [prefill]);
   const [photo, setPhoto] = useState<AttachedPhoto | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const { isLoaded, can } = usePermissions();
