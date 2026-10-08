@@ -19,16 +19,17 @@ export const countOpenCases = async (
 ): Promise<CaseCountsRow> => {
   const result = await client.query<CaseCountsRow>(
     `SELECT count(*) AS total,
-            count(*) FILTER (WHERE created_at + interval '1 hour' *
-              CASE priority WHEN 'P1' THEN $2::numeric WHEN 'P2' THEN $3::numeric
-                            ELSE $4::numeric END < now()
+            count(*) FILTER (WHERE NOT sla_paused AND COALESCE(sla_due_at,
+              created_at + interval '1 hour' *
+                CASE priority WHEN 'P1' THEN $2::numeric WHEN 'P2' THEN $3::numeric
+                              ELSE $4::numeric END) < now()
             ) AS breaching,
             count(*) FILTER (WHERE priority = 'P1') AS p1,
             count(*) FILTER (WHERE priority = 'P2') AS p2,
             count(*) FILTER (WHERE priority = 'P3') AS p3
      FROM support_cases
      WHERE tenant_id = $1 AND deleted_at IS NULL
-       AND status IN ('open', 'in_progress')`,
+       AND status IN ('new', 'open', 'waiting_on_customer')`,
     [tenantId, slaHours.P1, slaHours.P2, slaHours.P3],
   );
   return result.rows[0];

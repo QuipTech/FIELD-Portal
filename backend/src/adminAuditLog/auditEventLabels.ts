@@ -42,6 +42,8 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   'ai_query_logs:delete': 'Purged expired AI query logs',
   'data_export_request:create': 'Requested data export',
   'account_deletion_request:create': 'Requested account deletion',
+  'support_case:create': 'Raised support case',
+  'support_case:update': 'Changed support case',
 };
 
 const capitalize = (text: string) =>

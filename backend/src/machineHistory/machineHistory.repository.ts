@@ -43,7 +43,7 @@ export const findMachineDetail = async (
             u.avatar_url AS owner_avatar_url,
             (SELECT count(*)::int FROM support_cases sc
              WHERE sc.machine_id = m.id AND sc.tenant_id = $2 AND sc.deleted_at IS NULL
-               AND sc.status IN ('open', 'in_progress')) AS open_case_count
+               AND sc.status IN ('new', 'open', 'waiting_on_customer')) AS open_case_count
      FROM machines m
      JOIN machine_manufacturers mf ON mf.id = m.manufacturer_id
      JOIN machine_models mm ON mm.id = m.model_id

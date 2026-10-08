@@ -1,43 +1,36 @@
 "use client";
 
-import { LoadingSpinner } from "@/components/ui/loadingSpinner";
+import { EmptyState } from "@/components/ui/emptyState";
+import { LoadErrorState } from "@/components/ui/loadErrorState";
+import { CaseListSkeleton } from "@/components/supportCases/caseListSkeleton";
 import { useSupportCases } from "../useSupportCases";
 import { CasesFilterBar } from "./casesFilterBar";
 import { CasesTable } from "./casesTable";
+import { NewCaseButton } from "./newCaseButton";
 
 export const CasesManager = () => {
-  const { filters, updateFilter, isFiltered, cases, options } = useSupportCases();
+  const { filters, updateFilter, isFiltered, cases } = useSupportCases();
   const items = cases.data?.items ?? [];
 
   const renderBody = () => {
-    if (!cases.data && cases.isLoading) {
-      return (
-        <div className="flex flex-1 items-center justify-center text-mutedGray">
-          <LoadingSpinner size="md" />
-        </div>
-      );
-    }
-    if (cases.error) return <p className="text-sm text-danger">{cases.error}</p>;
-    if (items.length === 0) {
-      return (
-        <p className="py-10 text-center text-sm text-mutedGray">
-          {isFiltered || filters.status !== "active"
-            ? "No cases match these filters."
-            : "No open support cases. Raise one with New case."}
-        </p>
-      );
-    }
-    return <CasesTable cases={items} />;
+    if (!cases.data && cases.isLoading) return <CaseListSkeleton />;
+    if (cases.error) return <LoadErrorState message={cases.error} onRetry={cases.reload} />;
+    if (items.length > 0) return <CasesTable cases={items} />;
+    return isFiltered ? (
+      <EmptyState icon="search" title="No cases match these filters" />
+    ) : (
+      <EmptyState
+        icon="life"
+        title="No cases yet"
+        description="Raise a case and QuipTech support will pick it up. You can chat with them right here."
+        actions={<NewCaseButton />}
+      />
+    );
   };
 
   return (
     <>
-      <CasesFilterBar
-        filters={filters}
-        statusCounts={cases.data?.statusCounts ?? null}
-        options={options}
-        onChange={updateFilter}
-      />
+      <CasesFilterBar filters={filters} statusCounts={cases.data?.statusCounts ?? null} onChange={updateFilter} />
       {renderBody()}
     </>
   );

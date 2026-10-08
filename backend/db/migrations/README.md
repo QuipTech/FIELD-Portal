@@ -55,6 +55,10 @@ session (set per-request by `DatabaseService.withTenant`).
 | `0066` | Demo requests — `platform.demo_requests` (marketing-site demo form: contact details, follow-up status + notes, team/confirmation email sent times, IP); service role only, no tenant access |
 | `0067` | `platform.demo_requests.user_agent` (the submitting browser's User-Agent) |
 | `0068` | Machine detail — each machine's installed system/component tree seeded from its model template (trigger on `machines` insert + backfill, with a `baseline` snapshot), history entries' component/hours/downtime, `machines.operating_hours_read_at`, `configuration_snapshots.is_known_good`, `machine_photos` gallery |
+| `0069` | Support case chat — statuses `new`/`open`/`waiting_on_customer`/`resolved`/`closed` (`in_progress` → `open`, unassigned `open` → `new`), `description`, SLA (`sla_due_at`, `sla_paused`, `sla_paused_at`; a status trigger pauses/resumes it and sets `resolved_at`/`closed_at`), `support_updates.author_role` + `is_internal` (staff-only notes), message-linked `support_attachments`, `case_events` (append-only thread lines), `support_case_reads` (unread badge) |
+| `0070` | Support staff — `support.agent` permission (Owner + new default `Support Agent` system role only, enforced by trigger), SECURITY DEFINER `user_has_permission()`, `support_case_person()` (names staff across organisations, nobody else), `support_case_tenant_id()` |
+| `0071` | Support queue — SECURITY DEFINER `admin_list_support_cases()`, `admin_support_case_stats()`, `admin_list_support_staff()`, `support_staff_unread_case_count()` |
+| `0072` | Case lifecycle — `support_close_resolved_cases()` (7-day auto-close with event + audit), 0054's case notification triggers skip customers on internal notes and link staff to `/admin/cases/:n`, 0064/0065 case report and unactioned-case alert on the new statuses |
 
 ## Two forward references, resolved across files
 

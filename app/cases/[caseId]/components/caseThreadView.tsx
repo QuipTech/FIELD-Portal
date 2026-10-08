@@ -1,45 +1,49 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { Icon } from "@/components/icons/icon";
-import { Tag } from "@/components/ui/tag";
+import { Button } from "@/components/ui/button";
+import { ErrorToast } from "@/components/ui/errorToast";
 import { LoadingSpinner } from "@/components/ui/loadingSpinner";
-import { getCasePriorityTone } from "@/lib/format/casePriority";
-import { CASE_STATUS_LABELS, formatCaseNumber } from "@/lib/format/caseLabels";
+import { CaseThread } from "@/components/supportCases/caseThread/caseThread";
+import { CaseThreadSkeleton } from "@/components/supportCases/caseThread/caseThreadSkeleton";
+import { CaseComposer } from "@/components/supportCases/caseComposer";
+import { CaseHeaderBar } from "@/components/supportCases/caseHeaderBar";
+import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import { useCaseThread } from "../useCaseThread";
-import { CaseMessageThread } from "./caseMessageThread";
-import { CaseReplyBox } from "./caseReplyBox";
-import { CaseDetailsRail } from "./caseDetailsRail";
+import { CaseInfoPanel } from "./caseInfoPanel";
+import { isReopenable, replyClosedReason } from "./customerCaseRules";
 
 export const CaseThreadView = ({ caseNumber }: { caseNumber: number }) => {
-  const { supportCase, messages, typingName, isLive, sendReply, updateCase, noteTyping } = useCaseThread(caseNumber);
+  const { supportCase, thread, reopen } = useCaseThread(caseNumber);
+  const [toast, setToast] = useState<string | null>(null);
+  const [isReopening, setIsReopening] = useState(false);
   const item = supportCase.data;
+
+  const handleReopen = async () => {
+    setIsReopening(true);
+    await reopen()
+      .catch((error: unknown) => setToast(toApiErrorMessage(error, "Couldn't reopen the case.")))
+      .finally(() => setIsReopening(false));
+  };
 
   return (
     <div className="flex h-screen flex-col bg-surfaceGray">
-      <div className="flex flex-none items-center gap-2.5 border-b border-slate-200/80 bg-surface px-6 py-4">
-        <Link href="/cases" className="text-[15px] text-bodyGray">
-          Cases
-        </Link>
-        <Icon name="chevr" className="stroke-mutedGray" />
-        <span className="text-[15px] font-medium text-ink">
-          {formatCaseNumber(caseNumber)} {item?.subject}
-        </span>
-        {item && (
-          <div className="ml-auto flex items-center gap-2.5">
-            <span
-              className={`flex items-center gap-1.5 text-xs ${isLive ? "text-bodyGray" : "text-mutedGray"}`}
-              title={isLive ? "New replies appear automatically" : "Reconnecting…"}
-            >
-              <span className={`h-2 w-2 rounded-full ${isLive ? "bg-emerald-500" : "bg-slate-300"}`} />
-              {isLive ? "Live" : "Offline"}
-            </span>
-            <Tag tone={getCasePriorityTone(item.priority)}>
-              {CASE_STATUS_LABELS[item.status]} · {item.priority}
-            </Tag>
-          </div>
-        )}
-      </div>
+      <CaseHeaderBar
+        backHref="/cases"
+        backLabel="Cases"
+        caseNumber={caseNumber}
+        item={item}
+        audience="customer"
+        isLive={thread.isLive}
+        actions={
+          item && isReopenable(item) ? (
+            <Button size="sm" onClick={handleReopen} disabled={isReopening}>
+              Reopen
+            </Button>
+          ) : null
+        }
+      />
       <div className="flex min-h-0 flex-1">
         {!item ? (
           <div className="flex flex-1 items-center justify-center text-mutedGray">
@@ -56,24 +60,26 @@ export const CaseThreadView = ({ caseNumber }: { caseNumber: number }) => {
           </div>
         ) : (
           <div className="m-4 flex flex-1 gap-3 overflow-hidden rounded-2xl border border-slate-200/80 bg-surface p-3">
-            <main className="flex flex-[2.2] flex-col gap-3.5 overflow-y-auto p-3">
-              {messages.error ? (
-                <p className="text-sm text-danger">{messages.error}</p>
-              ) : (
-                <CaseMessageThread messages={messages.data ?? []} />
-              )}
-              <CaseReplyBox
-                status={item.status}
-                typingName={typingName}
-                onSend={sendReply}
-                onTyping={noteTyping}
-                onStatusChange={(status) => updateCase({ status })}
+            <main className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-surfaceGray">
+              <div className="flex-1 overflow-y-auto px-6 py-6">
+                {thread.isLoading ? <CaseThreadSkeleton /> : <CaseThread messages={thread.messages} events={thread.events} perspective="customer" />}
+                {thread.error && <p className="mt-3 text-sm text-danger">{thread.error}</p>}
+              </div>
+              <CaseComposer
+                scope="customer"
+                caseNumber={caseNumber}
+                typingName={thread.typingName}
+                replyClosedReason={replyClosedReason(item)}
+                onSend={thread.sendMessage}
+                onTyping={thread.noteTyping}
+                onError={setToast}
               />
             </main>
-            <CaseDetailsRail item={item} onChange={updateCase} />
+            <CaseInfoPanel item={item} />
           </div>
         )}
       </div>
+      {toast && <ErrorToast key={toast} message={toast} onDismiss={() => setToast(null)} />}
     </div>
   );
 };

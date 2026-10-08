@@ -5,6 +5,7 @@ import { getAccessToken } from "../auth/authSession";
 export const CASE_SOCKET_EVENTS = {
   caseUpdated: "case:updated",
   message: "case:message",
+  event: "case:event",
   typing: "case:typing",
   join: "case:join",
   leave: "case:leave",

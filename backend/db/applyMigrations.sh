@@ -14,8 +14,12 @@ run_query() {
   psql "$MIGRATION_DATABASE_URL" -v ON_ERROR_STOP=1 -tA -c "$1"
 }
 
+# Assigned on their own lines so a failed query (e.g. no connection) stops
+# the script under set -e — inside `[ "$(…)" = … ]` it wouldn't, and every
+# migration from 0001 would be treated as unapplied.
+has_migrations_table="$(run_query "SELECT to_regclass('schema_migrations') IS NOT NULL")"
 applied_versions=""
-if [ "$(run_query "SELECT to_regclass('schema_migrations') IS NOT NULL")" = "t" ]; then
+if [ "$has_migrations_table" = "t" ]; then
   applied_versions="$(run_query "SELECT version FROM schema_migrations")"
 fi
 

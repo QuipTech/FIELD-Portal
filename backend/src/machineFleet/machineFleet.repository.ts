@@ -102,7 +102,7 @@ export const findFeaturedDownMachine = async (
      LEFT JOIN LATERAL (
        SELECT sc.case_number, sc.subject, sc.priority FROM support_cases sc
        WHERE sc.tenant_id = $1 AND sc.machine_id = m.id AND sc.deleted_at IS NULL
-         AND sc.status IN ('open', 'in_progress')
+         AND sc.status IN ('new', 'open', 'waiting_on_customer')
        ORDER BY sc.priority, sc.updated_at DESC LIMIT 1
      ) c ON true
      WHERE m.tenant_id = $1 AND m.deleted_at IS NULL AND m.status = 'down'

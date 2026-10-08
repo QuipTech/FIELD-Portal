@@ -10,9 +10,11 @@ import {
 const EXCERPT_LENGTH = 60;
 
 const CASE_STATUS_LABELS: Record<string, string> = {
+  new: 'new',
   open: 'open',
-  in_progress: 'in progress',
+  waiting_on_customer: 'waiting on customer',
   resolved: 'resolved',
+  closed: 'closed',
 };
 const PRIORITY_TONES: Record<string, ActivityTone> = {
   P1: 'danger',
@@ -54,8 +56,8 @@ export const caseToActivity = (row: CaseActivityRow): ActivityItem => {
     occurredAt: new Date(row.updated_at).toISOString(),
     href: `/cases/${row.case_number}`,
     tag:
-      row.status === 'resolved'
-        ? { label: 'Resolved', tone: 'ok' }
+      row.status === 'resolved' || row.status === 'closed'
+        ? { label: row.status === 'closed' ? 'Closed' : 'Resolved', tone: 'ok' }
         : {
             label: `${row.priority} ${status}`,
             tone: PRIORITY_TONES[row.priority] ?? 'default',

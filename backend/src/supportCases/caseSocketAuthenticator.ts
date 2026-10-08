@@ -7,15 +7,18 @@ import { findUserPermissionCodes } from '../auth/userAccess.repository';
 import { verifySocketToken } from '../common/security/verifySocketToken';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { findUserDisplayName } from './caseOptions.repository';
+import { isSupportStaff, SUPPORT_CREATE_PERMISSION } from './caseAccessPolicy';
 
 export interface CaseSocketUser extends AuthenticatedUser {
   name: string;
+  // As of connecting: decides the rooms joined on connect. Joining a case
+  // re-reads them (CaseAccessService).
+  permissions: string[];
 }
 
-const REQUIRED_PERMISSION = 'support.create';
-
 // The socket twin of JwtAuthGuard + RequirePermissionsGuard: the portal
-// sends its access token in the handshake (`auth.token`). Null means the
+// sends its access token in the handshake (`auth.token`). Customers need
+// support.create, staff support.agent or platform.manage. Null means the
 // connection is refused.
 @Injectable()
 export class CaseSocketAuthenticator {
@@ -36,9 +39,14 @@ export class CaseSocketAuthenticator {
     const { sub: userId, tenantId, email } = payload;
     return this.databaseService.withTenant(tenantId, async (client) => {
       const permissions = await findUserPermissionCodes(client, userId);
-      if (!permissions.includes(REQUIRED_PERMISSION)) return null;
+      const mayConnect =
+        permissions.includes(SUPPORT_CREATE_PERMISSION) ||
+        isSupportStaff(permissions);
+      if (!mayConnect) return null;
       const name = await findUserDisplayName(client, tenantId, userId);
-      return name === null ? null : { userId, tenantId, email, name };
+      return name === null
+        ? null
+        : { userId, tenantId, email, name, permissions };
     });
   };
 }

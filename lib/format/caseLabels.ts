@@ -22,15 +22,26 @@ export const CASE_PRIORITIES: { value: CasePriority; label: string }[] = [
 ];
 
 export const CASE_STATUS_LABELS: Record<CaseStatus, string> = {
+  new: "New",
   open: "Open",
-  in_progress: "In progress",
+  waiting_on_customer: "Waiting on customer",
   resolved: "Resolved",
+  closed: "Closed",
 };
 
 export const CASE_STATUS_TONES: Record<CaseStatus, Tone> = {
-  open: "amber",
-  in_progress: "primary",
+  new: "primary",
+  open: "default",
+  waiting_on_customer: "amber",
   resolved: "ok",
+  closed: "ok",
+};
+
+// The customer reads "waiting on customer" as being about them.
+export const CUSTOMER_CASE_STATUS_LABELS: Record<CaseStatus, string> = {
+  ...CASE_STATUS_LABELS,
+  new: "Awaiting assignment",
+  waiting_on_customer: "Waiting on you",
 };
 
 // "#1042"

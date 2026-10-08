@@ -1,32 +1,41 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
+import { DashboardConfig } from '../dashboard/dashboardConfig';
 import * as casesRepository from './supportCases.repository';
 import * as optionsRepository from './caseOptions.repository';
-import { insertCaseMessage } from './caseMessages.repository';
 import { requireSupportCase } from './requireSupportCase';
-import { CaseEventsPublisher } from './caseEventsPublisher';
-import { toPerson, toStatusCounts, toSupportCase } from './supportCaseMapper';
+import { postMessageToCase } from './postMessageToCase';
+import { recordCaseChange } from './recordCaseChange';
+import { CaseAnnouncer } from './caseAnnouncer.service';
+import { canReopenCase, resolveReopenedStatus } from './caseAccessPolicy';
+import { toStatusCounts, toSupportCase } from './supportCaseMapper';
 import { ListSupportCasesQueryDto } from './dto/listSupportCasesQueryDto';
 import { CreateSupportCaseDto } from './dto/createSupportCaseDto';
-import { UpdateSupportCaseDto } from './dto/updateSupportCaseDto';
 import {
+  CaseStatus,
   SupportCase,
   SupportCaseList,
   SupportCaseOptions,
 } from './types/supportCaseResponse';
 
 const UNKNOWN_MACHINE_MESSAGE = 'That machine is not in your organisation.';
-const UNASSIGNABLE_MESSAGE =
-  "That person can't take support cases (they need the Manage support cases permission).";
+const REOPEN_REFUSED_MESSAGE =
+  'Only a case resolved in the last 7 days can be reopened.';
 
-// Support cases within the caller's own organisation (tenantId from the
-// JWT). Each change is pushed to connected portals once committed.
+// The customer side: cases in the caller's own organisation (tenantId
+// from the JWT, every query under its RLS). Customers can't assign or
+// change status or priority — that's AdminCaseUpdatesService.
 @Injectable()
 export class SupportCasesService {
   constructor(
     private readonly databaseService: DatabaseService,
-    private readonly caseEventsPublisher: CaseEventsPublisher,
+    private readonly dashboardConfig: DashboardConfig,
+    private readonly caseAnnouncer: CaseAnnouncer,
   ) {}
 
   listCases = async (
@@ -58,20 +67,14 @@ export class SupportCasesService {
       ),
     );
 
+  // Machines for the New case form.
   getOptions = async (actor: AuthenticatedUser): Promise<SupportCaseOptions> =>
     this.databaseService.withTenant(actor.tenantId, async (client) => {
-      const users = await optionsRepository.listAssignableUsers(
-        client,
-        actor.tenantId,
-      );
       const machines = await optionsRepository.listMachineOptions(
         client,
         actor.tenantId,
       );
       return {
-        assignees: users.flatMap(
-          (user) => toPerson(user.id, user.first_name, user.last_name) ?? [],
-        ),
         machines: machines.map((machine) => ({
           id: machine.id,
           label: machine.label,
@@ -80,12 +83,13 @@ export class SupportCasesService {
       };
     });
 
-  // The description becomes the case's first message, in one transaction.
+  // One transaction: the case, its "created" line and audit entry, and the
+  // description as its first message carrying the attachments.
   createCase = async (
     actor: AuthenticatedUser,
     dto: CreateSupportCaseDto,
   ): Promise<SupportCase> => {
-    const created = await this.databaseService.withActor(
+    const posted = await this.databaseService.withActor(
       actor,
       async (client) => {
         if (
@@ -102,32 +106,53 @@ export class SupportCasesService {
           tenantId: actor.tenantId,
           reporterId: actor.userId,
           subject: dto.subject,
+          description: dto.description,
           category: dto.category,
           priority: dto.priority,
           machineId: dto.machineId ?? null,
-        });
-        await insertCaseMessage(client, {
-          tenantId: actor.tenantId,
-          caseId: inserted.id,
-          authorId: actor.userId,
-          body: dto.description,
+          slaHours: Math.round(this.dashboardConfig.slaHours[dto.priority]),
         });
         const caseNumber = Number(inserted.case_number);
-        return toSupportCase(
-          await requireSupportCase(client, actor.tenantId, caseNumber),
-        );
+        await recordCaseChange(client, {
+          tenantId: actor.tenantId,
+          caseId: inserted.id,
+          caseNumber,
+          actorId: actor.userId,
+          action: 'create',
+          events: [{ type: 'created', toValue: dto.priority }],
+        });
+        return postMessageToCase(client, {
+          tenantId: actor.tenantId,
+          supportCase: await requireSupportCase(
+            client,
+            actor.tenantId,
+            caseNumber,
+          ),
+          authorId: actor.userId,
+          authorRole: 'customer',
+          body: dto.description,
+          isInternal: false,
+          attachmentIds: dto.attachmentIds ?? [],
+        });
       },
     );
-    this.caseEventsPublisher.publishCaseUpdated(actor.tenantId, created);
+    const created = toSupportCase(posted.supportCase);
+    this.caseAnnouncer.announceChange(actor.tenantId, {
+      row: posted.supportCase,
+      events: [],
+      actorId: actor.userId,
+      previousAssigneeId: null,
+    });
     return created;
   };
 
-  updateCase = async (
+  // Within 7 days of being resolved, anyone in the organisation can
+  // reopen a case: back to its assignee (open), or to the queue (new).
+  reopenCase = async (
     actor: AuthenticatedUser,
     caseNumber: number,
-    dto: UpdateSupportCaseDto,
   ): Promise<SupportCase> => {
-    const updated = await this.databaseService.withActor(
+    const change = await this.databaseService.withActor(
       actor,
       async (client) => {
         const existing = await requireSupportCase(
@@ -135,26 +160,43 @@ export class SupportCasesService {
           actor.tenantId,
           caseNumber,
         );
-        if (dto.assigneeId) {
-          const assignable = await optionsRepository.listAssignableUsers(
-            client,
-            actor.tenantId,
-          );
-          if (!assignable.some((user) => user.id === dto.assigneeId)) {
-            throw new BadRequestException(UNASSIGNABLE_MESSAGE);
-          }
+        if (
+          !canReopenCase(
+            existing.status as CaseStatus,
+            existing.resolved_at,
+            new Date(),
+          )
+        ) {
+          throw new ConflictException(REOPEN_REFUSED_MESSAGE);
         }
+        const status = resolveReopenedStatus(existing.assignee_id);
         await casesRepository.updateCase(client, {
           tenantId: actor.tenantId,
           caseId: existing.id,
-          patch: dto,
+          patch: { status },
         });
-        return toSupportCase(
-          await requireSupportCase(client, actor.tenantId, caseNumber),
+        const events = await recordCaseChange(client, {
+          tenantId: actor.tenantId,
+          caseId: existing.id,
+          caseNumber,
+          actorId: actor.userId,
+          action: 'update',
+          events: [
+            { type: 'reopened', fromValue: existing.status, toValue: status },
+          ],
+        });
+        const row = await requireSupportCase(
+          client,
+          actor.tenantId,
+          caseNumber,
         );
+        return { row, events };
       },
     );
-    this.caseEventsPublisher.publishCaseUpdated(actor.tenantId, updated);
-    return updated;
+    return this.caseAnnouncer.announceChange(actor.tenantId, {
+      ...change,
+      actorId: actor.userId,
+      previousAssigneeId: null,
+    });
   };
 }
