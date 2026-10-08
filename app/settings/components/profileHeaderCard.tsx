@@ -20,7 +20,7 @@ export const ProfileHeaderCard = () => {
 
   if (!profile) return null;
 
-  const caption = [profile.email, profile.role, profile.location, signedInProfile?.tenant?.name]
+  const caption = [profile.email, profile.role, signedInProfile?.tenant?.name]
     .filter(Boolean)
     .join(" · ");
 

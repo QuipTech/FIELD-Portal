@@ -26,8 +26,7 @@ interface EditProfileModalProps {
 const SAVE_FAILED_MESSAGE = "Couldn't save your profile. Please try again.";
 
 // The photo uploads (and is saved) as soon as it's picked; the name and
-// mobile number are saved with "Save changes". Role and location aren't stored on the
-// server yet, so they only last for this visit.
+// mobile number are saved with "Save changes".
 export const EditProfileModal = ({ profile, onSave, onAvatarUploaded, onClose }: EditProfileModalProps) => {
   const [draft, setDraft] = useState<ProfileDetails>(profile);
   const [isSaving, setIsSaving] = useState(false);
@@ -71,15 +70,10 @@ export const EditProfileModal = ({ profile, onSave, onAvatarUploaded, onClose }:
           {/* The sign-in identity — changing it needs verification, not a text field. */}
           <Input icon="user" type="email" value={draft.email} readOnly disabled />
         </div>
-        <div className="flex gap-2.5">
-          <div className="flex flex-1 flex-col gap-1.5">
-            <span className="text-xs font-medium uppercase tracking-wide text-mutedGray">Role</span>
-            <Input value={draft.role} onChange={(event) => setDraft({ ...draft, role: event.target.value })} />
-          </div>
-          <div className="flex flex-1 flex-col gap-1.5">
-            <span className="text-xs font-medium uppercase tracking-wide text-mutedGray">Location</span>
-            <Input value={draft.location} onChange={(event) => setDraft({ ...draft, location: event.target.value })} />
-          </div>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium uppercase tracking-wide text-mutedGray">Role</span>
+          {/* Assigned by an admin on the Users page, not editable here. */}
+          <Input value={draft.role} readOnly disabled />
         </div>
         <div className="flex flex-col gap-1.5">
           <span className="text-xs font-medium uppercase tracking-wide text-mutedGray">Mobile number</span>

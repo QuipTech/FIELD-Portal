@@ -17,7 +17,9 @@ automatically.
 
 `dev` is the day-to-day integration branch and never deploys. Merge `dev`
 into `staging-dev` to release to staging, and `staging-dev` into `main` to
-release to production.
+release to production. First-time production go-live, including its own
+Cognito user pool, is walked through step by step in
+[`productionLaunch.md`](productionLaunch.md).
 
 The API gets its own hostname because Socket.IO reads its namespace
 (`/support-cases`, `/notifications`) from the URL path, so the API can't sit
@@ -38,7 +40,10 @@ deploy/
 │   ├── resolveDeployConfig.sh   ← runs in CI: branch → environment + its variables
 │   ├── triggerRemoteDeploy.sh   ← runs in CI: sends the SSM command, waits for it
 │   └── deployRelease.sh         ← runs on the host: secrets → pull → migrate → up
-└── iam/                         ← policy templates (replace the <PLACEHOLDERS>)
+├── iam/                         ← policy templates (replace the <PLACEHOLDERS>)
+├── productionLaunch.md          ← step-by-step first production go-live
+├── productionStatus.md          ← current production readiness: done / required
+└── stagingTestChecklist.md      ← full QA checklist to sign off staging before production
 ```
 
 ## How a deploy runs
@@ -116,9 +121,14 @@ Region: `ap-southeast-2` (the RDS instance's region).
      `MIGRATION_DATABASE_URL=postgresql://<admin user>:<pw>@<rds host>:5432/<db>?sslmode=verify-full`
    - Before the first production deploy, rotate the placeholder passwords of
      `field_app` and `field_service` (see `backend/README.md`).
-10. **Cognito app client**: add the callback URL
-    `https://<portal host>/auth/callback` and the sign-out URL
-    `https://<portal host>/login` for each environment.
+10. **Cognito**: each environment has its **own user pool** (production
+    users never live in the staging pool). On the environment's app client,
+    allow the callback URL `https://<portal host>/auth/callback` and the
+    sign-out URL `https://<portal host>/login`. The same pool and client IDs
+    go in GitHub (`<ENV>_NEXT_PUBLIC_COGNITO_*`, for the portal) and in
+    `/field-portal/<env>/api-env` (`COGNITO_USER_POOL_ID`,
+    `COGNITO_CLIENT_ID`, for the API), and the pool ID goes in the
+    instance role's `CognitoUserManagement` statement.
 11. **SES**: production needs SES out of sandbox mode and a verified
     `SES_FROM_EMAIL` identity.
 
@@ -129,9 +139,10 @@ variables → Actions → Variables** tab (not the Secrets tab, since the
 workflow reads `vars.*`, and none of these values are secret). The branch
 decides the environment, and
 `scripts/resolveDeployConfig.sh` picks `STAGING_<NAME>` / `PRODUCTION_<NAME>`
-first, then a shared `<NAME>`. The server and domains **must** be
-environment-prefixed. They have no shared fallback, so production can never
-deploy onto the staging server.
+first, then a shared `<NAME>`. The server, domains and Cognito settings
+**must** be environment-prefixed. They have no shared fallback, so production
+can never deploy onto the staging server or sign users into the staging user
+pool. A production deploy also fails if its user pool ID equals staging's.
 
 | Variable                           | Scope    | Example                                                    |
 | ---------------------------------- | -------- | ---------------------------------------------------------- |
@@ -139,18 +150,21 @@ deploy onto the staging server.
 | `AWS_DEPLOY_ROLE_ARN`              | shared   | `arn:aws:iam::<ACCOUNT_ID>:role/field-portal-github-deploy` |
 | `DEPLOY_BUCKET`                    | shared   | `quiptech-field-deploy-<ACCOUNT_ID>`                       |
 | `ACME_EMAIL`                       | shared   | the address Let's Encrypt sends expiry notices to          |
-| `NEXT_PUBLIC_COGNITO_USER_POOL_ID` | shared*  | the user pool ID                                           |
-| `NEXT_PUBLIC_COGNITO_CLIENT_ID`    | shared*  | the app client ID                                          |
-| `NEXT_PUBLIC_COGNITO_DOMAIN`       | shared*  | the hosted UI domain                                       |
 | `STAGING_EC2_INSTANCE_ID`          | staging  | `i-0123456789abcdef0`                                      |
 | `STAGING_PORTAL_DOMAIN`            | staging  | `staging.<domain>`                                         |
 | `STAGING_API_DOMAIN`               | staging  | `staging-api.<domain>`                                     |
+| `STAGING_NEXT_PUBLIC_COGNITO_USER_POOL_ID` | staging | the staging user pool ID                        |
+| `STAGING_NEXT_PUBLIC_COGNITO_CLIENT_ID`    | staging | the staging app client ID                       |
+| `STAGING_NEXT_PUBLIC_COGNITO_DOMAIN`       | staging | the staging hosted UI domain                    |
 | `PRODUCTION_EC2_INSTANCE_ID`       | prod     | `i-0fedcba9876543210`                                      |
 | `PRODUCTION_PORTAL_DOMAIN`         | prod     | `app.<domain>`                                             |
 | `PRODUCTION_API_DOMAIN`            | prod     | `api.<domain>`                                             |
+| `PRODUCTION_NEXT_PUBLIC_COGNITO_USER_POOL_ID` | prod | the production user pool ID                     |
+| `PRODUCTION_NEXT_PUBLIC_COGNITO_CLIENT_ID`    | prod | the production app client ID                    |
+| `PRODUCTION_NEXT_PUBLIC_COGNITO_DOMAIN`       | prod | the production hosted UI domain                 |
 
-\* Any shared variable can be overridden for one environment by adding the
-prefixed name, e.g. `PRODUCTION_NEXT_PUBLIC_COGNITO_CLIENT_ID`.
+Any shared variable can be overridden for one environment by adding the
+prefixed name, e.g. `PRODUCTION_ACME_EMAIL`.
 
 The AWS deploy role only trusts pushes and manual runs on `staging-dev` and
 `main` (`iam/githubDeployTrustPolicy.json`). There is no approval step before
@@ -182,10 +196,10 @@ docker compose -p field-portal logs -f api
 ## Environment variables required
 
 From GitHub repository variables (see the table above): `AWS_REGION`,
-`AWS_DEPLOY_ROLE_ARN`, `DEPLOY_BUCKET`, `ACME_EMAIL`,
-`NEXT_PUBLIC_COGNITO_USER_POOL_ID`, `NEXT_PUBLIC_COGNITO_CLIENT_ID`,
-`NEXT_PUBLIC_COGNITO_DOMAIN`, and per environment `<ENV>_EC2_INSTANCE_ID`,
-`<ENV>_PORTAL_DOMAIN`, `<ENV>_API_DOMAIN`.
+`AWS_DEPLOY_ROLE_ARN`, `DEPLOY_BUCKET`, `ACME_EMAIL`, and per environment
+`<ENV>_EC2_INSTANCE_ID`, `<ENV>_PORTAL_DOMAIN`, `<ENV>_API_DOMAIN`,
+`<ENV>_NEXT_PUBLIC_COGNITO_USER_POOL_ID`, `<ENV>_NEXT_PUBLIC_COGNITO_CLIENT_ID`,
+`<ENV>_NEXT_PUBLIC_COGNITO_DOMAIN`.
 
 On the host (Parameter Store): the backend variables in
 `backend/.env.example`, plus `MIGRATION_DATABASE_URL`.

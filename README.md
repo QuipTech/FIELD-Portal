@@ -32,7 +32,10 @@ Runs on **http://localhost:3001** (not 3000), so it can run side by side with th
 Staging (`staging-dev` branch → `https://staging.<domain>`) and production
 (`main` → `https://app.<domain>`) run on Amazon EC2 and are deployed by
 `.github/workflows/deployPortal.yml`. Setup and operations are covered in
-[`deploy/README.md`](deploy/README.md). The production build uses
+[`deploy/README.md`](deploy/README.md), and the first production go-live
+(including production's own Cognito user pool) in
+[`deploy/productionLaunch.md`](deploy/productionLaunch.md). Each environment
+has its own Cognito user pool. The production build uses
 `output: "standalone"` (`next.config.js`) so the Docker image can run
 without the full `node_modules`.
 
