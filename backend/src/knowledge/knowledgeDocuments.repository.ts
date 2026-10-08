@@ -45,12 +45,30 @@ export interface KnowledgeDocumentFilter {
   offset: number;
 }
 
+// The documents tables FORCE row-level security, so a tenant's own rows are
+// only visible once app.tenant_id is set. Superusers (local dev) bypass RLS,
+// which hides this; the field_app role in staging/production doesn't.
+const queryKnowledgeDocuments = (
+  databaseService: DatabaseService,
+  visibleToTenantId: string | null,
+  params: unknown[],
+) =>
+  visibleToTenantId
+    ? databaseService.withTenant(visibleToTenantId, (client) =>
+        client.query<KnowledgeDocumentRow>(KNOWLEDGE_DOCUMENTS_QUERY, params),
+      )
+    : databaseService.query<KnowledgeDocumentRow>(
+        KNOWLEDGE_DOCUMENTS_QUERY,
+        params,
+      );
+
 export const listKnowledgeDocuments = async (
   databaseService: DatabaseService,
   filter: KnowledgeDocumentFilter,
 ): Promise<KnowledgeDocumentRow[]> => {
-  const result = await databaseService.query<KnowledgeDocumentRow>(
-    KNOWLEDGE_DOCUMENTS_QUERY,
+  const result = await queryKnowledgeDocuments(
+    databaseService,
+    filter.visibleToTenantId,
     [
       null,
       filter.search ? escapeLikePattern(filter.search) : null,
@@ -70,8 +88,9 @@ export const findKnowledgeDocument = async (
   visibleToTenantId: string | null,
   includeAllTenants = false,
 ): Promise<KnowledgeDocumentRow | null> => {
-  const result = await databaseService.query<KnowledgeDocumentRow>(
-    KNOWLEDGE_DOCUMENTS_QUERY,
+  const result = await queryKnowledgeDocuments(
+    databaseService,
+    visibleToTenantId,
     [itemId, null, null, 1, 0, visibleToTenantId, includeAllTenants],
   );
   return result.rows[0] ?? null;
