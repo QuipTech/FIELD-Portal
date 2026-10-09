@@ -51,6 +51,8 @@ export const toSupportStaffMember = (
   name: toPersonName(row.first_name, row.last_name),
   email: row.email,
   avatarUrl: row.avatar_url,
+  organisationName: row.organisation_name,
   isAdmin: row.is_admin,
+  isSupportStaff: row.is_support_staff,
   openCaseCount: Number(row.open_case_count),
 });

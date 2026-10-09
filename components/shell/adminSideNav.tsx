@@ -8,6 +8,7 @@ import { PERMISSIONS, type PermissionCode } from "@/lib/auth/permissionCodes";
 import { LogoutButton } from "./logoutButton";
 import { NavUnreadBadge } from "./navUnreadBadge";
 import { useUnreadCaseCount } from "@/lib/hooks/useUnreadCaseCount";
+import { useSupportStaffAccess } from "@/lib/hooks/useSupportStaffAccess";
 
 interface AdminNavLink {
   href: string;
@@ -15,11 +16,14 @@ interface AdminNavLink {
   icon: IconName;
   // Hidden from anyone without it.
   permission?: PermissionCode;
+  // Shown to QuipTech support staff (not a single permission).
+  isStaffOnly?: boolean;
 }
 
 const SUPPORT_QUEUE_HREF = "/admin/cases";
 
-// Support Agents reach the admin portal for support cases only.
+// Support staff who aren't the admin reach the admin portal for support
+// cases only.
 const links: AdminNavLink[] = [
   { href: "/admin/dashboard", label: "Overview", icon: "grid", permission: PERMISSIONS.managePlatform },
   { href: "/admin/users", label: "Users", icon: "users", permission: PERMISSIONS.managePlatform },
@@ -28,7 +32,7 @@ const links: AdminNavLink[] = [
   { href: "/admin/machines", label: "Machine library", icon: "db", permission: PERMISSIONS.managePlatform },
   { href: "/admin/ai-configuration", label: "AI configuration", icon: "sliders", permission: PERMISSIONS.managePlatform },
   { href: "/admin/audit-log", label: "Audit log", icon: "file", permission: PERMISSIONS.managePlatform },
-  { href: SUPPORT_QUEUE_HREF, label: "Support cases", icon: "life", permission: PERMISSIONS.workSupportCases },
+  { href: SUPPORT_QUEUE_HREF, label: "Support cases", icon: "life", isStaffOnly: true },
   { href: "/admin/subscriptions", label: "Subscriptions", icon: "card", permission: PERMISSIONS.managePlatform },
   { href: "/admin/demo-requests", label: "Demo requests", icon: "mail", permission: PERMISSIONS.managePlatform },
 ];
@@ -49,8 +53,11 @@ const NavItem = ({ href, label, icon, active, badgeCount = 0 }: AdminNavLink & {
 export const AdminSideNav = () => {
   const pathname = usePathname();
   const { can } = usePermissions();
-  const visibleLinks = links.filter((link) => !link.permission || can(link.permission));
-  const unreadCaseCount = useUnreadCaseCount("staff", can(PERMISSIONS.workSupportCases));
+  const { isStaff } = useSupportStaffAccess();
+  const visibleLinks = links.filter(
+    (link) => (!link.permission || can(link.permission)) && (!link.isStaffOnly || isStaff),
+  );
+  const unreadCaseCount = useUnreadCaseCount("staff", isStaff);
 
   return (
     <div className="flex w-[216px] flex-none flex-col gap-0.5 rounded-r-[18px] bg-gradient-to-b from-brandDeep to-[#221C52] p-3">

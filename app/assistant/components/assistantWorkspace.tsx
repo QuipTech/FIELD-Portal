@@ -19,6 +19,7 @@ import { ThreadsRail } from "./threadsRail";
 import { ChatMessageList } from "./chatMessageList";
 import { ChatComposer } from "./chatComposer";
 import { MachineContextPicker } from "./machineContextPicker";
+import { DocumentContextTag } from "./documentContextTag";
 
 const TITLE_MAX_LENGTH = 80;
 
@@ -28,11 +29,13 @@ export const AssistantWorkspace = () => {
   const [newThreadMachineId, setNewThreadMachineId] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [launchPrompt, setLaunchPrompt] = useState("");
+  const [sourceDocument, setSourceDocument] = useState<{ id: string; title: string } | null>(null);
 
   useEffect(() => {
-    const { machineId, prompt } = readAssistantLaunchParams();
+    const { machineId, prompt, document } = readAssistantLaunchParams();
     if (machineId) setNewThreadMachineId(machineId);
     if (prompt) setLaunchPrompt(prompt);
+    setSourceDocument(document);
   }, []);
   const { activeThread } = threads;
   const newThreadMachine = machines.data?.items.find((machine) => machine.id === newThreadMachineId);
@@ -45,6 +48,8 @@ export const AssistantWorkspace = () => {
   const asker = useAskAssistant({
     activeThread,
     machineId: newThreadMachineId,
+    documentId: sourceDocument?.id ?? null,
+    onDocumentUsed: () => setSourceDocument(null),
     setMessages: threads.setMessages,
     onThreadSaved: (conversationId, question) =>
       threads.adoptThread({
@@ -73,6 +78,7 @@ export const AssistantWorkspace = () => {
           showUserMenu={false}
           actions={
             <>
+              {sourceDocument && <DocumentContextTag title={sourceDocument.title} onClear={() => setSourceDocument(null)} />}
               <MachineContextPicker
                 fixedMachine={activeThread?.machine ?? null}
                 isThreadOpen={activeThread !== null}
@@ -85,6 +91,7 @@ export const AssistantWorkspace = () => {
                 size="sm"
                 onClick={() => {
                   asker.cancel();
+                  setSourceDocument(null);
                   threads.startNewThread();
                 }}
               >

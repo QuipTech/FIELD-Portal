@@ -1,17 +1,16 @@
 import { AdminShell } from "@/components/shell/adminShell";
 import { AdminTopBar } from "@/components/shell/adminTopBar";
-import { PermissionView } from "@/components/auth/permissionView";
-import { PERMISSIONS } from "@/lib/auth/permissionCodes";
+import { SupportStaffView } from "@/components/supportCases/supportStaffView";
 import { AdminCasesQueue } from "./components/adminCasesQueue";
 
-// Support staff only: the admin (Owner) and Support Agents.
+// Support staff only: the admin (Owner), Support Agents and QuipTech's team.
 const AdminCasesPage = () => {
   return (
     <AdminShell topBar={<AdminTopBar label="Support cases" />}>
       <main className="flex flex-1 flex-col gap-5 overflow-y-auto p-6">
-        <PermissionView permission={PERMISSIONS.workSupportCases}>
+        <SupportStaffView>
           <AdminCasesQueue />
-        </PermissionView>
+        </SupportStaffView>
       </main>
     </AdminShell>
   );

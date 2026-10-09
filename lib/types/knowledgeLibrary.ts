@@ -11,8 +11,11 @@ export interface KnowledgeResult {
   title: string;
   type: KnowledgeDocumentType | string;
   snippet: string | null;
+  // The matched passage's page and heading; null when browsing.
   page: number | null;
   heading: string | null;
+  // The article section that best matches the search (opens there).
+  sectionId: string | null;
   // Machine models the document mentions, e.g. "CAT 793F".
   models: string[];
   source: "shared" | "organisation";

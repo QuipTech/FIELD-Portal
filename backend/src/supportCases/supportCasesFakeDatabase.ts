@@ -12,26 +12,46 @@ import { SupportCaseRow } from './types/supportCaseRows';
 
 export const TEST_USERS: Record<
   string,
-  { tenantId: string; permissions: string[] }
+  { tenantId: string; permissions: string[]; isStaff: boolean }
 > = {
   'admin-1': {
     tenantId: 'quiptech',
     permissions: ['support.create', 'support.agent', 'platform.manage'],
+    isStaff: true,
   },
   'staff-1': {
     tenantId: 'quiptech',
     permissions: ['support.create', 'support.agent'],
+    isStaff: true,
   },
   'staff-2': {
     tenantId: 'quiptech',
     permissions: ['support.create', 'support.agent'],
+    isStaff: true,
   },
-  'customer-a': { tenantId: 'tenant-a', permissions: ['support.create'] },
-  'customer-b': { tenantId: 'tenant-b', permissions: ['support.create'] },
+  // QuipTech's team with no support role: staff by organisation (0073).
+  'teammate-1': {
+    tenantId: 'quiptech',
+    permissions: ['support.create'],
+    isStaff: true,
+  },
+  'customer-a': {
+    tenantId: 'tenant-a',
+    permissions: ['support.create'],
+    isStaff: false,
+  },
+  'customer-b': {
+    tenantId: 'tenant-b',
+    permissions: ['support.create'],
+    isStaff: false,
+  },
 };
 
 // A support person the admin can assign (assigneeId must be a UUID).
 export const ASSIGNABLE_STAFF_ID = '7a1d2b9e-0c1f-4c55-9a7e-2f3b4c5d6e7f';
+
+// Listed in the assign dropdown, but not support staff.
+export const NON_STAFF_USER_ID = '0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b';
 
 export interface FakeDatabaseState {
   supportCase: SupportCaseRow;
@@ -55,14 +75,21 @@ const answer = (state: FakeDatabaseState, sql: string, params: unknown[]) => {
     const userId = params[0] as string;
     return (TEST_USERS[userId]?.permissions ?? []).map((code) => ({ code }));
   }
+  if (sql.includes('is_support_staff($1) AS is_staff')) {
+    return [{ is_staff: TEST_USERS[params[0] as string]?.isStaff ?? false }];
+  }
   if (sql.includes('support_case_tenant_id')) {
     const isKnown = Number(params[0]) === Number(state.supportCase.case_number);
     return [{ tenant_id: isKnown ? state.supportCase.tenant_id : null }];
   }
   if (sql.includes('admin_list_support_staff')) {
-    return ['admin-1', 'staff-1', 'staff-2', ASSIGNABLE_STAFF_ID].map((id) => ({
-      id,
-    }));
+    return [
+      ...['admin-1', 'staff-1', 'staff-2', ASSIGNABLE_STAFF_ID].map((id) => ({
+        id,
+        is_support_staff: true,
+      })),
+      { id: NON_STAFF_USER_ID, is_support_staff: false },
+    ];
   }
   if (
     sql.includes('FROM support_cases c') &&

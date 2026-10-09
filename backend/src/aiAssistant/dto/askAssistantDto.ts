@@ -47,6 +47,12 @@ export class AskAssistantDto {
   @IsUUID()
   machineId?: string;
 
+  // Answer from this document only (a knowledge item id): the Knowledge
+  // article's "Ask AI". Applies to this question, not the whole thread.
+  @IsOptional()
+  @IsUUID()
+  documentId?: string;
+
   @IsOptional()
   @ValidateNested()
   @Type(() => AttachedImageDto)

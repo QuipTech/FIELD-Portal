@@ -31,6 +31,7 @@ import { OrganisationSubscriptionModule } from './organisationSubscription/organ
 import { SupportCasesModule } from './supportCases/supportCases.module';
 import { MachineFleetModule } from './machineFleet/machineFleet.module';
 import { KnowledgeLibraryModule } from './knowledgeLibrary/knowledgeLibrary.module';
+import { KnowledgeArticleModule } from './knowledgeArticle/knowledgeArticle.module';
 import { AiAssistantModule } from './aiAssistant/aiAssistant.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -73,6 +74,7 @@ import { RequestSourceMiddleware } from './common/requestSource/requestSource.mi
     SupportCasesModule,
     MachineFleetModule,
     KnowledgeLibraryModule,
+    KnowledgeArticleModule,
     AiAssistantModule,
     DashboardModule,
     NotificationsModule,

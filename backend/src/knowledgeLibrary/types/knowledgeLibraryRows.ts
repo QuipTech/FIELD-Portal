@@ -8,6 +8,7 @@ export interface KnowledgeResultRow {
   source_oem: string | null;
   updated_at: Date;
   version_number: number;
+  live_version_id: string;
   chunk_text: string | null;
   page_number: number | null;
   section_heading: string | null;

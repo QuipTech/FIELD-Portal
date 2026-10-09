@@ -42,6 +42,11 @@ export const updateAdminCaseRequest = (accessToken: string, caseNumber: number, 
     body: JSON.stringify(changes),
   });
 
-// Admin only: everyone who can take cases, with their open case counts.
+// Admin only: every active user, support staff first (only they can be
+// assigned), with their open case counts.
 export const listSupportStaffRequest = (accessToken: string) =>
   apiRequest<SupportStaffMember[]>("/admin/staff", { headers: authorizationHeader(accessToken) });
+
+// 403 unless the caller is support staff; isAdmin for the admin (Owner).
+export const getSupportStaffAccessRequest = (accessToken: string) =>
+  apiRequest<{ isAdmin: boolean }>("/admin/cases/access", { headers: authorizationHeader(accessToken) });

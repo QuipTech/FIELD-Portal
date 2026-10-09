@@ -70,6 +70,7 @@ export class AiAskContextService {
       actor,
       dto.question,
       thread.machine,
+      dto.documentId,
     );
     return {
       conversationId: thread.conversationId,
@@ -151,11 +152,14 @@ export class AiAskContextService {
     return { row, context: formatMachineContext(row, entries) };
   };
 
-  // The machine's make and model steer retrieval toward its manuals.
+  // The machine's make and model steer retrieval toward its manuals. With
+  // documentId, only that document is searched, and its closest passages
+  // are used however weak the match: the technician chose the source.
   private retrieveChunks = async (
     actor: AuthenticatedUser,
     question: string,
     machine: MachineRow | null,
+    documentId?: string,
   ): Promise<RetrievedChunk[]> => {
     const query = machine
       ? `${machine.manufacturer_name} ${machine.model_name}: ${question}`
@@ -164,9 +168,10 @@ export class AiAskContextService {
       actor,
       query,
       RETRIEVAL_LIMIT,
+      documentId,
     );
     return matches
-      .filter((match) => match.score >= MIN_SOURCE_SCORE)
+      .filter((match) => documentId || match.score >= MIN_SOURCE_SCORE)
       .map((match) => ({
         chunkId: match.chunkId,
         documentId: match.documentId,

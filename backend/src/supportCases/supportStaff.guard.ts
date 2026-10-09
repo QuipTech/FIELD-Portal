@@ -9,7 +9,8 @@ import {
 import { DatabaseService } from '../database/database.service';
 import { findUserPermissionCodes } from '../auth/userAccess.repository';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
-import { isSupportAdmin, isSupportStaff } from './caseAccessPolicy';
+import { isSupportAdmin } from './caseAccessPolicy';
+import { findIsSupportStaff } from './supportStaffStatus';
 
 const NOT_STAFF_MESSAGE = 'Only QuipTech support staff can do this.';
 
@@ -23,8 +24,8 @@ interface SupportStaffRequest {
   supportStaff?: SupportStaffContext;
 }
 
-// For /admin/cases: the caller must be support staff (support.agent or
-// platform.manage), read from the database on every request. Must run
+// For /admin/cases: the caller must be QuipTech support staff
+// (supportStaffStatus.ts), read from the database on every request. Must run
 // after JwtAuthGuard. Which cases they may touch is CaseAccessService's.
 @Injectable()
 export class SupportStaffGuard implements CanActivate {
@@ -36,7 +37,9 @@ export class SupportStaffGuard implements CanActivate {
       request.user.tenantId,
       (client) => findUserPermissionCodes(client, request.user.userId),
     );
-    if (!isSupportStaff(permissions)) {
+    if (
+      !(await findIsSupportStaff(this.databaseService, request.user.userId))
+    ) {
       throw new ForbiddenException(NOT_STAFF_MESSAGE);
     }
     request.supportStaff = { isAdmin: isSupportAdmin(permissions) };

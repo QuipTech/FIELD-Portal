@@ -3,6 +3,7 @@ import { DatabaseService } from '../database/database.service';
 import { findUserPermissionCodes } from '../auth/userAccess.repository';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { findCaseTenantId } from './adminSupportCases.repository';
+import { findIsSupportStaff } from './supportStaffStatus';
 import { findCaseByNumber } from './supportCases.repository';
 import { CaseViewerRole, resolveCaseViewerRole } from './caseAccessPolicy';
 import { CaseStaffRole } from './types/adminSupportCaseResponse';
@@ -37,9 +38,12 @@ export class CaseAccessService {
   resolveAccess = async (
     actor: AuthenticatedUser,
     caseNumber: number,
-    permissions?: string[],
   ): Promise<CaseAccess | null> => {
-    const granted = permissions ?? (await this.loadPermissions(actor));
+    const permissions = await this.loadPermissions(actor);
+    const isStaff = await findIsSupportStaff(
+      this.databaseService,
+      actor.userId,
+    );
     const caseTenantId = await findCaseTenantId(
       this.databaseService,
       caseNumber,
@@ -51,7 +55,7 @@ export class CaseAccessService {
     );
     if (!supportCase) return null;
     const role = resolveCaseViewerRole(
-      { userId: actor.userId, tenantId: actor.tenantId, permissions: granted },
+      { userId: actor.userId, tenantId: actor.tenantId, permissions, isStaff },
       { tenantId: caseTenantId, assigneeId: supportCase.assignee_id },
     );
     return role ? { role, caseTenantId, supportCase } : null;

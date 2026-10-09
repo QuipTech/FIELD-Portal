@@ -2,6 +2,7 @@
 
 import { LoadingSpinner } from "@/components/ui/loadingSpinner";
 import type { KnowledgeLibraryFilters } from "@/lib/types/knowledgeLibrary";
+import { toListContext } from "@/lib/knowledge/knowledgeLinks";
 import { useKnowledgeLibrary } from "../useKnowledgeLibrary";
 import { KnowledgeFilterNav } from "./knowledgeFilterNav";
 import { KnowledgeFilterPills } from "./knowledgeFilterPills";
@@ -13,6 +14,7 @@ export const KnowledgeLibraryView = ({ initialFilters }: { initialFilters: Knowl
   const { filters, updateFilter, results, hasSearch } = useKnowledgeLibrary(initialFilters);
   const data = results.data;
   const isNarrowed = hasSearch || Boolean(filters.type || filters.make || filters.model);
+  const listContext = toListContext(filters);
 
   const renderResults = () => {
     if (!data) {
@@ -31,7 +33,7 @@ export const KnowledgeLibraryView = ({ initialFilters }: { initialFilters: Knowl
         </p>
       );
     }
-    return data.items.map((result) => <KnowledgeResultCard key={result.id} result={result} />);
+    return data.items.map((result) => <KnowledgeResultCard key={result.id} result={result} listContext={listContext} />);
   };
 
   return (
@@ -54,7 +56,7 @@ export const KnowledgeLibraryView = ({ initialFilters }: { initialFilters: Knowl
           onSortChange={(sort) => updateFilter("sort", sort)}
           onClearModel={() => updateFilter("model", "")}
         />
-        <OrganisationDocuments />
+        <OrganisationDocuments listContext={listContext} />
         {results.error && <p className="text-sm text-danger">{results.error}</p>}
         {renderResults()}
       </main>

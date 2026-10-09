@@ -55,6 +55,9 @@ export interface AskAssistantInput {
   question: string;
   conversationId?: string;
   machineId?: string;
+  // Answer this question from one document only (a Knowledge article's
+  // "Ask AI").
+  documentId?: string;
   image?: { mediaType: AttachedPhoto["mediaType"]; data: string };
 }
 

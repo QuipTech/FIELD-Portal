@@ -183,7 +183,9 @@ export class AdminCaseUpdatesService {
 
   private assertIsSupportStaff = async (userId: string): Promise<void> => {
     const staff = await listSupportStaff(this.databaseService);
-    if (!staff.some((member) => member.id === userId)) {
+    if (
+      !staff.some((member) => member.id === userId && member.is_support_staff)
+    ) {
       throw new BadRequestException(NOT_SUPPORT_STAFF_MESSAGE);
     }
   };

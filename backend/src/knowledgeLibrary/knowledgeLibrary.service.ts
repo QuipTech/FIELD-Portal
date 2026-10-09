@@ -8,6 +8,10 @@ import {
 import * as libraryRepository from './knowledgeLibrary.repository';
 import * as facetsRepository from './knowledgeLibraryFacets.repository';
 import { toKnowledgeResult, toTotal } from './knowledgeLibraryMapper';
+import {
+  findMatchingSections,
+  MatchingSectionRow,
+} from './matchingSections.repository';
 import { SearchKnowledgeLibraryQueryDto } from './dto/searchKnowledgeLibraryQueryDto';
 import {
   KnowledgeLibraryResults,
@@ -48,8 +52,19 @@ export class KnowledgeLibraryService {
           filters.model,
         )
       : null;
+    const sections = await this.findSections(
+      actor.tenantId,
+      filters,
+      rows,
+      searchMode,
+    );
     return {
-      items: rows.map(toKnowledgeResult),
+      items: rows.map((row) =>
+        toKnowledgeResult(
+          row,
+          sections && (sections.get(row.live_version_id) ?? null),
+        ),
+      ),
       total: toTotal(rows),
       searchMode,
       makes,
@@ -94,6 +109,25 @@ export class KnowledgeLibraryService {
       ),
       searchMode: 'keyword',
     };
+  };
+
+  // Each result's best section for the search; null when browsing.
+  private findSections = async (
+    tenantId: string,
+    filters: SearchKnowledgeLibraryQueryDto,
+    rows: KnowledgeResultRow[],
+    searchMode: LibrarySearchMode,
+  ): Promise<Map<string, MatchingSectionRow> | null> => {
+    if (searchMode === 'browse' || !filters.search) return null;
+    const found = await findMatchingSections(this.databaseService, {
+      tenantId,
+      search: filters.search,
+      matches: rows.map((row) => ({
+        versionId: row.live_version_id,
+        chunkPage: row.page_number,
+      })),
+    });
+    return new Map(found.map((row) => [row.document_version_id, row]));
   };
 
   // Null when the embedding model can't be used (not set up, no access,

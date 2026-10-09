@@ -1,4 +1,5 @@
 import { deriveDocumentState } from './knowledgeFileRules';
+import { toDocumentDisplayTitle } from './documentDisplayTitle';
 import { KnowledgeDocumentRow } from './types/knowledgeDocumentRows';
 import { KnowledgeDocument } from './types/knowledgeDocumentResponse';
 
@@ -20,7 +21,7 @@ export const toKnowledgeDocument = (
   id: row.id,
   isShared: row.tenant_id === null,
   organisationName: row.organisation_name,
-  title: row.title,
+  title: toDocumentDisplayTitle(row.title),
   type: row.type,
   status: row.status,
   state: deriveDocumentState(row.status, row.ingestion_status),

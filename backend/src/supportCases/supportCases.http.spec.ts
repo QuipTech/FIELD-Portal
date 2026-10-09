@@ -27,6 +27,7 @@ import { CaseEventsPublisher } from './caseEventsPublisher';
 import { SupportStaffGuard } from './supportStaff.guard';
 import {
   ASSIGNABLE_STAFF_ID,
+  NON_STAFF_USER_ID,
   createFakeDatabase,
   TEST_USERS,
 } from './supportCasesFakeDatabase';
@@ -175,6 +176,12 @@ describe('only an admin or the assignee can change status', () => {
     expect(fakeDatabase.state.updates).toHaveLength(2);
   });
 
+  it('lets a QuipTech team member without a role change it once assigned', async () => {
+    fakeDatabase.reset({ assignee_id: 'teammate-1' });
+    await setStatus('teammate-1').expect(200);
+    expect(fakeDatabase.state.updates).toHaveLength(1);
+  });
+
   it('refuses another support agent (404) and a customer (403)', async () => {
     await setStatus('staff-2').expect(404);
     await setStatus('customer-a').expect(403);
@@ -211,9 +218,9 @@ describe('assigning a case', () => {
     ]);
   });
 
-  it("refuses someone who isn't support staff", async () => {
+  it("refuses a listed user who isn't support staff", async () => {
     fakeDatabase.reset({ status: 'new', assignee_id: null });
-    await assign('0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b').expect(400);
+    await assign(NON_STAFF_USER_ID).expect(400);
     expect(fakeDatabase.state.updates).toHaveLength(0);
   });
 });

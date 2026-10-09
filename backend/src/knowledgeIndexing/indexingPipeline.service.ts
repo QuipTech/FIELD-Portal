@@ -13,6 +13,8 @@ import { extractPdf } from './extraction/pdfPageExtractor';
 import { extractDocx } from './extraction/docxBlockExtractor';
 import { TextractOcrService } from './extraction/textractOcr.service';
 import { chunkBlocks } from './chunking/chunkDocument';
+import { buildDocumentSections } from './sections/buildDocumentSections';
+import { replaceDocumentSections } from './sections/documentSections.repository';
 import {
   BedrockEmbedderService,
   toVectorLiteral,
@@ -33,8 +35,8 @@ const EMBED_SHARE = 50;
 // The job was deleted or reset while running; stop quietly.
 export class IndexingCancelledError extends Error {}
 
-// One document version: extract → (OCR) → chunk → embed → store → link
-// machine models → live / needs review.
+// One document version: extract → (OCR) → chunk → embed → store → save
+// sections → link machine models → live / needs review.
 @Injectable()
 export class IndexingPipelineService {
   constructor(
@@ -111,6 +113,16 @@ export class IndexingPipelineService {
         EMBED_START + (EMBED_SHARE * (start + batch.length)) / chunks.length,
       );
     }
+
+    // The Knowledge article page reads these, not the chunks.
+    await replaceDocumentSections(
+      this.databaseService,
+      job.version_id,
+      buildDocumentSections(extracted.blocks, {
+        title: job.title,
+        fileName: null,
+      }),
+    );
 
     const fullText = extracted.blocks.map((block) => block.text).join('\n');
     const models = await indexingRepository.listMachineModels(

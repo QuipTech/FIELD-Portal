@@ -1,5 +1,7 @@
+import { toDocumentDisplayTitle } from '../knowledge/documentDisplayTitle';
 import { KnowledgeResult } from './types/knowledgeLibraryResponse';
 import { KnowledgeResultRow } from './types/knowledgeLibraryRows';
+import { MatchingSectionRow } from './matchingSections.repository';
 
 export const SNIPPET_MAX_LENGTH = 280;
 
@@ -13,15 +15,24 @@ export const toSnippet = (text: string | null): string | null => {
   return `${(lastSpace > 0 ? cut.slice(0, lastSpace) : cut).replace(/[\s,.;:]+$/, '')}…`;
 };
 
+// matchedSection: the best section for the search; undefined when browsing.
 export const toKnowledgeResult = (
   row: KnowledgeResultRow,
+  matchedSection?: MatchingSectionRow | null,
 ): KnowledgeResult => ({
   id: row.id,
-  title: row.title,
+  title: toDocumentDisplayTitle(row.title),
   type: row.type,
   snippet: toSnippet(row.chunk_text),
-  page: row.page_number,
-  heading: row.section_heading,
+  page:
+    matchedSection === undefined
+      ? null
+      : (matchedSection?.page_number ?? row.page_number),
+  heading:
+    matchedSection === undefined
+      ? null
+      : (matchedSection?.heading ?? row.section_heading),
+  sectionId: matchedSection ? `s${matchedSection.ordinal}` : null,
   models: row.models ?? [],
   source: row.tenant_id === null ? 'shared' : 'organisation',
   sourceOem: row.source_oem,

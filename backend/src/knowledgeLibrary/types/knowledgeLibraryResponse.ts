@@ -9,8 +9,13 @@ export interface KnowledgeResult {
   type: string;
   // The best-matching passage (or the opening one when browsing).
   snippet: string | null;
+  // The matched passage's page and heading; null when browsing (no
+  // search, so nothing matched).
   page: number | null;
   heading: string | null;
+  // The article section (/knowledge/:id?section=…) that best matches the
+  // search; null when browsing or when the document has no sections yet.
+  sectionId: string | null;
   // Machine models the document mentions, e.g. "CAT 793F".
   models: string[];
   // Shared QuipTech library, or the organisation's own upload.

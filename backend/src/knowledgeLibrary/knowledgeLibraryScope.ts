@@ -47,7 +47,7 @@ export const buildVisibleItemsCte = (
 // relation `b` (chunk_text, page_number, section_heading).
 export const RESULT_COLUMNS = `
   vi.id, vi.title, vi.type, vi.tenant_id, vi.source_oem, vi.updated_at,
-  vi.version_number, b.chunk_text, b.page_number, b.section_heading,
+  vi.version_number, vi.live_version_id, b.chunk_text, b.page_number, b.section_heading,
   (SELECT array_agg(mf.name || ' ' || mm.name ORDER BY km.mention_count DESC)
      FROM knowledge_item_machine_models km
      JOIN machine_models mm ON mm.id = km.machine_model_id

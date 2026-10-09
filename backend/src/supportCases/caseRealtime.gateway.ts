@@ -22,7 +22,7 @@ import {
   CaseSocketUser,
 } from './caseSocketAuthenticator';
 import { CaseAccessService } from './caseAccess.service';
-import { isSupportAdmin, SUPPORT_AGENT_PERMISSION } from './caseAccessPolicy';
+import { isSupportAdmin } from './caseAccessPolicy';
 
 interface CaseRoomRequest {
   caseNumber?: unknown;
@@ -83,7 +83,7 @@ export class CaseRealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     if (!user) return;
     const rooms = [tenantRoom(user.tenantId)];
     if (isSupportAdmin(user.permissions)) rooms.push(SUPPORT_ADMINS_ROOM);
-    if (user.permissions.includes(SUPPORT_AGENT_PERMISSION)) {
+    if (user.isStaff) {
       rooms.push(agentRoom(user.userId));
     }
     await socket.join(rooms);

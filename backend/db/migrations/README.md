@@ -59,6 +59,10 @@ session (set per-request by `DatabaseService.withTenant`).
 | `0070` | Support staff — `support.agent` permission (Owner + new default `Support Agent` system role only, enforced by trigger), SECURITY DEFINER `user_has_permission()`, `support_case_person()` (names staff across organisations, nobody else), `support_case_tenant_id()` |
 | `0071` | Support queue — SECURITY DEFINER `admin_list_support_cases()`, `admin_support_case_stats()`, `admin_list_support_staff()`, `support_staff_unread_case_count()` |
 | `0072` | Case lifecycle — `support_close_resolved_cases()` (7-day auto-close with event + audit), 0054's case notification triggers skip customers on internal notes and link staff to `/admin/cases/:n`, 0064/0065 case report and unactioned-case alert on the new statuses |
+| `0073` | Support staff members — `is_support_staff()`: `support.agent`, `platform.manage`, or anyone in an organisation with a platform administrator (QuipTech's team); `support_case_person()` uses it |
+| `0074` | Assign dropdown — `admin_list_support_staff()` returns every active user with `organisation_name` and `is_support_staff` (staff first); only staff can be assigned |
+| `0075` | Team assignees — the assign dropdown marks staff by `is_support_staff()`, matching the API |
+| `0076` | Knowledge article — `document_sections` (heading, start page, text per section) and `document_figures` (captions; image key for later) per version, saved by the indexer via `replace_document_sections()` or backfilled from chunks on first view (`backfill_document_sections()`), text index for search-to-section matching, `document_versions.summary` |
 
 ## Two forward references, resolved across files
 
