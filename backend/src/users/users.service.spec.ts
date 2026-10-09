@@ -4,11 +4,13 @@ import * as authRepository from '../auth/auth.repository';
 import { CognitoIdentity } from '../auth/types/cognitoIdentity';
 import * as usersRepository from './users.repository';
 import { createTenantAndFirstUserFromCognito } from './cognitoSignup';
-import { UsersService } from './users.service';
+import { ACCOUNT_REMOVED_MESSAGE, UsersService } from './users.service';
+import * as removedAccounts from './removedAccounts.repository';
 
 jest.mock('../auth/auth.repository');
 jest.mock('./users.repository');
 jest.mock('./cognitoSignup');
+jest.mock('./removedAccounts.repository');
 
 const googleIdentity: CognitoIdentity = {
   cognitoSub: 'sub-1',
@@ -41,6 +43,18 @@ describe('UsersService.findOrCreateFromCognito', () => {
     jest.resetAllMocks();
     jest.mocked(usersRepository.findUserByCognitoSub).mockResolvedValue(null);
     jest.mocked(authRepository.findUserByEmailForLogin).mockResolvedValue(null);
+    jest.mocked(removedAccounts.isRemovedAccount).mockResolvedValue(false);
+  });
+
+  it('tells someone an admin removed that they were removed, instead of offering signup', async () => {
+    jest.mocked(removedAccounts.isRemovedAccount).mockResolvedValue(true);
+    await expect(
+      buildService().findOrCreateFromCognito(googleIdentity, {
+        companyName: 'Acme',
+        phoneNumber: '+61400000000',
+      }),
+    ).rejects.toThrow(new ForbiddenException(ACCOUNT_REMOVED_MESSAGE));
+    expect(createTenantAndFirstUserFromCognito).not.toHaveBeenCalled();
   });
 
   it('asks for a signup profile for a first-time user, creating nothing', async () => {

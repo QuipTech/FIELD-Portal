@@ -13,16 +13,17 @@ interface UsersTableProps {
   isLoading: boolean;
   errorMessage: string | null;
   // The signed-in admin: no row menu on their own row (they can't change
-  // their own role).
+  // their own role or remove themselves).
   currentUserId: string | null;
   onChangeRole: (user: AdminUser) => void;
+  onRemove: (user: AdminUser) => void;
 }
 
 const TableMessage = ({ children }: { children: ReactNode }) => (
   <div className="flex items-center justify-center gap-2 p-10 text-sm text-mutedGray">{children}</div>
 );
 
-export const UsersTable = ({ users, isLoading, errorMessage, currentUserId, onChangeRole }: UsersTableProps) => {
+export const UsersTable = ({ users, isLoading, errorMessage, currentUserId, onChangeRole, onRemove }: UsersTableProps) => {
   return (
     <Table>
       <TableHeaderRow>
@@ -66,7 +67,10 @@ export const UsersTable = ({ users, isLoading, errorMessage, currentUserId, onCh
                 {user.id !== currentUserId && (
                   <ActionMenu
                     label={fullName}
-                    items={[{ label: "Change role", icon: "shield", onSelect: () => onChangeRole(user) }]}
+                    items={[
+                      { label: "Change role", icon: "shield", onSelect: () => onChangeRole(user) },
+                      { label: "Remove user", icon: "x", tone: "danger", onSelect: () => onRemove(user) },
+                    ]}
                   />
                 )}
               </TableCell>

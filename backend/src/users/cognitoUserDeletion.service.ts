@@ -15,12 +15,34 @@ export class CognitoUserDeletionService {
   deleteCognitoUsersForAccount = async (
     account: AccountIdentityRow,
   ): Promise<void> => {
+    const usernames = await this.findAccountUsernames(account);
+    await Promise.all(usernames.map(this.userDirectory.deleteUser));
+  };
+
+  // An admin removing someone: their sign-ins are disabled rather than
+  // deleted, so signing in again says why instead of "wrong password".
+  disableCognitoUsersForAccount = async (
+    account: AccountIdentityRow,
+  ): Promise<void> => {
+    const usernames = await this.findAccountUsernames(account);
+    await Promise.all(usernames.map(this.userDirectory.disableUser));
+  };
+
+  // Re-inviting a removed person: their disabled sign-ins go, so Cognito
+  // can create the invited one.
+  deleteCognitoUsersForEmail = async (email: string): Promise<void> => {
+    const usernames = await this.findUsernames('email', email);
+    await Promise.all(usernames.map(this.userDirectory.deleteUser));
+  };
+
+  private findAccountUsernames = async (
+    account: AccountIdentityRow,
+  ): Promise<string[]> => {
     const lookups = [this.findUsernames('email', account.email)];
     if (account.cognito_sub) {
       lookups.push(this.findUsernames('sub', account.cognito_sub));
     }
-    const usernames = new Set((await Promise.all(lookups)).flat());
-    await Promise.all([...usernames].map(this.userDirectory.deleteUser));
+    return [...new Set((await Promise.all(lookups)).flat())];
   };
 
   private findUsernames = async (

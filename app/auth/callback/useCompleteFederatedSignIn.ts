@@ -9,6 +9,7 @@ import { Hub } from "aws-amplify/utils";
 import { getCognitoSession } from "@/lib/auth/cognitoFederatedSignIn";
 import { clearPendingSignupProfile, readPendingSignupProfile } from "@/lib/auth/pendingSignupProfile";
 import { saveAuthSession } from "@/lib/auth/authSession";
+import { ACCOUNT_REMOVED_MESSAGE, isDisabledSignInMessage } from "@/lib/auth/cognitoPasswordAuth";
 import { resolvePostLoginRoute } from "@/lib/auth/postLoginRouting";
 import { logAuthDebug } from "@/lib/auth/authDebugLog";
 import { syncCognitoSessionRequest } from "@/lib/api/authApi";
@@ -80,6 +81,10 @@ export const useCompleteFederatedSignIn = () => {
         // finish — that's not an error, just go to the sign-in page.
         if (!cameFromCognito) {
           router.replace("/login");
+          return;
+        }
+        if (isDisabledSignInMessage(redirectFailureDetail)) {
+          setSignInError(ACCOUNT_REMOVED_MESSAGE);
           return;
         }
         setSignInError(

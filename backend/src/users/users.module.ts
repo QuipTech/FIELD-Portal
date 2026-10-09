@@ -15,6 +15,10 @@ import { UserProfileService } from './userProfile.service';
     CognitoUserDirectoryService,
     UserProfileService,
   ],
-  exports: [UsersService, CognitoUserDirectoryService],
+  exports: [
+    UsersService,
+    CognitoUserDirectoryService,
+    CognitoUserDeletionService,
+  ],
 })
 export class UsersModule {}

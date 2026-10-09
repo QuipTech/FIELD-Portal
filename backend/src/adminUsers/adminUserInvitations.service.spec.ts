@@ -3,11 +3,13 @@ import * as adminUsersRepository from './adminUsers.repository';
 import * as adminRolesRepository from '../adminRoles/adminRoles.repository';
 import * as authRepository from '../auth/auth.repository';
 import * as audit from '../common/audit/runAuditedChange';
+import * as removedAccounts from '../users/removedAccounts.repository';
 
 jest.mock('./adminUsers.repository');
 jest.mock('../adminRoles/adminRoles.repository');
 jest.mock('../auth/auth.repository');
 jest.mock('../common/audit/runAuditedChange');
+jest.mock('../users/removedAccounts.repository');
 
 const actor = { userId: 'u1', tenantId: 'org-a', email: 'owner@a.com' };
 // A single-organisation scope (the Owner's list narrowed to one org).
@@ -35,11 +37,16 @@ const setup = () => {
       { id: 'role-1', name: 'Field Technician', tenant_id: null } as never,
     ]);
   jest.mocked(authRepository.findUserByEmailForLogin).mockResolvedValue(null);
+  const cognitoUsers = {
+    deleteCognitoUsersForEmail: jest.fn().mockResolvedValue(undefined),
+  };
+  jest.mocked(removedAccounts.isRemovedAccount).mockResolvedValue(false);
   const service = new AdminUserInvitationsService(
     {} as never,
     cognito as never,
+    cognitoUsers as never,
   );
-  return { service, cognito };
+  return { service, cognito, cognitoUsers };
 };
 
 describe('AdminUserInvitationsService.inviteUser', () => {
@@ -53,6 +60,21 @@ describe('AdminUserInvitationsService.inviteUser', () => {
     });
     expect(cognito.createInvitedUser).toHaveBeenCalledWith(dto);
     expect(cognito.deleteUser).not.toHaveBeenCalled();
+  });
+
+  it('re-invites a removed person: deletes their disabled sign-in first, then clears the removal', async () => {
+    const { service, cognito, cognitoUsers } = setup();
+    jest.mocked(removedAccounts.isRemovedAccount).mockResolvedValue(true);
+    jest.mocked(audit.runAuditedChange).mockResolvedValue('user-9');
+    await service.inviteUser(actor, ownerScope, dto);
+    expect(cognitoUsers.deleteCognitoUsersForEmail).toHaveBeenCalledWith(
+      'new@a.com',
+    );
+    expect(cognito.createInvitedUser).toHaveBeenCalled();
+    expect(removedAccounts.clearRemovedAccount).toHaveBeenCalledWith(
+      {},
+      'new@a.com',
+    );
   });
 
   it('removes the Cognito user again when saving fails', async () => {
