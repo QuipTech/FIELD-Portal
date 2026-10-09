@@ -19,15 +19,18 @@ interface AssigneePickerProps {
   onAssign: (assigneeId: string | null) => void;
 }
 
-// A13c: the admin's assign dropdown — search support staff (with how many
-// open cases each has), assign to me, or unassign.
+// A13c: the admin's assign dropdown — every user, support staff first and
+// the only ones selectable (with how many open cases each has); assign to
+// me, or unassign.
 export const AssigneePicker = ({ assignee, currentUserId, isBusy, onAssign }: AssigneePickerProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
-  const staff = useApiResource(listSupportStaffRequest, [], "Couldn't load support staff.");
+  const staff = useApiResource(listSupportStaffRequest, [], "Couldn't load users.");
   const term = query.trim().toLowerCase();
-  const matches = (staff.data ?? []).filter((member) => `${member.name} ${member.email}`.toLowerCase().includes(term));
+  const matches = (staff.data ?? []).filter((member) =>
+    `${member.name} ${member.email} ${member.organisationName}`.toLowerCase().includes(term),
+  );
   const canAssignToMe = currentUserId !== null && assignee?.id !== currentUserId;
 
   useEffect(() => {
@@ -72,11 +75,11 @@ export const AssigneePicker = ({ assignee, currentUserId, isBusy, onAssign }: As
             icon="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search support staff"
-            aria-label="Search support staff"
+            placeholder="Search users"
+            aria-label="Search users"
             className="mb-1"
           />
-          <div role="listbox" aria-label="Support staff" className="flex max-h-64 flex-col gap-0.5 overflow-y-auto">
+          <div role="listbox" aria-label="Users" className="flex max-h-72 flex-col gap-0.5 overflow-y-auto">
             {staff.isLoading && !staff.data && (
               <span className="flex justify-center p-3 text-mutedGray">
                 <LoadingSpinner />
@@ -84,7 +87,7 @@ export const AssigneePicker = ({ assignee, currentUserId, isBusy, onAssign }: As
             )}
             {staff.error && <span className="block p-3 text-xs text-danger">{staff.error}</span>}
             {staff.data && matches.length === 0 && (
-              <span className="block p-3 text-sm text-mutedGray">No support staff match “{query}”.</span>
+              <span className="block p-3 text-sm text-mutedGray">No users match “{query}”.</span>
             )}
             {matches.map((member) => (
               <StaffOption

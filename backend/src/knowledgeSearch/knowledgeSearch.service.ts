@@ -36,6 +36,8 @@ export class KnowledgeSearchService {
     actor: AuthenticatedUser,
     query: string,
     limit: number,
+    // Only this document (a knowledge item id), within what the caller sees.
+    documentId?: string,
   ): Promise<KnowledgeMatch[]> => {
     const queryVector = toVectorLiteral(
       await this.embedQuery(query, actor.tenantId),
@@ -46,6 +48,7 @@ export class KnowledgeSearchService {
         queryVector,
         tenantId: actor.tenantId,
         limit,
+        documentId,
       },
     );
     return rows.map((row) => ({

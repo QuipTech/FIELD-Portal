@@ -16,6 +16,7 @@ export interface ChunkMatchRow {
 // document isn't archived or deleted, and it's the caller's organisation's
 // or the shared library's. Scope is explicit in SQL (the backend's DB role
 // may bypass RLS). Ordered by cosine distance (HNSW index, migration 0013).
+// $4 narrows it to one document (Ask AI on a Knowledge article).
 const LIVE_CHUNK_SEARCH = `
   SELECT c.id AS chunk_id, ki.id AS knowledge_item_id, ki.title, ki.type,
          c.page_number, c.section_heading, c.chunk_text,
@@ -28,17 +29,24 @@ const LIVE_CHUNK_SEARCH = `
                          AND ki.deleted_at IS NULL
                          AND ki.status <> 'archived'
   WHERE (c.tenant_id IS NULL OR c.tenant_id = $2)
+    AND ($4::uuid IS NULL OR ki.id = $4)
   ORDER BY c.embedding <=> $1::vector
   LIMIT $3`;
 
 export const searchLiveChunks = async (
   databaseService: DatabaseService,
-  params: { queryVector: string; tenantId: string; limit: number },
+  params: {
+    queryVector: string;
+    tenantId: string;
+    limit: number;
+    documentId?: string | null;
+  },
 ): Promise<ChunkMatchRow[]> => {
   const result = await databaseService.query<ChunkMatchRow>(LIVE_CHUNK_SEARCH, [
     params.queryVector,
     params.tenantId,
     params.limit,
+    params.documentId ?? null,
   ]);
   return result.rows;
 };

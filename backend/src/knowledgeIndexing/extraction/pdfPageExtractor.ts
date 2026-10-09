@@ -20,8 +20,10 @@ interface PdfLine {
 const MIN_TEXT_CHARS_PER_PAGE = 20;
 const HEADING_FONT_RATIO = 1.15;
 const MAX_HEADING_CHARS = 120;
-// "3.2 Hydraulic pump", "A. Safety" — numbered section titles.
-const NUMBERED_HEADING = /^(\d+(\.\d+)*|[A-Z])[.)]?\s+\S.{0,78}$/;
+// "1. Purpose", "3.2 Hydraulic pump", "A. Safety" — numbered section
+// titles. A lone number needs its "." or ")", so a table row such as
+// "2 Check main relief valve setting 2850 PSI" isn't taken for a heading.
+const NUMBERED_HEADING = /^(\d+(\.\d+)+[.)]?|\d+[.)]|[A-Z][.)])\s+\S.{0,78}$/;
 
 // pdf.js text items on the same baseline (y) form one line.
 const toLines = (page: number, items: PdfTextItem[]): PdfLine[] => {
@@ -59,10 +61,17 @@ const medianFontSize = (lines: PdfLine[]): number => {
   return sizes[Math.floor(sizes.length / 2)] ?? 0;
 };
 
+const couldBeHeading = (text: string): boolean =>
+  text.length <= MAX_HEADING_CHARS &&
+  /[A-Za-z]/.test(text) &&
+  !/[.,;:]$/.test(text);
+
+// A numbered section title, judged from its text alone (no font sizes).
+export const isNumberedHeading = (text: string): boolean =>
+  couldBeHeading(text) && NUMBERED_HEADING.test(text);
+
 const isHeadingLine = (line: PdfLine, bodyFontSize: number): boolean =>
-  line.text.length <= MAX_HEADING_CHARS &&
-  /[A-Za-z]/.test(line.text) &&
-  !/[.,;:]$/.test(line.text) &&
+  couldBeHeading(line.text) &&
   ((bodyFontSize > 0 && line.fontSize >= bodyFontSize * HEADING_FONT_RATIO) ||
     NUMBERED_HEADING.test(line.text));
 

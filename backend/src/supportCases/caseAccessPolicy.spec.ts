@@ -16,16 +16,26 @@ const customerOf = (tenantId: string): CaseViewer => ({
   userId: 'customer-1',
   tenantId,
   permissions: ['support.create', 'machine.view'],
+  isStaff: false,
 });
 const agent = (userId: string): CaseViewer => ({
   userId,
   tenantId: 'quiptech',
   permissions: ['support.create', 'support.agent'],
+  isStaff: true,
 });
+// QuipTech's own team, with no support role: staff by organisation.
+const teamMember: CaseViewer = {
+  userId: 'staff-1',
+  tenantId: 'quiptech',
+  permissions: ['support.create'],
+  isStaff: true,
+};
 const admin: CaseViewer = {
   userId: 'admin-1',
   tenantId: 'quiptech',
   permissions: ['support.create', 'support.agent', 'platform.manage'],
+  isStaff: true,
 };
 
 describe('resolveCaseViewerRole', () => {
@@ -42,6 +52,22 @@ describe('resolveCaseViewerRole', () => {
   it('lets a support agent see only the cases assigned to them', () => {
     expect(resolveCaseViewerRole(agent('staff-1'), CASE_IN_A)).toBe('assignee');
     expect(resolveCaseViewerRole(agent('staff-2'), CASE_IN_A)).toBeNull();
+  });
+
+  it('lets a QuipTech team member work a case once assigned, without a role', () => {
+    expect(resolveCaseViewerRole(teamMember, CASE_IN_A)).toBe('assignee');
+    expect(
+      resolveCaseViewerRole(teamMember, { ...CASE_IN_A, assigneeId: 'x' }),
+    ).toBeNull();
+  });
+
+  it('never treats a customer as the assignee, even if assigned', () => {
+    expect(
+      resolveCaseViewerRole(customerOf('tenant-b'), {
+        tenantId: 'tenant-a',
+        assigneeId: 'customer-1',
+      }),
+    ).toBeNull();
   });
 
   it('lets the admin see every case', () => {

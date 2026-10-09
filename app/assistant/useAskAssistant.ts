@@ -13,6 +13,9 @@ interface AskAssistantOptions {
   activeThread: AssistantThreadSummary | null;
   // Context for a new thread; an existing thread keeps its own.
   machineId: string;
+  // Answer the next question from this document only (then cleared).
+  documentId: string | null;
+  onDocumentUsed: () => void;
   setMessages: Dispatch<SetStateAction<ChatEntry[]>>;
   onThreadSaved: (conversationId: string, question: string) => void;
 }
@@ -29,7 +32,14 @@ const newEntry = (id: string, role: ChatEntry["role"], content: string): ChatEnt
 // Sends a question and streams the answer into the message list. A
 // failed question is taken back off the list (nothing was saved) and
 // `ask` resolves false so the composer can restore it.
-export const useAskAssistant = ({ activeThread, machineId, setMessages, onThreadSaved }: AskAssistantOptions) => {
+export const useAskAssistant = ({
+  activeThread,
+  machineId,
+  documentId,
+  onDocumentUsed,
+  setMessages,
+  onThreadSaved,
+}: AskAssistantOptions) => {
   const [isAnswering, setIsAnswering] = useState(false);
   const [askError, setAskError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -81,6 +91,7 @@ export const useAskAssistant = ({ activeThread, machineId, setMessages, onThread
           question,
           conversationId: activeThread?.id,
           machineId: activeThread ? undefined : machineId || undefined,
+          documentId: documentId ?? undefined,
           image: photo ? { mediaType: photo.mediaType, data: photo.data } : undefined,
         },
         { onEvent: handleEvent, signal: controller.signal },
@@ -97,6 +108,7 @@ export const useAskAssistant = ({ activeThread, machineId, setMessages, onThread
       if (outcome.failure) setAskError(outcome.failure);
       return false;
     }
+    if (documentId) onDocumentUsed();
     if (outcome.conversationId) onThreadSaved(outcome.conversationId, question);
     return true;
   };

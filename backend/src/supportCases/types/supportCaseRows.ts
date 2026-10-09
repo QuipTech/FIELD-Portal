@@ -109,6 +109,8 @@ export interface SupportStaffRow {
   last_name: string;
   email: string;
   avatar_url: string | null;
+  organisation_name: string;
   is_admin: boolean;
+  is_support_staff: boolean;
   open_case_count: string;
 }

@@ -61,6 +61,13 @@ export class AdminSupportCasesController {
     return this.adminSupportCasesService.getStats(actor, staff);
   }
 
+  // Whether the caller is support staff (403 if not) and the admin: the
+  // portal shows the Support cases screens from this.
+  @Get('cases/access')
+  access(@CurrentSupportStaff() staff: SupportStaffContext) {
+    return staff;
+  }
+
   @Get('cases/unread-count')
   unreadCount(@CurrentUser() actor: AuthenticatedUser) {
     return this.adminSupportCasesService.countUnread(actor);

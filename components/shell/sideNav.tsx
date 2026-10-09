@@ -7,6 +7,7 @@ import { Icon, type IconName } from "../icons/icon";
 import { LogoutButton } from "./logoutButton";
 import { NavUnreadBadge } from "./navUnreadBadge";
 import { useUnreadCaseCount } from "@/lib/hooks/useUnreadCaseCount";
+import { useSupportStaffAccess } from "@/lib/hooks/useSupportStaffAccess";
 
 interface NavLink {
   href: string;
@@ -36,11 +37,15 @@ const NavItem = ({ href, label, icon, active, badgeCount = 0 }: NavLink & { acti
 );
 
 const CASES_HREF = "/cases";
+// QuipTech's support team also work customers' cases from here.
+const SUPPORT_QUEUE_HREF = "/admin/cases";
 
 export const SideNav = () => {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const unreadCaseCount = useUnreadCaseCount("customer");
+  const { isStaff } = useSupportStaffAccess();
+  const staffCaseCount = useUnreadCaseCount("staff", isStaff);
 
   return (
     <div
@@ -63,6 +68,15 @@ export const SideNav = () => {
           badgeCount={link.href === CASES_HREF ? unreadCaseCount : 0}
         />
       ))}
+      {isStaff && (
+        <NavItem
+          href={SUPPORT_QUEUE_HREF}
+          label={collapsed ? "" : "Support queue"}
+          icon="users"
+          active={pathname.startsWith(SUPPORT_QUEUE_HREF)}
+          badgeCount={staffCaseCount}
+        />
+      )}
       <div className="mt-auto flex flex-col gap-0.5 border-t border-white/[0.16] pt-2.5">
         <NavItem
           href="/settings"

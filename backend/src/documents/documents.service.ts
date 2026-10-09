@@ -11,6 +11,7 @@ import {
 } from '../storage/types/storedFile';
 import * as knowledgeDocumentsRepository from '../knowledge/knowledgeDocuments.repository';
 import { toKnowledgeDocument } from '../knowledge/knowledgeDocumentMapper';
+import { toDocumentDisplayTitle } from '../knowledge/documentDisplayTitle';
 import { signDocumentDownload } from '../knowledge/signDocumentDownload';
 import { DocumentPageCountService } from '../knowledge/documentPageCount.service';
 import { IndexingWorkerService } from '../knowledgeIndexing/indexingWorker.service';
@@ -53,7 +54,7 @@ export class DocumentsService {
           versionId: randomUUID(),
           tenantId: actor.tenantId,
           userId: actor.userId,
-          title: dto.title ?? stored.fileName,
+          title: dto.title ?? toDocumentDisplayTitle(stored.fileName),
           type: dto.type,
           bucket: this.storageService.requireBucket(),
           stored,

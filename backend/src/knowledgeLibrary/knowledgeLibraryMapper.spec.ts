@@ -16,6 +16,7 @@ const row = (
   source_oem: 'Caterpillar',
   updated_at: new Date('2026-03-14T00:00:00Z'),
   version_number: 4,
+  live_version_id: 'version-4',
   chunk_text: 'Nitrogen charging sequence,\n\nride-height check.',
   page_number: 214,
   section_heading: 'Suspension',
@@ -58,6 +59,45 @@ describe('toKnowledgeResult', () => {
     const result = toKnowledgeResult(row({ tenant_id: 't-1', models: null }));
     expect(result.source).toBe('organisation');
     expect(result.models).toEqual([]);
+  });
+});
+
+describe('toKnowledgeResult page and section', () => {
+  it('shows no page when browsing, since nothing matched', () => {
+    expect(toKnowledgeResult(row())).toMatchObject({
+      page: null,
+      heading: null,
+      sectionId: null,
+    });
+  });
+
+  it("shows the matched section's page, heading and anchor", () => {
+    expect(
+      toKnowledgeResult(row(), {
+        document_version_id: 'version-4',
+        ordinal: 3,
+        heading: '4. Diagnostic Procedure',
+        page_number: 2,
+      }),
+    ).toMatchObject({
+      page: 2,
+      heading: '4. Diagnostic Procedure',
+      sectionId: 's3',
+    });
+  });
+
+  it("falls back to the matched chunk's page with no saved sections", () => {
+    expect(toKnowledgeResult(row(), null)).toMatchObject({
+      page: 214,
+      heading: 'Suspension',
+      sectionId: null,
+    });
+  });
+
+  it('cleans a file-name title', () => {
+    expect(
+      toKnowledgeResult(row({ title: 'CAT_793F_Bulletin (2).pdf' })).title,
+    ).toBe('CAT 793F Bulletin');
   });
 });
 

@@ -56,6 +56,9 @@ export interface SupportStaffMember {
   name: string;
   email: string;
   avatarUrl: string | null;
+  organisationName: string;
   isAdmin: boolean;
+  // Only support staff can be assigned; everyone else is listed greyed out.
+  isSupportStaff: boolean;
   openCaseCount: number;
 }

@@ -17,6 +17,9 @@ export interface CaseViewer {
   userId: string;
   tenantId: string;
   permissions: string[];
+  // QuipTech support staff (supportStaffStatus.ts): may work cases
+  // assigned to them, in any organisation.
+  isStaff: boolean;
 }
 
 export interface CaseOwnership {
@@ -41,9 +44,6 @@ const NEW_STATUS_MESSAGE =
 export const isSupportAdmin = (permissions: string[]): boolean =>
   permissions.includes(PLATFORM_PERMISSION_CODE);
 
-export const isSupportStaff = (permissions: string[]): boolean =>
-  isSupportAdmin(permissions) || permissions.includes(SUPPORT_AGENT_PERMISSION);
-
 // null means "not yours to see": callers answer 404, never 403, so a case
 // number from elsewhere gives nothing away.
 export const resolveCaseViewerRole = (
@@ -51,10 +51,7 @@ export const resolveCaseViewerRole = (
   supportCase: CaseOwnership,
 ): CaseViewerRole | null => {
   if (isSupportAdmin(viewer.permissions)) return 'admin';
-  if (
-    viewer.permissions.includes(SUPPORT_AGENT_PERMISSION) &&
-    supportCase.assigneeId === viewer.userId
-  ) {
+  if (viewer.isStaff && supportCase.assigneeId === viewer.userId) {
     return 'assignee';
   }
   if (

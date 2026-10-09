@@ -1,8 +1,7 @@
 import { notFound } from "next/navigation";
 import { AdminShell } from "@/components/shell/adminShell";
 import { AdminTopBar } from "@/components/shell/adminTopBar";
-import { PermissionView } from "@/components/auth/permissionView";
-import { PERMISSIONS } from "@/lib/auth/permissionCodes";
+import { SupportStaffView } from "@/components/supportCases/supportStaffView";
 import { AdminCaseView } from "./components/adminCaseView";
 
 interface AdminCasePageProps {
@@ -17,9 +16,9 @@ const AdminCasePage = ({ params }: AdminCasePageProps) => {
 
   return (
     <AdminShell topBar={<AdminTopBar label="Support cases" />}>
-      <PermissionView permission={PERMISSIONS.workSupportCases} className="m-8">
+      <SupportStaffView className="m-8">
         <AdminCaseView caseNumber={caseNumber} />
-      </PermissionView>
+      </SupportStaffView>
     </AdminShell>
   );
 };
