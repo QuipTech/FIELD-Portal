@@ -1,26 +1,21 @@
 "use client";
 
 import { LoadingSpinner } from "@/components/ui/loadingSpinner";
-import { DocumentUploader } from "@/components/uploads/documentUploader";
 import type { KnowledgeListContext } from "@/lib/knowledge/knowledgeLinks";
 import { useOrganisationDocuments } from "../useOrganisationDocuments";
 import { OrganisationDocumentRow } from "./organisationDocumentRow";
 
-// The organisation's own uploads plus the shared QuipTech library; each
-// row opens the document's article.
+// The organisation's own documents plus the shared QuipTech library; each
+// row opens the document's article. Documents are added from the admin
+// portal (Admin → Knowledge), not here.
 export const OrganisationDocuments = ({ listContext }: { listContext: KnowledgeListContext }) => {
-  const { documents, isLoading, loadError, reloadDocuments } = useOrganisationDocuments();
+  const { documents, isLoading, loadError } = useOrganisationDocuments();
 
   return (
     <section className="flex flex-col gap-2.5 rounded-xl border border-borderGray p-4">
-      <div className="flex items-start gap-3">
-        <div className="flex flex-col">
-          <h2 className="text-[15px] font-medium text-ink">Documents</h2>
-          <span className="text-xs text-mutedGray">Your organisation&apos;s uploads and the shared QuipTech library</span>
-        </div>
-        <div className="ml-auto">
-          <DocumentUploader onUploaded={reloadDocuments} />
-        </div>
+      <div className="flex flex-col">
+        <h2 className="text-[15px] font-medium text-ink">Documents</h2>
+        <span className="text-xs text-mutedGray">Your organisation&apos;s documents and the shared QuipTech library</span>
       </div>
       {isLoading && (
         <span className="flex items-center gap-2 text-sm text-mutedGray">
