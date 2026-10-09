@@ -12,13 +12,13 @@ const PAGE_SIZE = 100;
 const SIGNED_OUT_MESSAGE = "Your session has expired. Sign in again to see users.";
 const FALLBACK_ERROR_MESSAGE = "Couldn't load users. Please try again.";
 
-export const useAdminUsers = (filters: { search: string; role: string; organisationId: string }) => {
+export const useAdminUsers = (filters: { search: string; role: string }) => {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
-  const { search, role, organisationId } = filters;
+  const { search, role } = filters;
 
   useEffect(() => {
     const accessToken = getAccessToken();
@@ -32,7 +32,7 @@ export const useAdminUsers = (filters: { search: string; role: string; organisat
     let isCurrent = true;
     setIsLoading(true);
     const timer = setTimeout(() => {
-      listAdminUsersRequest(accessToken, { search, role, organisationId, pageSize: PAGE_SIZE })
+      listAdminUsersRequest(accessToken, { search, role, pageSize: PAGE_SIZE })
         .then((response) => {
           if (!isCurrent) return;
           setUsers(response.users);
@@ -50,7 +50,7 @@ export const useAdminUsers = (filters: { search: string; role: string; organisat
       isCurrent = false;
       clearTimeout(timer);
     };
-  }, [search, role, organisationId, reloadCount]);
+  }, [search, role, reloadCount]);
 
   const reload = () => setReloadCount((count) => count + 1);
 

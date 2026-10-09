@@ -45,3 +45,12 @@ export const changeUserRoleRequest = (accessToken: string, userId: string, roleI
     headers: { Authorization: `Bearer ${accessToken}` },
     body: JSON.stringify({ roleId }),
   });
+
+// Deletes their account completely and disables their sign-in; signing in
+// again tells them an administrator removed them. Refused for your own
+// account and for the last Owner.
+export const removeUserRequest = (accessToken: string, userId: string): Promise<null> =>
+  apiRequest<null>(`/admin/users/${userId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });

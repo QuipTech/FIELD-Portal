@@ -13,6 +13,11 @@ import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import * as authRepository from '../auth/auth.repository';
 import { runAuditedChange } from '../common/audit/runAuditedChange';
 import { CognitoUserDirectoryService } from '../users/cognitoUserDirectory.service';
+import { CognitoUserDeletionService } from '../users/cognitoUserDeletion.service';
+import {
+  clearRemovedAccount,
+  isRemovedAccount,
+} from '../users/removedAccounts.repository';
 import * as adminUsersRepository from './adminUsers.repository';
 import * as adminRolesRepository from '../adminRoles/adminRoles.repository';
 import { InviteUserDto } from './dto/inviteUserDto';
@@ -39,6 +44,7 @@ export class AdminUserInvitationsService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly cognitoDirectory: CognitoUserDirectoryService,
+    private readonly cognitoUsers: CognitoUserDeletionService,
   ) {}
 
   inviteUser = async (
@@ -57,6 +63,7 @@ export class AdminUserInvitationsService {
     ) {
       throw new ConflictException(ALREADY_USER_MESSAGE);
     }
+    await this.releaseRemovedSignIn(dto.email);
     const cognitoUser = await this.createCognitoUser(dto);
     try {
       const id = await runAuditedChange(
@@ -83,6 +90,7 @@ export class AdminUserInvitationsService {
           };
         },
       );
+      await clearRemovedAccount(this.databaseService, dto.email);
       return { id };
     } catch (error) {
       await this.cognitoDirectory
@@ -132,6 +140,14 @@ export class AdminUserInvitationsService {
     if (!role) {
       throw new BadRequestException(ROLE_NOT_ALLOWED_MESSAGE);
     }
+  };
+
+  // Someone an admin removed keeps a disabled Cognito sign-in (so they're
+  // told why they can't sign in). Inviting them again deletes it first, so
+  // Cognito can create the new one.
+  private releaseRemovedSignIn = async (email: string): Promise<void> => {
+    if (!(await isRemovedAccount(this.databaseService, email))) return;
+    await this.cognitoUsers.deleteCognitoUsersForEmail(email);
   };
 
   private createCognitoUser = async (dto: InviteUserDto) => {

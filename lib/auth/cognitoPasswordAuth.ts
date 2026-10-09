@@ -44,9 +44,17 @@ const COGNITO_ERROR_MESSAGES: Record<string, string> = {
 const describePasswordPolicyError = (message: string) =>
   message.replace(/^Password did not conform with policy:\s*/i, "");
 
+// What someone an admin removed sees: the API disables their sign-in, so
+// Cognito answers "User is disabled." (matches the API's own wording).
+export const ACCOUNT_REMOVED_MESSAGE =
+  "An administrator removed your FIELD account. Contact your administrator if you think this is a mistake.";
+
+export const isDisabledSignInMessage = (message: string | undefined): boolean => /user is disabled/i.test(message ?? "");
+
 export const toCognitoErrorMessage = (error: unknown, fallback: string): string => {
   if (error instanceof UnsupportedSignInStepError) return error.message;
   if (!(error instanceof AuthError)) return fallback;
+  if (error.name === "NotAuthorizedException" && isDisabledSignInMessage(error.message)) return ACCOUNT_REMOVED_MESSAGE;
   if (error.name === "InvalidPasswordException") return describePasswordPolicyError(error.message);
   if (error.name === "InvalidParameterException" && /password/i.test(error.message)) {
     return describePasswordPolicyError(error.message);
