@@ -1,0 +1,9 @@
+# Context for api.Dockerfile (backend/).
+node_modules
+dist
+coverage
+certs
+.env*
+*.pem
+*.p8
+**/.DS_Store

@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { PLATFORM_PERMISSION_CODE } from '../auth/systemRoleNames';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { StorageService } from '../storage/storage.service';
 import { SharedLibraryStorageService } from '../storage/sharedLibraryStorage.service';
@@ -130,14 +131,18 @@ export class DocumentLifecycleService {
     }
   };
 
+  // Shared library + the actor's organisation; the Owner (platform
+  // permission) can reach every organisation's documents.
   findVisibleRow = async (
     actor: AuthenticatedUser,
     itemId: string,
   ): Promise<KnowledgeDocumentRow> => {
+    const access = await loadActorAccess(this.databaseService, actor);
     const row = await knowledgeDocumentsRepository.findKnowledgeDocument(
       this.databaseService,
       itemId,
       actor.tenantId,
+      access.permissions.includes(PLATFORM_PERMISSION_CODE),
     );
     if (!row) throw new NotFoundException(DOCUMENT_NOT_FOUND_MESSAGE);
     return row;

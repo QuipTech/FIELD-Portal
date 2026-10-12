@@ -5,6 +5,9 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { Icon, type IconName } from "../icons/icon";
 import { LogoutButton } from "./logoutButton";
+import { NavUnreadBadge } from "./navUnreadBadge";
+import { useUnreadCaseCount } from "@/lib/hooks/useUnreadCaseCount";
+import { useSupportStaffAccess } from "@/lib/hooks/useSupportStaffAccess";
 
 interface NavLink {
   href: string;
@@ -20,7 +23,7 @@ const primaryLinks: NavLink[] = [
   { href: "/cases", label: "Support cases", icon: "life" },
 ];
 
-const NavItem = ({ href, label, icon, active }: NavLink & { active: boolean }) => (
+const NavItem = ({ href, label, icon, active, badgeCount = 0 }: NavLink & { active: boolean; badgeCount?: number }) => (
   <Link
     href={href}
     className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-[15px] transition-colors ${
@@ -29,12 +32,20 @@ const NavItem = ({ href, label, icon, active }: NavLink & { active: boolean }) =
   >
     <Icon name={icon} className={active ? "stroke-white" : "stroke-white/60"} />
     <span className="truncate">{label}</span>
+    {label && <NavUnreadBadge count={badgeCount} />}
   </Link>
 );
+
+const CASES_HREF = "/cases";
+// QuipTech's support team also work customers' cases from here.
+const SUPPORT_QUEUE_HREF = "/admin/cases";
 
 export const SideNav = () => {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const unreadCaseCount = useUnreadCaseCount("customer");
+  const { isStaff } = useSupportStaffAccess();
+  const staffCaseCount = useUnreadCaseCount("staff", isStaff);
 
   return (
     <div
@@ -54,8 +65,18 @@ export const SideNav = () => {
           {...link}
           label={collapsed ? "" : link.label}
           active={pathname.startsWith(link.href)}
+          badgeCount={link.href === CASES_HREF ? unreadCaseCount : 0}
         />
       ))}
+      {isStaff && (
+        <NavItem
+          href={SUPPORT_QUEUE_HREF}
+          label={collapsed ? "" : "Support queue"}
+          icon="users"
+          active={pathname.startsWith(SUPPORT_QUEUE_HREF)}
+          badgeCount={staffCaseCount}
+        />
+      )}
       <div className="mt-auto flex flex-col gap-0.5 border-t border-white/[0.16] pt-2.5">
         <NavItem
           href="/settings"

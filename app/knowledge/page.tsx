@@ -1,12 +1,25 @@
 import { TopBar } from "@/components/shell/topBar";
-import { knowledgeSearchResults } from "@/lib/mockData/knowledge";
-import { KnowledgeFilterNav } from "./components/knowledgeFilterNav";
-import { KnowledgeFilterPills } from "./components/knowledgeFilterPills";
-import { KnowledgeResultCard } from "./components/knowledgeResultCard";
-import { KnowledgeSearchBar } from "./components/knowledgeSearchBar";
-import { OrganisationDocuments } from "./components/organisationDocuments";
+import { knowledgeDocumentTypes, type KnowledgeDocumentType } from "@/lib/types/adminDocument";
+import type { KnowledgeLibraryFilters } from "@/lib/types/knowledgeLibrary";
+import { KnowledgeLibraryView } from "./components/knowledgeLibraryView";
 
-const KnowledgeSearchPage = () => {
+interface KnowledgeSearchPageProps {
+  // e.g. /knowledge?model=<machine model id>&q=suspension
+  searchParams: { q?: string; type?: string; make?: string; model?: string };
+}
+
+const toDocumentType = (value: string | undefined): KnowledgeDocumentType | "" =>
+  knowledgeDocumentTypes.find((option) => option.value === value)?.value ?? "";
+
+const KnowledgeSearchPage = ({ searchParams }: KnowledgeSearchPageProps) => {
+  const initialFilters: KnowledgeLibraryFilters = {
+    search: searchParams.q ?? "",
+    type: toDocumentType(searchParams.type),
+    make: searchParams.make ?? "",
+    model: searchParams.model ?? "",
+    sort: "relevance",
+  };
+
   return (
     <div className="flex h-screen flex-col bg-surfaceGray">
       <TopBar>
@@ -14,15 +27,7 @@ const KnowledgeSearchPage = () => {
       </TopBar>
       <div className="flex min-h-0 flex-1">
         <div className="m-4 flex flex-1 gap-3 overflow-hidden rounded-2xl border border-slate-200/80 bg-surface p-3">
-          <KnowledgeFilterNav />
-          <main className="flex flex-1 flex-col gap-3 overflow-y-auto p-2">
-            <KnowledgeSearchBar defaultValue="rear suspension cylinder recharge" />
-            <KnowledgeFilterPills />
-            <OrganisationDocuments />
-            {knowledgeSearchResults.map((result) => (
-              <KnowledgeResultCard key={result.slug} result={result} />
-            ))}
-          </main>
+          <KnowledgeLibraryView initialFilters={initialFilters} />
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { Icon } from "@/components/icons/icon";
+import { Tag } from "@/components/ui/tag";
 import type { AdminRole } from "@/lib/types/adminRole";
 
 interface RolesListProps {
@@ -34,7 +35,16 @@ export const RolesList = ({ roles, selectedRoleId, totalPermissions, onSelect }:
           >
             <div className="flex items-center">
               <span className={`text-[15px] text-ink ${selected ? "font-medium" : ""}`}>{role.name}</span>
-              <Icon name="chevr" className={`ml-auto ${selected ? "stroke-primary" : "stroke-mutedGray"}`} />
+              <span className="ml-auto flex items-center gap-1.5">
+                {role.organisation ? (
+                  <Tag>{role.organisation.name}</Tag>
+                ) : role.isBuiltIn ? (
+                  <Tag tone="primary">Default</Tag>
+                ) : (
+                  <Tag>Custom</Tag>
+                )}
+                <Icon name="chevr" className={selected ? "stroke-primary" : "stroke-mutedGray"} />
+              </span>
             </div>
             <span className="text-xs text-mutedGray">{describeRole(role, totalPermissions)}</span>
           </button>

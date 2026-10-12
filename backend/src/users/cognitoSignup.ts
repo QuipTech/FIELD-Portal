@@ -7,10 +7,11 @@ import { CognitoIdentity } from '../auth/types/cognitoIdentity';
 import * as usersRepository from './users.repository';
 import { CognitoSignupProfile } from './types/cognitoUserResolution';
 
-// Self-serve signup via Google/Apple — mirrors registerTenantAndFirstUser
-// (/auth/register): a new tenant with this user as its Customer, in one
-// transaction, just without a password. Google/Apple don't supply a company
-// or phone number, so the signup profile dialog collects them first.
+// Self-serve signup through Cognito (email/password, Google or Apple): a new
+// tenant with this user as its Customer, in one transaction. Cognito holds
+// the password, if any. Company and phone number aren't Cognito attributes:
+// the portal's register form (email/password) or the signup profile dialog
+// (Google/Apple) sends them to /auth/sync.
 export const createTenantAndFirstUserFromCognito = async (
   databaseService: DatabaseService,
   identity: CognitoIdentity,

@@ -4,7 +4,7 @@ import { KnowledgeLibrary } from "./components/knowledgeLibrary";
 
 const AdminKnowledgePage = () => {
   return (
-    <AdminShell topBar={<AdminTopBar label="Knowledge" showBell={false} />}>
+    <AdminShell topBar={<AdminTopBar label="Knowledge" />}>
       <main className="m-4 flex flex-1 flex-col gap-3.5 overflow-y-auto rounded-2xl border border-slate-200/80 bg-surface p-6">
         <KnowledgeLibrary />
       </main>

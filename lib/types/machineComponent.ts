@@ -1,10 +1,20 @@
-import type { Tone } from "@/components/ui/tone";
-import type { IconName } from "@/components/icons/icon";
-
-export interface MachineComponentStatus {
+// A machine's equipment tree: systems (Powertrain, Hydraulics …) and the
+// components installed in each.
+export interface MachineSystem {
+  id: string;
   name: string;
-  note: string;
-  tag: string;
-  tone: Extract<Tone, "ok" | "amber">;
-  icon: IconName;
+}
+
+export type ComponentCondition = "ok" | "worn" | "service_due" | "fault";
+
+export interface MachineComponent {
+  id: string;
+  systemId: string;
+  systemName: string;
+  name: string;
+  // From the component's latest history entry; null when nothing about
+  // its condition has been recorded.
+  condition: ComponentCondition | null;
+  // e.g. "Serviced 19 Feb", "Fault logged 28 Feb" or "S/N 4T-9455".
+  caption: string;
 }

@@ -3,7 +3,14 @@ export interface AdminRole {
   name: string;
   userCount: number;
   permissionCodes: string[];
-  // Owner / Customer: the code depends on them, so no rename or delete.
+  // null for a system role (every organisation); otherwise its own org.
+  organisation: { id: string; name: string } | null;
+  // Whether the caller may change it: the Owner any role, an organisation
+  // admin
+  // only their organisation's own roles.
+  isEditable: boolean;
+  // A default role shipped with the platform (Owner, Customer, Technical
+  // Manager, Field Technician, Knowledge Manager): no rename or delete.
   isBuiltIn: boolean;
   // Owner always holds every permission.
   arePermissionsLocked: boolean;

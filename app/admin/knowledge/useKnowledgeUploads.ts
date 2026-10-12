@@ -5,7 +5,7 @@ import { requireAccessToken } from "@/lib/api/requireAccessToken";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import { StorageUploadError } from "@/lib/api/signedUrlUpload";
 import type { KnowledgeDocumentType } from "@/lib/types/adminDocument";
-import { uploadKnowledgeDocument } from "./uploadKnowledgeDocument";
+import { uploadKnowledgeDocument, uploadKnowledgeVersion } from "./uploadKnowledgeDocument";
 
 export interface PendingUpload {
   file: File;
@@ -21,6 +21,9 @@ export interface UploadProgress {
 }
 
 const UPLOAD_FAILED_MESSAGE = "Upload failed. Please try again.";
+
+const toUploadErrorMessage = (error: unknown): string =>
+  error instanceof StorageUploadError ? error.message : toApiErrorMessage(error, UPLOAD_FAILED_MESSAGE);
 
 // Uploads run one after another so a batch of large manuals doesn't
 // saturate the connection; each file reports its own progress.
@@ -44,15 +47,26 @@ export const useKnowledgeUploads = (onUploaded: () => void) => {
         );
         updateUpload(id, { status: "done", fraction: 1 });
       } catch (error) {
-        const errorMessage =
-          error instanceof StorageUploadError ? error.message : toApiErrorMessage(error, UPLOAD_FAILED_MESSAGE);
-        updateUpload(id, { status: "failed", errorMessage });
+        updateUpload(id, { status: "failed", errorMessage: toUploadErrorMessage(error) });
       }
       onUploaded();
     }
   };
 
+  // A new version of one existing document, shown in the same progress list.
+  const startVersionUpload = async (documentId: string, file: File) => {
+    const id = crypto.randomUUID();
+    setUploads((current) => [...current, { id, fileName: `${file.name} (new version)`, fraction: 0, status: "uploading" }]);
+    try {
+      await uploadKnowledgeVersion(requireAccessToken(), documentId, file, (fraction) => updateUpload(id, { fraction }));
+      updateUpload(id, { status: "done", fraction: 1 });
+    } catch (error) {
+      updateUpload(id, { status: "failed", errorMessage: toUploadErrorMessage(error) });
+    }
+    onUploaded();
+  };
+
   const clearFinishedUploads = () => setUploads((current) => current.filter((upload) => upload.status === "uploading"));
 
-  return { uploads, startUploads, clearFinishedUploads };
+  return { uploads, startUploads, startVersionUpload, clearFinishedUploads };
 };

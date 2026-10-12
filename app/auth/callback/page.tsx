@@ -12,7 +12,7 @@ const AuthCallbackPage = () => {
     useCompleteFederatedSignIn();
 
   // Signing out of Cognito (rather than just linking to /login) drops the
-  // Google/Apple session, so the next attempt can pick a different account.
+  // Cognito session, so the next attempt can use a different account.
   const handleBackToSignIn = () => {
     signOutOfCognito().catch(() => window.location.assign("/login"));
   };

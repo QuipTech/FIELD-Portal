@@ -4,10 +4,15 @@ import { DocumentsModule } from '../documents/documents.module';
 import { AdminKnowledgeVersionsService } from './adminKnowledgeVersions.service';
 import { AdminKnowledgeController } from './adminKnowledge.controller';
 import { AdminKnowledgeService } from './adminKnowledge.service';
+import { AdminKnowledgeUploadsService } from './adminKnowledgeUploads.service';
 
 @Module({
   imports: [KnowledgeModule, DocumentsModule],
   controllers: [AdminKnowledgeController],
-  providers: [AdminKnowledgeService, AdminKnowledgeVersionsService],
+  providers: [
+    AdminKnowledgeService,
+    AdminKnowledgeUploadsService,
+    AdminKnowledgeVersionsService,
+  ],
 })
 export class AdminKnowledgeModule {}

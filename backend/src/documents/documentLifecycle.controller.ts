@@ -24,8 +24,8 @@ import { RejectDocumentDto } from './dto/rejectDocumentDto';
 
 // Indexing status and lifecycle actions for a document the caller can see
 // (their organisation's or the shared library). Who may act is decided per
-// document in documentAccess.ts: shared-library changes and reviews are
-// Owner-only; an organisation's own documents need knowledge.submit.
+// document in documentAccess.ts: shared-library changes and reviews need
+// platform.manage (Owner); an organisation's own documents need knowledge.submit.
 @Controller('documents/:documentId')
 @UseGuards(JwtAuthGuard)
 export class DocumentLifecycleController {

@@ -21,5 +21,31 @@ module.exports = {
     '@typescript-eslint/explicit-function-return-type': 'off',
     '@typescript-eslint/explicit-module-boundary-types': 'off',
     '@typescript-eslint/no-explicit-any': 'off',
+    // Stripe is reached only through src/billing (see the override below);
+    // everything else checks entitlements in app.entitlements.
+    'no-restricted-imports': [
+      'error',
+      {
+        paths: [
+          {
+            name: 'stripe',
+            message:
+              'Only src/billing may import the Stripe SDK. Read entitlements from app.entitlements instead.',
+          },
+        ],
+        patterns: [
+          {
+            group: ['stripe/*'],
+            message: 'Only src/billing may import the Stripe SDK.',
+          },
+        ],
+      },
+    ],
   },
+  overrides: [
+    {
+      files: ['src/billing/**/*.ts'],
+      rules: { 'no-restricted-imports': 'off' },
+    },
+  ],
 };

@@ -4,36 +4,24 @@
 # build output
 /dist
 
-# typescript
-*.tsbuildinfo
-
-# env files (hold real DB endpoints — never commit; keep .env.example as the template)
-.env
-.env.*
-!.env.example
-
-# secrets & certificates — never commit
-/certs/*
+# misc
+.DS_Store
 *.pem
-*.p8
-*.key
-*.cert
-*.crt
-# Amazon's public RDS CA bundle — not a secret, required at runtime by database.service.ts
-!/certs/rdsGlobalBundle.pem
 
 # debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
 
-# testing
+# env files (hold real DB endpoints — never commit)
+.env
+.env.*.local
+.env.development
+.env.staging
+.env.production
+
+# typescript
+*.tsbuildinfo
+
+# coverage
 /coverage
-
-# os / editor
-.DS_Store
-Thumbs.db
-.idea/
-.vscode/*
-!.vscode/extensions.json

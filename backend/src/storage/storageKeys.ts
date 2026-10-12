@@ -2,7 +2,14 @@ import { randomUUID } from 'crypto';
 
 // Top-level folders in the bucket. Tenant-owned objects always sit at
 // {folder}/{tenantId}/…, which is what deleteFile checks.
-export const STORAGE_FOLDERS = ['documents', 'photos', 'avatars'] as const;
+export const STORAGE_FOLDERS = [
+  'documents',
+  'photos',
+  'avatars',
+  'branding',
+  'exports',
+  'cases',
+] as const;
 
 // The shared knowledge library (tenant_id IS NULL) lives beside tenant
 // folders; tenant ids are UUIDs, so they can never equal "shared".
@@ -44,6 +51,27 @@ export const buildAvatarKey = (
   userId: string,
   extension: string,
 ) => `avatars/${tenantId}/${userId}.${extension}`;
+
+// A fresh key per upload, so a cached copy of the old logo is never shown
+// in place of the new one; the previous object is deleted after saving.
+export const buildBrandingLogoKey = (tenantId: string, extension: string) =>
+  `branding/${tenantId}/logo-${randomUUID()}.${extension}`;
+
+// A support case attachment. caseId is null for an upload made before
+// its case exists (the New case form).
+export const buildCaseAttachmentKey = (
+  tenantId: string,
+  caseId: string | null,
+  fileName: string,
+) =>
+  `cases/${tenantId}/${caseId ?? 'pending'}/${randomUUID()}-${toSafeFileName(fileName)}`;
+
+// One file per export request ("My data" → Export my data).
+export const buildDataExportKey = (
+  tenantId: string,
+  userId: string,
+  requestId: string,
+) => `exports/${tenantId}/${userId}/${requestId}.json`;
 
 // The multi-tenant boundary for deletes: only keys under one of this
 // tenant's own folders, with no path tricks.

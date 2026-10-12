@@ -3,6 +3,8 @@ export interface KnowledgeDocumentRow {
   id: string;
   // NULL for the shared library.
   tenant_id: string | null;
+  // The owning organisation's name; null for the shared library.
+  organisation_name: string | null;
   title: string;
   type: string;
   status: string;

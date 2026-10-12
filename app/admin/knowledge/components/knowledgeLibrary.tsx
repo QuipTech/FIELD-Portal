@@ -3,26 +3,24 @@
 import { useRef, useState, type DragEvent } from "react";
 import { Icon } from "@/components/icons/icon";
 import { Button } from "@/components/ui/button";
-import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import { ACCEPTED_KNOWLEDGE_FILES } from "@/lib/format/knowledgeUploadFile";
-import type { KnowledgeDocument } from "@/lib/types/adminDocument";
 import { DocumentsTable } from "./documentsTable";
 import { UploadDocumentsModal } from "./uploadDocumentsModal";
 import { UploadProgressList } from "./uploadProgressList";
 import { DeleteDocumentDialog } from "./deleteDocumentDialog";
+import { RejectDocumentDialog } from "./rejectDocumentDialog";
 import { useKnowledgeDocuments } from "../useKnowledgeDocuments";
 import { useKnowledgeUploads } from "../useKnowledgeUploads";
+import { useDocumentRowActions } from "../useDocumentRowActions";
 
-const DOWNLOAD_FAILED_MESSAGE = "Couldn't download the document. Please try again.";
 
 export const KnowledgeLibrary = () => {
-  const { documents, total, isLoading, loadError, reloadDocuments, downloadDocument, deleteDocument } =
+  const { documents, total, isLoading, loadError, reloadDocuments, downloadDocument, runAction, rejectDocument, deleteDocument } =
     useKnowledgeDocuments();
-  const { uploads, startUploads, clearFinishedUploads } = useKnowledgeUploads(reloadDocuments);
+  const { uploads, startUploads, startVersionUpload, clearFinishedUploads } = useKnowledgeUploads(reloadDocuments);
+  const rowActions = useDocumentRowActions({ downloadDocument, runAction, startVersionUpload });
   const [selectedFiles, setSelectedFiles] = useState<File[] | null>(null);
-  const [documentToDelete, setDocumentToDelete] = useState<KnowledgeDocument | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const chooseFiles = (fileList: FileList | null) => {
@@ -35,12 +33,6 @@ export const KnowledgeLibrary = () => {
     chooseFiles(event.dataTransfer.files);
   };
 
-  const handleDownload = (document: KnowledgeDocument) => {
-    setActionError(null);
-    downloadDocument(document.id).catch((error: unknown) =>
-      setActionError(toApiErrorMessage(error, DOWNLOAD_FAILED_MESSAGE)),
-    );
-  };
 
   return (
     <>
@@ -63,7 +55,7 @@ export const KnowledgeLibrary = () => {
         />
       </div>
       <div className="flex items-center gap-2">
-        {actionError && <span className="text-xs text-danger">{actionError}</span>}
+        {rowActions.actionError && <span className="text-xs text-danger">{rowActions.actionError}</span>}
         {!loadError && (
           <span className="ml-auto text-xs text-slate-400">
             {total.toLocaleString("en-GB")} {total === 1 ? "document" : "documents"}
@@ -89,19 +81,18 @@ export const KnowledgeLibrary = () => {
         documents={documents}
         isLoading={isLoading}
         loadError={loadError}
-        onDownload={handleDownload}
-        onDelete={setDocumentToDelete}
+        onAction={rowActions.handleAction}
       />
       {selectedFiles && (
         <UploadDocumentsModal files={selectedFiles} onUpload={startUploads} onClose={() => setSelectedFiles(null)} />
       )}
-      {documentToDelete && (
-        <DeleteDocumentDialog
-          document={documentToDelete}
-          onDelete={deleteDocument}
-          onClose={() => setDocumentToDelete(null)}
-        />
+      {rowActions.documentToDelete && (
+        <DeleteDocumentDialog document={rowActions.documentToDelete} onDelete={deleteDocument} onClose={rowActions.closeDelete} />
       )}
+      {rowActions.documentToReject && (
+        <RejectDocumentDialog document={rowActions.documentToReject} onReject={rejectDocument} onClose={rowActions.closeReject} />
+      )}
+      {rowActions.versionPickerInput}
     </>
   );
 };

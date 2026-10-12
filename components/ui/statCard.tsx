@@ -4,9 +4,11 @@ import { toneCardClasses, type Tone } from "./tone";
 interface StatCardProps {
   label: string;
   value: string;
-  caption: string;
-  icon: IconName;
+  // Both optional, for a plain number card (e.g. the support queue).
+  caption?: string;
+  icon?: IconName;
   tone: Extract<Tone, "amber" | "danger" | "primary" | "default">;
+  variant?: "tinted" | "plain";
 }
 
 const valueColorClasses: Record<StatCardProps["tone"], string> = {
@@ -23,17 +25,21 @@ const iconColorClasses: Record<StatCardProps["tone"], string> = {
   default: "bg-fillGray text-bodyGray",
 };
 
-export const StatCard = ({ label, value, caption, icon, tone }: StatCardProps) => {
+// variant "plain": a white card whatever the tone; only the number takes it.
+export const StatCard = ({ label, value, caption, icon, tone, variant = "tinted" }: StatCardProps) => {
+  const cardClasses = variant === "plain" ? "border-borderGray bg-surface" : toneCardClasses[tone];
   return (
-    <div className={`flex flex-1 flex-col gap-2 rounded-2xl border p-5 ${toneCardClasses[tone]}`}>
+    <div className={`flex flex-1 flex-col gap-2 rounded-2xl border p-5 ${cardClasses}`}>
       <div className="flex items-center">
         <span className="text-[15px] text-bodyGray">{label}</span>
-        <span className={`ml-auto flex h-[30px] w-[30px] items-center justify-center rounded-lg ${iconColorClasses[tone]}`}>
-          <Icon name={icon} className="h-[14px] w-[14px]" />
-        </span>
+        {icon && (
+          <span className={`ml-auto flex h-[30px] w-[30px] items-center justify-center rounded-lg ${iconColorClasses[tone]}`}>
+            <Icon name={icon} className="h-[14px] w-[14px]" />
+          </span>
+        )}
       </div>
       <div className={`text-[26px] font-medium leading-none ${valueColorClasses[tone]}`}>{value}</div>
-      <span className="text-xs text-mutedGray">{caption}</span>
+      {caption && <span className="text-xs text-mutedGray">{caption}</span>}
     </div>
   );
 };

@@ -12,52 +12,61 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwtAuthGuard';
-import { RequireRolesGuard } from '../auth/guards/requireRoles.guard';
-import { RequireRoles } from '../auth/decorators/requireRoles.decorator';
 import { CurrentUser } from '../auth/decorators/currentUser.decorator';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
-import { OWNER_ROLE_NAME } from '../auth/systemRoleNames';
+import { AdminScopeGuard } from '../auth/adminScope/adminScope.guard';
+import { CurrentAdminScope } from '../auth/adminScope/currentAdminScope.decorator';
+import { AdminScope } from '../auth/adminScope/adminScope';
 import { AdminRolesService } from './adminRoles.service';
 import { CreateRoleDto } from './dto/createRoleDto';
 import { UpdateRoleDto } from './dto/updateRoleDto';
 
-// Platform-wide system roles, shared by every organisation — Owner only.
+// System roles plus organisation roles; the Owner manages all of them
+// (AdminScopeGuard).
 @Controller('admin/roles')
-@UseGuards(JwtAuthGuard, RequireRolesGuard)
-@RequireRoles(OWNER_ROLE_NAME)
+@UseGuards(JwtAuthGuard, AdminScopeGuard)
 export class AdminRolesController {
   constructor(private readonly adminRolesService: AdminRolesService) {}
 
   @Get()
-  list() {
-    return this.adminRolesService.listRoles();
+  list(@CurrentAdminScope() scope: AdminScope) {
+    return this.adminRolesService.listRoles(scope);
   }
 
   @Get(':roleId')
-  get(@Param('roleId', ParseUUIDPipe) roleId: string) {
-    return this.adminRolesService.getRole(roleId);
+  get(
+    @CurrentAdminScope() scope: AdminScope,
+    @Param('roleId', ParseUUIDPipe) roleId: string,
+  ) {
+    return this.adminRolesService.getRole(scope, roleId);
   }
 
   @Post()
-  create(@CurrentUser() actor: AuthenticatedUser, @Body() dto: CreateRoleDto) {
-    return this.adminRolesService.createRole(actor, dto);
+  create(
+    @CurrentAdminScope() scope: AdminScope,
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: CreateRoleDto,
+  ) {
+    return this.adminRolesService.createRole(actor, scope, dto);
   }
 
   @Patch(':roleId')
   update(
+    @CurrentAdminScope() scope: AdminScope,
     @CurrentUser() actor: AuthenticatedUser,
     @Param('roleId', ParseUUIDPipe) roleId: string,
     @Body() dto: UpdateRoleDto,
   ) {
-    return this.adminRolesService.updateRole(actor, roleId, dto);
+    return this.adminRolesService.updateRole(actor, scope, roleId, dto);
   }
 
   @Delete(':roleId')
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(
+    @CurrentAdminScope() scope: AdminScope,
     @CurrentUser() actor: AuthenticatedUser,
     @Param('roleId', ParseUUIDPipe) roleId: string,
   ) {
-    return this.adminRolesService.deleteRole(actor, roleId);
+    return this.adminRolesService.deleteRole(actor, scope, roleId);
   }
 }

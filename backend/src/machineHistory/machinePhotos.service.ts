@@ -5,6 +5,7 @@ import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { StorageService } from '../storage/storage.service';
 import { IncomingFile, UploadedFile } from '../storage/types/storedFile';
 import * as machineHistoryRepository from './machineHistory.repository';
+import * as historyEntriesRepository from './historyEntries.repository';
 import { assertMachineInTenant } from './machineHistory.service';
 import { toMachinePhoto } from './machinePhotoMapper';
 import { MachinePhoto } from './types/machineHistoryResponse';
@@ -110,7 +111,7 @@ export class MachinePhotosService {
   ): Promise<void> =>
     this.databaseService.withTenant(actor.tenantId, async (client) => {
       await assertMachineInTenant(client, actor.tenantId, target.machineId);
-      const exists = await machineHistoryRepository.historyEntryExists(client, {
+      const exists = await historyEntriesRepository.historyEntryExists(client, {
         tenantId: actor.tenantId,
         ...target,
       });

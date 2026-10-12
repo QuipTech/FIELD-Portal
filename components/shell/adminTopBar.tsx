@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Icon } from "../icons/icon";
 import { Tag } from "../ui/tag";
-import { IconButton } from "../ui/iconButton";
 import { TopBar } from "./topBar";
 
 const adminUserMenuItems = [
@@ -13,23 +12,14 @@ const adminUserMenuItems = [
 interface AdminTopBarProps {
   label: string;
   actions?: ReactNode;
-  showBell?: boolean;
 }
 
-export const AdminTopBar = ({ label, actions, showBell = true }: AdminTopBarProps) => {
+export const AdminTopBar = ({ label, actions }: AdminTopBarProps) => {
   return (
     <TopBar
       logoHref="/admin/dashboard"
-      userInitials="TM"
-      userName="T. Meyer"
-      userRoleLabel="System Administrator"
       userMenuItems={adminUserMenuItems}
-      actions={
-        <>
-          {actions}
-          {showBell && <IconButton icon="bell" tone="amber" />}
-        </>
-      }
+      actions={actions}
     >
       <Link href="/dashboard">
         <Tag tone="primary">

@@ -1,4 +1,8 @@
-import { NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  ConflictException,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import * as usersRepository from './users.repository';
 import { AccountDeletionService } from './accountDeletion.service';
@@ -29,6 +33,18 @@ describe('AccountDeletionService.deleteOwnAccount', () => {
     jest.resetAllMocks();
     jest.mocked(usersRepository.findAccountIdentity).mockResolvedValue(account);
     jest.mocked(usersRepository.deleteUserAccount).mockResolvedValue(true);
+    jest.mocked(usersRepository.isLastOwner).mockResolvedValue(false);
+  });
+
+  it("refuses to delete the organisation's last Owner, touching nothing", async () => {
+    jest.mocked(usersRepository.isLastOwner).mockResolvedValue(true);
+    const deleteCognitoUsers = jest.fn();
+
+    await expect(
+      buildService(deleteCognitoUsers).deleteOwnAccount('user-1', 'tenant-1'),
+    ).rejects.toThrow(ConflictException);
+    expect(deleteCognitoUsers).not.toHaveBeenCalled();
+    expect(usersRepository.deleteUserAccount).not.toHaveBeenCalled();
   });
 
   it('deletes the Cognito users, then the database account', async () => {

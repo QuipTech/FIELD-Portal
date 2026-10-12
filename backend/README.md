@@ -5,8 +5,8 @@
 This is the backend API for the QuipTech FIELD Portal — a NestJS service that
 backs the User Portal and Admin Console frontend at `portal/`. The full
 Phase 1 database schema (multi-tenant, RLS-enforced) lives under
-`db/migrations/`, and the first API surface — registration and login — is
-implemented under `src/auth/`.
+`db/migrations/`. Sign-up and sign-in go through Amazon Cognito; `src/auth/`
+exchanges the Cognito login for a FIELD session.
 
 ## Folder structure
 
@@ -45,13 +45,35 @@ backend/
 │   ├── documents/            ← /documents — an organisation's own documents
 │   ├── machineHistory/       ← /machines/:id — history entries + photos
 │   ├── adminKnowledge/       ← /admin/knowledge — shared library (Owner only)
+│   ├── machineLibrary/       ← /admin/machineModels — model system/component trees (Owner only)
+│   ├── adminAi/              ← /admin/ai — AI usage, prompt versions, review queue (Owner only)
+│   ├── adminAuditLog/        ← /admin/auditLog — every organisation's audit events + CSV (Owner only)
+│   ├── adminSubscriptions/   ← /admin/subscriptions — each organisation's subscription (Owner only)
+│   ├── organisationBranding/ ← /organisation/branding — the caller's own organisation's branding
+│   ├── organisationNotifications/ ← /organisation/notifications — alert rules + delivery channels (Owner)
+│   ├── organisationSubscription/ ← GET /organisation/subscription — the caller's plan, or Free
+│   ├── supportCases/         ← /support-cases REST + Socket.IO gateway (live case chat)
+│   ├── machineFleet/         ← GET/POST /machines (the Machines list), GET /machine-catalog
+│   ├── knowledgeLibrary/     ← GET /knowledge/library — the Knowledge screen's search
+│   ├── bedrock/              ← BedrockModule: Claude on Bedrock (streaming, retries, Sonnet/Haiku routing)
+│   ├── aiAssistant/          ← /ai — POST /ai/ask (SSE answers), threads; saves messages + citations
+│   ├── demoRequests/         ← POST /public/demo-requests (marketing site) + /admin/demo-requests (Owner only)
+│   ├── dashboard/            ← GET /dashboard — the Dashboard screen's figures in one request
+│   ├── notifications/        ← /notifications — the bell: list, unread count, mark read
+│   ├── adminOverview/        ← GET /admin/overview — the admin portal's Overview (scoped like other admin screens)
+│   ├── dataGovernance/       ← dataSchemas.config.ts: the platform/app/billing split (page + DB test)
+│   ├── adminDataRetention/   ← /admin/settings/data-retention + nightly AI log purge job
+│   ├── billing/              ← the ONLY Stripe code: webhook → app.subscriptions/entitlements
+│   ├── entitlements/         ← feature checks, read from app.entitlements only
+│   ├── myData/               ← /me/data-export, /me/deletion-request + export worker
 │   └── users/
 │       ├── users.module.ts / users.service.ts  ← findOrCreateFromCognito
 │       ├── userProfile.service.ts ← PATCH /users/me, POST /users/me/avatar
-│       ├── cognitoSignup.ts      ← new tenant + Owner for first-time Google/Apple users
+│       ├── cognitoSignup.ts      ← new tenant + Customer for first-time Google/Apple users
 │       ├── users.controller.ts / accountDeletion.service.ts
 │       │   / cognitoUserDeletion.service.ts
-│       │                         ← DELETE /users/me (self-service account deletion)
+│       │                         ← DELETE /users/me (self-service; the last Owner is refused),
+│       │                            GET /users/me/deletion-eligibility
 │       └── users.repository.ts   ← Cognito lookup/link + account deletion queries
 ├── db/
 │   └── migrations/          ← numbered SQL migrations, applied in order
@@ -93,9 +115,14 @@ for f in db/migrations/*.sql; do psql "$DATABASE_URL" -f "$f"; done
 ```
 
 Swap `.env.development` for `.env.staging` / `.env.production` to target the
-other databases. Every migration is idempotent (`IF NOT EXISTS`, `ON
-CONFLICT DO NOTHING`, guarded `DO $$ … $$` blocks), so re-running the whole
-set is safe.
+other databases. Deploys to staging and production do this automatically
+with `db/applyMigrations.sh` (stops on the first error, uses
+`MIGRATION_DATABASE_URL`). See `deploy/README.md`. Each migration records its
+version in `schema_migrations`, and the script skips versions already there.
+Re-running an applied migration is **not** always safe: a later file may drop
+and recreate a function with a different signature (e.g.
+`auth_lookup_user_by_email` in `0003` → `0026` → `0032`), and the earlier
+file would then fail.
 
 **Before deploying past local dev**, rotate the placeholder password created
 in `0002_extensions_and_app_role.sql`:
@@ -126,8 +153,9 @@ outside local dev.
   `app.tenant_id` for that transaction so PostgreSQL RLS does the actual
   tenant isolation — the query itself never needs a manual `WHERE tenant_id
   = …`.
-- Passwords are hashed with bcrypt (via `bcryptjs`, pure JS — no native
-  build step). Refresh tokens are signed JWTs; only their SHA-256 digest is
+- The backend never sees passwords: Cognito stores and checks them
+  (`users.password_hash` is only set on accounts from before the move to
+  Cognito, and nothing reads it for sign-in). Refresh tokens are signed JWTs; only their SHA-256 digest is
   stored (`sessions.refresh_token_hash`), so a leaked database dump can't be
   replayed as a live session.
 - `DATABASE_URL` uses `sslmode=verify-full`, and Node doesn't ship Amazon's
@@ -138,11 +166,15 @@ outside local dev.
   so if both are present the explicit CA is silently ignored and you get
   `self-signed certificate in certificate chain`.
 
-## Cognito sign-in (Google / Apple)
+## Cognito sign-in (email/password, Google, Apple)
 
-Email/password auth (`/auth/register`, `/auth/login`, `/auth/refresh`,
-`/auth/logout`, `/auth/me`) is unchanged. Cognito is used only for Google
-and Apple sign-in, and is exchanged for the same FIELD session:
+Every user signs up and signs in through Cognito; the backend has no
+password endpoints of its own. Email/password accounts live in the Cognito
+user pool directory — the portal calls Amplify's `signUp` /
+`confirmSignUp` (Cognito emails the 6-digit code) / `signIn` — and Google
+and Apple are federated providers. Either way the resulting Cognito ID
+token is exchanged for a FIELD session (`/auth/refresh`, `/auth/logout`
+and `/auth/me` then work as before):
 
 - `CognitoAuthGuard` (`src/auth/guards/cognitoAuth.guard.ts`) verifies the
   bearer **ID token** against `COGNITO_USER_POOL_ID` / `COGNITO_CLIENT_ID`
@@ -158,12 +190,19 @@ and Apple sign-in, and is exchanged for the same FIELD session:
      `{ status: 'profileRequired' }` and writes nothing. Called again with
      `{ companyName, phoneNumber }` (`SyncCognitoDto`, both required for
      signup), it runs self-serve signup (`src/users/cognitoSignup.ts`): a
-     new tenant named after the company, the user as its Owner with that
-     phone number and no password — the same shape `/auth/register` creates.
+     new tenant named after the company, the user as its Customer with that
+     phone number and no password. The portal's register form sends both
+     straight after the email is verified; Google/Apple users get the
+     signup profile dialog.
 
   Signed-in responses are `{ status: 'signedIn', session }`, where
-  `session` is the same shape `/auth/login` returns, so
-  every `JwtAuthGuard` route works for Google/Apple users unchanged.
+  `session` is `{ accessToken, refreshToken, expiresIn, user, tenant }`,
+  and every `JwtAuthGuard` route accepts it.
+- `POST /auth/password-reset/check` `{ email }` (public) runs before the
+  portal asks Cognito for a reset code: `ListUsers` by email returns
+  `eligible`, `notFound`, `federatedOnly` (`provider: google | apple` — no
+  password to reset) or `unverified` (Cognito can't email an unverified
+  address). It reveals whether an email has an account, as signup does.
 - `DELETE /users/me` (`JwtAuthGuard`, 204) permanently deletes the
   caller's own account. First every Cognito user with the account's email
   or `cognito_sub` is deleted (`cognitoUserDeletion.service.ts`; a failure
@@ -198,7 +237,275 @@ and Apple sign-in, and is exchanged for the same FIELD session:
   `audit_logs` row (`entity_type = 'role'`, before/after in `metadata`)
   in the same transaction, under the acting admin's organisation. Backed
   by the SECURITY DEFINER functions in migration `0029`.
-- Every session's `user` (login, register, refresh, Google/Apple) and
+- Machine library (`src/machineLibrary`, **Owner only**) — the shared
+  models every organisation's machines are built from, each with a
+  system → component template reused by every asset of that model
+  (migration `0040`; shared reference data, no RLS):
+  - `GET /admin/machineModels?search=` — `{ id, manufacturerName, name,
+    displayName, category, systemsCount, assetsCount }`. `assetsCount`
+    spans every organisation (SECURITY DEFINER `admin_list_machine_models`).
+  - `POST /admin/machineModels` `{ manufacturerName, name, category? }` —
+    the manufacturer is matched case-insensitively or created. `PATCH`
+    takes any subset; `DELETE` is a soft delete (204), 409 while machines
+    still use the model.
+  - `GET /admin/machineModels/:modelId/tree` — `{ modelId, systems: [{ id,
+    name, componentCount, components: [{ id, name }] }] }`.
+  - `POST /admin/machineModels/:modelId/systems` `{ name }`,
+    `PATCH`/`DELETE /admin/modelSystems/:systemId` (delete also removes its
+    components), `POST /admin/modelSystems/:systemId/components` `{ name }`,
+    `PATCH`/`DELETE /admin/modelComponents/:componentId`.
+  - `POST /admin/machineModels/:modelId/tree/import` `{ mode?: 'merge' |
+    'replace', systems: [{ name, components?: string[] }] }` — one
+    transaction; merge adds only what's missing.
+  Every tree change responds with the refreshed tree. Names are unique
+  per parent among live rows (case-insensitive; 409 otherwise). Each
+  change writes an `audit_logs` row (`entity_type` `machine_model` /
+  `model_system` / `model_component`) in the same transaction.
+- **Data separation & retention** (migrations `0046`–`0049`):
+  - Schemas: `platform` (plan catalogue, features — all tenants read,
+    service role writes), `app` (billing accounts, subscriptions,
+    entitlements, usage events — RLS, a tenant reads its own rows, only the
+    service role writes), `billing` (Stripe customers, invoices, webhook
+    log — no tenant access, outside RLS). 0043's `tenant_subscriptions` moved
+    to `app.subscriptions`. `src/dataGovernance/dataSchemas.config.ts` is the
+    single description; `npm run test:db` checks the database against it and
+    proves tenant A can't read tenant B and no tenant role can read billing.
+  - DB roles: `field_app` = tenant role (request pool, `DATABASE_URL`, scoped
+    by `app.tenant_id`); `field_service` = service role
+    (`SERVICE_DATABASE_URL`, `ServiceDatabaseService`).
+  - Metering: triggers write `app.usage_events` for every AI query (user
+    message), machine added, user added/removed and session started — always,
+    whatever the plan.
+  - Audit log append-only (no UPDATE/DELETE grants); config snapshots can't
+    be deleted by either role; AI conversations older than the
+    organisation's `ai_query_log_retention_months` (6/12/24, default 12) are
+    purged nightly (`purge_expired_ai_query_logs`, conversations under open
+    review kept), audited as `ai_query_logs`.
+  - `GET /admin/settings/data-retention` **(Owner)** → `{ schemas, principles,
+    retention: { aiQueryLogsMonths, allowedMonths } }`; `PATCH` `{
+    aiQueryLogsMonths }` changes the caller's organisation (audited).
+- **Billing** (`src/billing`) — the only code allowed to import `stripe`
+  (ESLint `no-restricted-imports` + `stripeImportBoundary.spec.ts`).
+  `POST /billing/stripe/webhook` verifies the signature on the raw body and
+  applies each event once (`billing.stripe_webhook_log`): customers link to
+  an organisation via `metadata.tenant_id`; subscription events map the
+  price to a plan (`platform.plans.stripe_price_id`) and sync
+  `app.subscriptions` + `app.entitlements`; invoices go to
+  `billing.stripe_invoices`. Feature checks use `EntitlementsService`
+  (`GET /organisation/entitlements`), never Stripe.
+- **Organisation subscription** (`src/organisationSubscription`, any signed-in
+  user): `GET /organisation/subscription` returns the organisation's plan from
+  `app.subscriptions`, or the Free plan when there is none, its term has ended,
+  or Stripe cancelled it.
+- **Knowledge library search** (`src/knowledgeLibrary`, any signed-in user):
+  `GET /knowledge/library` (`search`, `type`, `make`, `model`, `sort`) returns up
+  to 50 documents with their best passage, page and the models they mention,
+  from the organisation's own and the shared library — the same visibility
+  rule as AI retrieval (live version, not archived). With search text it
+  ranks by Bedrock embeddings; if the model can't be reached it falls back
+  to Postgres full-text (any word, title weighted) and retries AI after 5
+  minutes. `searchMode` says which: `semantic`, `keyword` or `browse`.
+- **Machines list** (`src/machineFleet`, migration `0052`): `GET /machines`
+  (`machine.view`; filters `search`, `site`, `make`, `status`, `machineClass`)
+  returns up to 200 machines, the filtered `total`, filter choices from the
+  whole fleet, and `featuredDown` — a down machine with its most urgent open
+  support case. `POST /machines` (`machine.create`, audited) registers a
+  machine against a Machine library model (409 on a duplicate serial);
+  `GET /machine-catalog` lists the library's makes and models for it.
+  `machines.status` is the operating status: `running`, `down`, `service_due`.
+- **Support cases** (`src/supportCases`, migration `0051`): REST at
+  `/support-cases` — list (filters `status`, `priority`, `assignee`, `search`),
+  `options`, create, `GET/PATCH /:caseNumber`, `GET/POST /:caseNumber/messages`.
+  Raising, reading and replying need `support.create`; assign / status /
+  priority need `support.manage`; replying to a resolved case is a 409. Live
+  delivery is Socket.IO at namespace `/support-cases` (token in the handshake
+  `auth.token`, checked in middleware): each portal joins its tenant's room
+  (`case:updated`), and `case:join` adds a case's room (`case:message`,
+  `case:typing`). Messages are saved over REST and pushed after commit.
+- **My data** (`src/myData`, any signed-in user): `POST /me/data-export`
+  queues an export (202; 409 if one is in progress) that the worker builds
+  as JSON in S3 (`exports/…`, link valid 7 days); `GET /me/data-export`
+  returns its status and signed download link. `POST /me/deletion-request`
+  records a request and audits it (`account_deletion_request`) for an
+  admin — it deletes nothing; `GET` returns the pending one.
+- Notifications & alerts (`src/organisationNotifications`, **Owner only**,
+  migration `0045`) — the caller's own organisation. **Configuration only:
+  nothing evaluates rules or sends anything yet.**
+  - `GET /organisation/notifications` — `{ rules, channels }`. The first
+    visit creates the channel settings and the five default rules
+    (`defaultAlertRules.ts`); deleted defaults don't come back.
+  - `GET /organisation/notifications/options` — the trigger catalog
+    (`alertTriggerCatalog.ts`: each trigger type's settings with limits and
+    defaults), audiences and channels; the portal builds its form from it.
+  - `POST /organisation/notifications/rules`, `PUT …/rules/:ruleId` — `{ name,
+    triggerType, triggerParams, audiences, channels, isEnabled? }`, validated
+    against the catalog (defaults filled in, unknown keys dropped). SMS is
+    only accepted on a P1 `case_unactioned` rule. 409 on a duplicate name.
+  - `PATCH …/rules/:ruleId` `{ isEnabled }` (the table's switch),
+    `DELETE …/rules/:ruleId` (soft delete, 204).
+  - `PATCH /organisation/notifications/channels` `{ push?, email?, sms? }` —
+    organisation-wide switches; each rule reports `disabledChannels` it
+    uses that are switched off.
+  Every change is audited (`alert_rule`, `notification_channels`).
+- Branding (`src/organisationBranding`, migration `0044`) — the signed-in
+  user's **own** organisation (no id in the path; always `actor.tenantId`):
+  - `GET /organisation/branding` — any signed-in user (the app themes
+    itself from it): company name, logo (15-minute signed URL for an
+    uploaded logo, else `branding_logo_url`), primary/accent colours
+    (`#RRGGBB`, null = FIELD default), support footer, watermark flag.
+  - `PUT /organisation/branding` **(Owner)** `{ companyName, primaryColor?,
+    accentColor?, supportFooter?, showWatermark? }` — renames the
+    organisation too; omitted optional fields are cleared.
+  - `POST /organisation/branding/logo` **(Owner)** multipart `file` — PNG,
+    JPG or SVG ≤ 2 MB; SVGs with scripts, event handlers, `javascript:`,
+    embedded content or entities are refused (`storage/svgSafety.ts`).
+    Stored at `branding/{tenantId}/logo-{uuid}.{ext}`; the old logo is
+    deleted after the new one is saved. `DELETE …/logo` **(Owner)** removes it.
+  Every change is audited as `organisation_branding`.
+- Subscriptions (`src/adminSubscriptions`, **Owner only**, migration
+  `0043`) — one `tenant_subscriptions` row per organisation: tier
+  (standard/enterprise/pilot/demo), billing basis (per asset / negotiated
+  with licensed assets / fixed fee; none for demo), start/end dates,
+  monthly AI query allowance, and add-ons (wearable seats, remote expert
+  seats, SSO). It's the entitlement source of truth — nothing calls
+  Stripe. Organisations can read their own row (RLS); only these admin
+  routes change it.
+  - `GET /admin/subscriptions?status=` — every live organisation,
+    including ones without a subscription (`status: not_set_up`), with
+    live `assetCount` and `aiQueriesThisMonth` (UTC calendar month), plus
+    `statusCounts` across all of them. Status comes from `endsOn`:
+    `expired` once past it, `expiring_soon` within 30 days, else `active`.
+  - `GET /admin/subscriptions/:tenantId`
+  - `PUT /admin/subscriptions/:tenantId` — sets up or replaces the whole
+    subscription (400 on a missing billing basis, a negotiated deal without
+    licensed assets, or an end before the start). Audited as
+    `tenant_subscription` with before/after.
+  The Notify action (renewal reminders) isn't built yet.
+- Audit log (`src/adminAuditLog`, **Owner only**, migration `0042`) —
+  every organisation's `audit_logs`, newest first:
+  - `GET /admin/auditLog?actorId=&entityType=&action=&from=&to=&page=&pageSize=`
+    — `from` inclusive / `to` exclusive ISO timestamps. Each event has a
+    readable `actionLabel` and `target` (`describeAuditEvent.ts`: the
+    entity's current name, else the metadata snapshot), `actor`,
+    `organisationName` and `source`.
+  - `GET /admin/auditLog/filters` — actors and entity/action pairs present.
+  - `GET /admin/auditLog/export` — same filters as CSV, newest 20,000
+    events; `X-Export-Truncated: true` when more matched. Cells starting
+    with `= + - @` are prefixed with `'` so spreadsheets don't run them.
+  Source: clients send `X-Field-Client: web|mobile` (the portal's
+  `httpClient` sends `web`; **the mobile app must send `mobile`**).
+  `RequestSourceMiddleware` keeps it for the request and
+  `insertAuditLog` stores it. Rows without a user or source (background
+  jobs) are reported as `system`.
+- AI configuration (`src/adminAi`, **Owner only**, migration `0041`) —
+  platform-wide, across every organisation:
+  - `GET /admin/ai/usage?days=30` — totals vs the prior period, active
+    users, cost, queries per day (zero-filled), top 5 organisations by
+    queries, flagged/unreviewed counts. A query = one technician message.
+  - `GET /admin/ai/platform` — read-only provider/region/models from env.
+  - `GET /admin/ai/prompts`, `GET /admin/ai/prompts/:id` — the assistant's
+    system prompt versions (newest first). `POST /admin/ai/prompts`
+    `{ body, notes?, publish? = true }` adds a version (versions are never
+    edited); `POST /:id/publish` makes one live (also the rollback);
+    `GET /:id/diff?against=` — line diff, default vs the previous version.
+  - `POST /admin/ai/prompts/test` `{ body, question }` — runs the draft on
+    `BEDROCK_ANSWER_MODEL_ID` via `@anthropic-ai/bedrock-sdk`; nothing is
+    stored. Bedrock failures map to 502/429/503 with a readable message.
+  - `GET /admin/ai/reviewQueue?status=&reviewerId=&page=&pageSize=`,
+    `GET /reviewQueue/reviewers`, `GET`/`PATCH /reviewQueue/:id`
+    `{ status?, notes? }`. Statuses: `unreviewed` → `in_review` →
+    `resolved`/`escalated`; moving an item claims it for the caller
+    unless it already has a reviewer, and `unreviewed` releases it.
+  Prompt and review changes are audited (`ai_prompt_version`,
+  `ai_review_item`) in the same transaction, like roles.
+- Admin access (migrations `0055`, `0056`; `src/auth/adminScope`): the
+  **Owner** role is the platform administrator. It holds `platform.manage`
+  (a trigger keeps that permission on Owner only) and every admin screen
+  shows and manages every organisation: users, audit log, AI usage and
+  review queue, roles, subscriptions, the shared knowledge and machine
+  libraries, AI prompts and document reviews. Self-serve signups get
+  Customer, so Owner is only ever granted deliberately.
+  Default roles (`roles.is_default`, migration `0062`: Owner, Customer,
+  Technical Manager, Field Technician, Knowledge Manager) can't be renamed
+  or deleted (trigger); roles an Owner adds can be deleted once no user
+  holds them. The admin SQL
+  functions take `p_tenant_id` (NULL = every organisation, which the
+  backend passes only for `platform.manage`; an organisation id narrows a
+  list, e.g. the Users screen's Organisation filter).
+- Users (`src/adminUsers`): `GET /admin/users?search=&role=&organisationId=`
+  (organisationId narrows the Owner's list to one organisation),
+  `GET /admin/organisations` (filter / invite options),
+  `POST /admin/users/invitations` `{ email, firstName, lastName, roleId,
+  organisationId? }`. Inviting creates the Cognito user (Cognito emails a
+  temporary password; the portal's /set-password screen replaces it on
+  first sign-in), then the FIELD account as `invited` with its role
+  (`admin_invite_user`, migration `0059`); if saving fails the Cognito user
+  is removed. The role must be a system role or one of
+  that organisation's. The first sign-in makes the account `active`.
+  Needs `cognito-idp:AdminCreateUser` on the user pool.
+  `PATCH /admin/users/:userId/role` `{ roleId }` gives the user exactly that
+  role (`admin_set_user_role`, migration `0061`): a system role or their
+  organisation's own; never your own account, and never removing the last
+  active Owner. Audited.
+- Organisation-scoped admin data (migration `0057`): machine models
+  (`machine_models.tenant_id`, NULL = shared catalog), organisation
+  documents and organisation roles (`roles.tenant_id`) exist alongside the
+  shared ones; registering a machine offers shared + own models, and an
+  organisation role can't reuse a system role's name (trigger), since role
+  names gate access.
+- Dashboard (`src/dashboard`, any signed-in user): `GET /dashboard` returns
+  open cases (by priority, and how many are past their SLA target —
+  `SUPPORT_SLA_HOURS_P1/P2/P3`, from case creation), machines down,
+  history entries this week (all / mine, weeks start Monday UTC), fleet
+  uptime for the last 8 weeks, recent activity (cases, history entries,
+  the caller's AI threads, new live documents incl. the shared library),
+  and "my machines" (registered, logged on, raised cases for or asked the
+  assistant about; down first).
+  - Uptime = share of tracked machine-time not `down` (`service_due`
+    counts as up). Every status change is recorded by a trigger on
+    `machines` into `machine_status_events` (migration `0053`); tracking
+    starts when that migration runs, so earlier weeks report `null`.
+  - `PATCH /machines/:machineId/status` `{ status }` (`machine.manage`)
+    changes a machine's status, audited with before/after. Audited changes
+    set `app.user_id` so the trigger records who made the change.
+- Notifications (`src/notifications`, any signed-in user, own rows only):
+  `GET /notifications?unreadOnly=&limit=&before=` (newest first;
+  `nextBefore` pages), `GET /notifications/unread-count` (the bell polls
+  it), `POST /notifications/:id/read`, `POST /notifications/read-all`.
+  Rows are written only by triggers (migration `0054`): replies and
+  assignee/status/priority changes on cases you reported or are assigned
+  to, machines you've worked on going down / service due, your flagged AI
+  answers being resolved/escalated, and documents going live in Knowledge
+  (shared-library documents notify every organisation). The actor is
+  never notified — their own rows' author, else `app.user_id`, which
+  `DatabaseService.withActor()` sets (use it for writes that should be
+  attributed). field_app can only read notifications and set `read_at`.
+- AI assistant (`src/aiAssistant` + `src/bedrock`, needs `ai.use`):
+  - `POST /ai/ask` `{ question, conversationId?, machineId?, image?:
+    { mediaType, data } }` — `data` is base64 (JPEG/PNG/WebP/GIF, ≤ ~3.75 MB;
+    this route alone accepts 6 MB JSON bodies). Retrieves the closest live
+    chunks (knowledge search), adds the machine and its last 5 history
+    entries, then streams `text/event-stream`: `start` `{ conversationId,
+    sources }` → `delta` `{ text }`… → `done` `{ userMessageId,
+    assistantMessageId, citedIndexes, stopReason }` or `error`
+    `{ message }`. Unknown thread/machine and validation fail as normal
+    JSON errors before the stream opens.
+  - Only a completed answer is saved (one transaction): `ai_conversations`
+    (new threads get the id sent in `start`), the question and answer in
+    `ai_messages` (`model_used`, `prompt_version` = `vN` or `built-in`),
+    every retrieved chunk in `ai_source_references` (prompt order = the
+    `[n]` in the answer), `ai_usage_log` (tokens + estimated cost), and an
+    `ai_review_items` row (`no_source`) when the answer cites nothing.
+  - `GET /ai/conversations` — the caller's own threads, newest first (50);
+    `GET /ai/conversations/:id` — its messages with sources.
+  - System prompt: the live `ai_prompt_versions` row, else the built-in
+    `TECHNICAL_ASSISTANT_PROMPT` (`src/bedrock/technicalAssistantPrompt.ts`).
+  - Model: Haiku (`BEDROCK_LIGHT_MODEL_ID`) when there is no photo and the
+    question, retrieved context and thread are under the
+    `BEDROCK_LIGHT_*` thresholds; Sonnet (`BEDROCK_ANSWER_MODEL_ID`)
+    otherwise. Throttling/5xx are retried with backoff until the first
+    text is sent; errors reach the portal only as generic messages.
+- Every session's `user` (`/auth/sync`, `/auth/refresh`) and
   `GET /auth/me` carry `roles` and `permissions` — the permission codes
   the user's roles grant (`userAccess.repository.ts`). `/auth/me` re-reads
   them each call, so the portal picks up role changes without a new login.
@@ -320,13 +627,78 @@ read as "not found" rather than "access denied"):
       "Resource": [
         "arn:aws:s3:::<bucket>/documents/*",
         "arn:aws:s3:::<bucket>/photos/*",
-        "arn:aws:s3:::<bucket>/avatars/*"
+        "arn:aws:s3:::<bucket>/avatars/*",
+        "arn:aws:s3:::<bucket>/branding/*",
+        "arn:aws:s3:::<bucket>/exports/*"
       ]
     },
     {
       "Effect": "Allow",
       "Action": "s3:ListBucket",
       "Resource": "arn:aws:s3:::<bucket>"
+    }
+  ]
+}
+```
+
+## Knowledge indexing pipeline (`src/knowledgeIndexing`)
+
+A DB-polling worker inside the API picks up document versions in state
+**queued** (`document_versions.ingestion_status = 'pending'`) with
+`claim_next_indexing_job()` (`FOR UPDATE SKIP LOCKED`, so several API
+instances are safe; a job idle for 30 min is reclaimed after a crash). It
+polls every 5 s and is woken straight away after uploads/retries.
+
+1. **Extract** — PDF text per page with pdf.js 3.11 (`isEvalSupported:
+   false`, CVE-2024-4367); headings from font size / section numbering.
+   DOCX via mammoth (Word heading styles). Legacy `.doc` → failed with a
+   "save as PDF/DOCX" message. Pages with no text layer are OCR'd with
+   Amazon Textract (async, straight from S3) when `TEXTRACT_OCR_ENABLED=true`.
+2. **Chunk** — ~900 tokens (≈4 chars/token), ~100-token overlap; each chunk
+   keeps its page number and section heading.
+3. **Embed** — Amazon Bedrock Titan Text Embeddings v2, 1024 dimensions,
+   normalised → `document_chunks.embedding` (pgvector, HNSW index).
+4. **Link** — machine-library models mentioned ("CAT 793F", "793F") →
+   `knowledge_item_machine_models`.
+5. **Finish** — shared-library bulletins/policies → **needs_review**;
+   everything else → **live** (and becomes `documents.live_version_id`).
+   Any error → **failed** with an actionable `error_message`.
+
+Progress (0–100) is stored per version. Every transition is audit-logged
+(worker transitions inside the SQL functions, user actions by the API).
+States map onto existing columns — see migration `0035`.
+
+**Endpoints** (JwtAuthGuard; visible = own organisation + shared library):
+`GET /documents/:id/status`, `POST /documents/:id/approve` | `reject`
+(`{ reason }`) | `retry` | `archive`, `POST /documents/:id/versions`
+(multipart, ≤ 20 MB), `DELETE /documents/:id` (permanent: versions,
+chunks, S3 files). Shared-library changes and reviews are Owner-only;
+an organisation's own documents need `knowledge.submit`
+(`src/documents/documentAccess.ts`). Large shared-library versions:
+`POST /admin/knowledge/documents/:id/versions` (signed PUT, ≤ 500 MB) then
+`…/upload-complete`.
+
+**AI retrieval:** `POST /knowledge/search` (`ai.use`) embeds the query and
+returns the closest chunks — only from each document's live version, not
+archived, and only the caller's organisation + the shared library
+(`src/knowledgeSearch`). The AI assistant should retrieve through
+`KnowledgeSearchService`, never query `document_chunks` directly.
+
+**IAM** for the backend's credentials, in addition to the S3 policy above:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "bedrock:InvokeModel",
+      "Resource": "arn:aws:bedrock:<region>::foundation-model/amazon.titan-embed-text-v2:0"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["textract:StartDocumentTextDetection", "textract:GetDocumentTextDetection"],
+      "Resource": "*"
     }
   ]
 }
@@ -344,9 +716,40 @@ read as "not found" rather than "access denied"):
 - `COGNITO_CLIENT_ID` — the portal's Cognito app client (the ID token audience)
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` — only when not running under
   an IAM role; need `cognito-idp:ListUsers` and `cognito-idp:AdminDeleteUser`
-  on the user pool (account deletion), plus the S3 permissions under "File storage"
+  on the user pool (account deletion) and `cognito-idp:AdminCreateUser`
+  (Users → Invite user), plus the S3 permissions under "File storage"
 - `S3_PORTAL_STORAGE_BUCKET` — the private S3 bucket for documents, photos
   and avatars (optional; file endpoints answer 503 without it)
 - `AWS_REGION` — that bucket's region
+- `KNOWLEDGE_INDEXING_ENABLED` — `false` to not run the indexing worker in
+  this process (default: runs)
+- `BEDROCK_EMBEDDING_MODEL_ID` — default `amazon.titan-embed-text-v2:0`
+- `BEDROCK_REGION` — Bedrock/Textract region (default `AWS_REGION`)
+- `TEXTRACT_OCR_ENABLED` — `true` to OCR scanned pages (default off)
+- `KNOWLEDGE_INDEXING_MAX_MB` — largest file indexed (default 200)
+- `BEDROCK_ANSWER_MODEL_ID` — Claude inference profile for technician
+  answers and the prompt Test button (default
+  `au.anthropic.claude-sonnet-4-5-20250929-v1:0`)
+- `SERVICE_DATABASE_URL` — connection string for the `field_service` role
+  (billing module, background jobs); falls back to `DATABASE_URL`
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` — Stripe, used only by
+  `src/billing`; unset = billing endpoints answer 503
+- `AI_LOG_RETENTION_JOB_ENABLED` (default on), `AI_LOG_RETENTION_HOUR_UTC`
+  (default 17) — the nightly AI query log purge
+- `DATA_EXPORT_WORKER_ENABLED` (default on; needs S3) — "My data" exports
+- `BEDROCK_BACKGROUND_MODEL_ID` — Claude inference profile for background
+  work (default `au.anthropic.claude-haiku-4-5-20251001-v1:0`)
+- `BEDROCK_LIGHT_MODEL_ID` — model for simple assistant questions
+  (default `BEDROCK_BACKGROUND_MODEL_ID`, i.e. Haiku 4.5)
+- `BEDROCK_LIGHT_ROUTING_ENABLED` — `false` sends every question to
+  `BEDROCK_ANSWER_MODEL_ID` (default on)
+- `BEDROCK_LIGHT_MAX_QUESTION_CHARS` (200), `BEDROCK_LIGHT_MAX_CONTEXT_CHARS`
+  (4000), `BEDROCK_LIGHT_MAX_HISTORY_MESSAGES` (4) — all must hold for Haiku
+- `BEDROCK_ANSWER_MAX_TOKENS` — answer length ceiling (default 4096)
+- `SUPPORT_SLA_HOURS_P1` (4), `SUPPORT_SLA_HOURS_P2` (24),
+  `SUPPORT_SLA_HOURS_P3` (72) — support case response targets; an open case
+  past its target counts as breaching SLA on the dashboard
+- The AWS identity needs `bedrock:InvokeModelWithResponseStream` on both
+  answer inference profiles (and their foundation models) for the assistant
 
 See `.env.example` for the full list.

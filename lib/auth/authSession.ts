@@ -50,15 +50,13 @@ export const getStoredTenant = (): AuthSessionTenant | null => {
   return raw ? (JSON.parse(raw) as AuthSessionTenant) : null;
 };
 
+export const getStoredSignInMethod = (): SignInMethod =>
+  isBrowser() && window.localStorage.getItem(SIGN_IN_METHOD_KEY) === "federated" ? "federated" : "password";
+
 export const getStoredProfile = (): SignedInProfile | null => {
   const user = getStoredUser();
   if (!user) return null;
-  const storedMethod = window.localStorage.getItem(SIGN_IN_METHOD_KEY);
-  return {
-    user,
-    tenant: getStoredTenant(),
-    signInMethod: (storedMethod === "federated" ? storedMethod : "password") satisfies SignInMethod,
-  };
+  return { user, tenant: getStoredTenant(), signInMethod: getStoredSignInMethod() };
 };
 
 export const clearAuthSession = (): void => {

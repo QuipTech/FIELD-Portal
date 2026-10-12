@@ -16,7 +16,7 @@ import { SyncCognitoDto } from './dto/syncCognitoDto';
 export class CognitoAuthController {
   constructor(private readonly cognitoAuthService: CognitoAuthService) {}
 
-  // Called by the portal's /auth/callback page right after a Google/Apple
+  // Called by the portal's /auth/callback page right after any Cognito
   // sign-in, with the Cognito ID token as the bearer token. A first-time
   // user gets `profileRequired` and calls again with company + phone.
   @Post('sync')

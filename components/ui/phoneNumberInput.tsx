@@ -6,7 +6,6 @@ import {
   buildPhoneCountryOptions,
   buildPhonePlaceholder,
   formatNationalDigits,
-  guessDefaultPhoneCountry,
   isTooLongForCountry,
   parseInternationalInput,
   stripNationalPrefix,
@@ -18,25 +17,32 @@ export interface PhoneNumberValue {
   // Always "+<calling code><digits>", ready to send to the API.
   e164: string;
   isValid: boolean;
+  // No digits entered — e164 still carries the calling code, so check this.
+  isEmpty: boolean;
 }
 
 interface PhoneNumberInputProps {
+  // A saved E.164 number to start from.
+  initialE164?: string | null;
   onChange: (phone: PhoneNumberValue) => void;
   onBlur?: () => void;
   autoFocus?: boolean;
   className?: string;
 }
 
-// Server render and first client render must match, so the locale-based
-// guess is applied after mount.
-const INITIAL_COUNTRY: CountryCode = "AU";
+const DEFAULT_COUNTRY: CountryCode = "AU";
 
-export const PhoneNumberInput = ({ onChange, onBlur, autoFocus, className = "" }: PhoneNumberInputProps) => {
+export const PhoneNumberInput = ({ initialE164, onChange, onBlur, autoFocus, className = "" }: PhoneNumberInputProps) => {
   const countryOptions = useMemo(buildPhoneCountryOptions, []);
-  const [country, setCountry] = useState<CountryCode>(INITIAL_COUNTRY);
-  const [digits, setDigits] = useState("");
-
-  useEffect(() => setCountry(guessDefaultPhoneCountry()), []);
+  const initial = useMemo(() => (initialE164 ? parseInternationalInput(initialE164) : null), [initialE164]);
+  const [country, setCountry] = useState<CountryCode>(initial?.country ?? DEFAULT_COUNTRY);
+  const [digits, setDigits] = useState(initial?.digits ?? "");
+  // Country names come from the runtime's Intl data, which differs between
+  // Node and each browser (e.g. "Falkland Islands" vs "… (Islas Malvinas)"),
+  // and the list is sorted by them. So the server render and hydration list
+  // only the selected country; the full list fills in once mounted.
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => setHasMounted(true), []);
 
   const selectedCountry = countryOptions.find((option) => option.code === country);
   const formattedNumber = formatNationalDigits(country, digits);
@@ -56,6 +62,7 @@ export const PhoneNumberInput = ({ onChange, onBlur, autoFocus, className = "" }
     const raw = event.target.value;
     const pasted = raw.trim().startsWith("+") ? parseInternationalInput(raw) : null;
     if (pasted) {
+      if (isTooLongForCountry(pasted.country, pasted.digits)) return;
       updatePhone(pasted.country, pasted.digits);
       return;
     }
@@ -86,9 +93,9 @@ export const PhoneNumberInput = ({ onChange, onBlur, autoFocus, className = "" }
           onChange={handleCountryChange}
           className="absolute inset-0 cursor-pointer opacity-0"
         >
-          {countryOptions.map((option) => (
+          {(hasMounted ? countryOptions : countryOptions.filter((option) => option.code === country)).map((option) => (
             <option key={option.code} value={option.code}>
-              {option.flag} {option.name} (+{option.callingCode})
+              {hasMounted ? `${option.flag} ${option.name} (+${option.callingCode})` : `+${option.callingCode}`}
             </option>
           ))}
         </select>

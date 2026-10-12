@@ -4,12 +4,17 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { expiresInSeconds, toAttachmentDisposition } from './signedUrlHelpers';
 import {
   AVATAR_RULE,
+  CASE_ATTACHMENT_RULE,
   DOCUMENT_RULE,
+  LOGO_RULE,
   PHOTO_RULE,
   validateIncomingFile,
 } from './storageFileRules';
 import {
   buildAvatarKey,
+  buildBrandingLogoKey,
+  buildCaseAttachmentKey,
+  buildDataExportKey,
   buildDocumentKey,
   buildMachinePhotoKey,
   isTenantOwnedKey,
@@ -19,7 +24,9 @@ import { IncomingFile, SignedUrl, StoredFile } from './types/storedFile';
 
 const DOWNLOAD_URL_TTL_SECONDS = 15 * 60;
 
-// Tenant-owned files: documents/, photos/, avatars/ under {tenantId}/.
+// Tenant-owned files: documents/, photos/, avatars/, branding/, exports/,
+// cases/
+// under {tenantId}/.
 // The bucket is private: clients only ever get short-lived signed URLs,
 // and the database stores object keys. (Shared-library files:
 // SharedLibraryStorageService.)
@@ -65,6 +72,43 @@ export class StorageService {
     );
   };
 
+  uploadBrandingLogo = (
+    file: IncomingFile | undefined,
+    tenantId: string,
+  ): Promise<StoredFile> => {
+    const { extension, contentType } = validateIncomingFile(file, LOGO_RULE);
+    return this.storeFile(
+      buildBrandingLogoKey(tenantId, extension),
+      file!,
+      contentType,
+    );
+  };
+
+  // tenantId is the case's organisation, also when staff upload.
+  uploadCaseAttachment = (
+    file: IncomingFile | undefined,
+    tenantId: string,
+    caseId: string | null,
+  ): Promise<StoredFile> => {
+    const { contentType } = validateIncomingFile(file, CASE_ATTACHMENT_RULE);
+    return this.storeFile(
+      buildCaseAttachmentKey(tenantId, caseId, file!.originalname),
+      file!,
+      contentType,
+    );
+  };
+
+  // A generated "My data" export (server-built JSON, not a user upload).
+  storeDataExport = async (
+    ids: { tenantId: string; userId: string; requestId: string },
+    json: string,
+  ): Promise<{ key: string; sizeBytes: number }> => {
+    const key = buildDataExportKey(ids.tenantId, ids.userId, ids.requestId);
+    const body = Buffer.from(json, 'utf8');
+    await this.storageBucket.putObject(key, body, 'application/json');
+    return { key, sizeBytes: body.length };
+  };
+
   // Images render inline; pass `downloadFileName` to make browsers save
   // the file under its original name instead.
   getSignedDownloadUrl = async (
@@ -87,7 +131,8 @@ export class StorageService {
   };
 
   // Tenant-scoped hard delete — refuses any key outside the tenant's own
-  // folders (documents/, photos/, avatars/ under {tenantId}/).
+  // folders (documents/, photos/, avatars/, branding/, exports/ under
+  // {tenantId}/).
   deleteFile = async (key: string, tenantId: string): Promise<void> => {
     if (!isTenantOwnedKey(key, tenantId)) {
       throw new ForbiddenException(

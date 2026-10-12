@@ -13,12 +13,13 @@ const DELETE_FAILED_MESSAGE = "Couldn't delete the document. Please try again.";
 export const DeleteDocumentDialog = ({ document, onDelete, onClose }: DeleteDocumentDialogProps) => (
   <ConfirmDialog
     title="Delete document"
-    confirmLabel="Delete"
+    confirmLabel="Delete permanently"
     onConfirm={() => onDelete(document.id)}
     onClose={onClose}
     toErrorMessage={(error) => toApiErrorMessage(error, DELETE_FAILED_MESSAGE)}
   >
-    Remove <span className="font-medium text-ink">{document.title}</span> from the knowledge library? Every
-    organisation loses access to it. This is recorded in the audit log.
+    Permanently delete <span className="font-medium text-ink">{document.title}</span>? Every version, its stored
+    files and its AI search index are removed, and every organisation loses access. This can&apos;t be undone; the
+    deletion is recorded in the audit log.
   </ConfirmDialog>
 );

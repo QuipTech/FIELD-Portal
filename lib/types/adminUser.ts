@@ -26,8 +26,24 @@ export interface AdminUserListResponse {
 export interface AdminUserListQuery {
   search?: string;
   role?: string;
+  // Narrows the Owner's list to one organisation.
+  organisationId?: string;
   page?: number;
   pageSize?: number;
+}
+
+export interface AdminOrganisation {
+  id: string;
+  name: string;
+}
+
+export interface InviteUserPayload {
+  email: string;
+  firstName: string;
+  lastName: string;
+  roleId: string;
+  // Defaults to the inviter's own organisation.
+  organisationId?: string;
 }
 
 export const adminUserStatusLabel: Record<AdminUserStatus, string> = {

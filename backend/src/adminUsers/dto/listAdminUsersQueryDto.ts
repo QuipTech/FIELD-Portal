@@ -1,6 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import {
   IsInt,
+  IsUUID,
   IsOptional,
   IsString,
   Max,
@@ -26,6 +27,14 @@ export class ListAdminUsersQueryDto {
   @IsString()
   @MaxLength(100)
   role?: string;
+
+  // Narrows the Owner's list to one organisation. Ignored for anyone whose
+  // scope is already one organisation, who only ever
+  // sees their own.
+  @IsOptional()
+  @Transform(trimToUndefined)
+  @IsUUID()
+  organisationId?: string;
 
   @IsOptional()
   @Type(() => Number)

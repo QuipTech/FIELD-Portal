@@ -1,5 +1,6 @@
 import { BadRequestException, PayloadTooLargeException } from '@nestjs/common';
 import { IncomingFile } from './types/storedFile';
+import { isSafeSvg } from './svgSafety';
 
 const MB = 1024 * 1024;
 
@@ -37,6 +38,25 @@ export const AVATAR_RULE: FileRule = {
   contentTypes: { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png' },
 };
 
+// An organisation's logo (Settings → Branding).
+export const LOGO_RULE: FileRule = {
+  label: 'PNG, JPG or SVG images without scripts',
+  maxBytes: 2 * MB,
+  contentTypes: {
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    svg: 'image/svg+xml',
+  },
+};
+
+// Support case attachments: photos of the fault, or a document.
+export const CASE_ATTACHMENT_RULE: FileRule = {
+  label: 'photos (JPG, PNG, HEIC) or PDF/Word documents',
+  maxBytes: 20 * MB,
+  contentTypes: { ...PHOTO_RULE.contentTypes, ...DOCUMENT_RULE.contentTypes },
+};
+
 const startsWith = (buffer: Buffer, bytes: number[], offset = 0) =>
   bytes.every((byte, index) => buffer[offset + index] === byte);
 
@@ -62,6 +82,8 @@ const hasMatchingSignature = (extension: string, buffer: Buffer): boolean => {
         buffer.toString('ascii', 4, 8) === 'ftyp' &&
         HEIC_BRANDS.includes(buffer.toString('ascii', 8, 12))
       );
+    case 'svg':
+      return isSafeSvg(buffer);
     default:
       return false;
   }

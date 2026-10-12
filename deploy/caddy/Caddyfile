@@ -1,0 +1,27 @@
+# TLS certificates are issued and renewed automatically by Let's Encrypt,
+# as long as both domains resolve to this host and ports 80/443 are open.
+{
+	email {$ACME_EMAIL}
+}
+
+(securityHeaders) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}
+
+{$PORTAL_DOMAIN} {
+	import securityHeaders
+	encode zstd gzip
+	reverse_proxy portal:3001
+}
+
+# No `encode` here: compressing would buffer the AI assistant's SSE stream.
+# Socket.IO websockets are proxied by reverse_proxy without extra config.
+{$API_DOMAIN} {
+	import securityHeaders
+	reverse_proxy api:4001
+}

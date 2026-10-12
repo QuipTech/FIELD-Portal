@@ -10,15 +10,16 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
 export const Input = ({ icon, className = "", type, ...props }: InputProps) => {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const isPasswordField = type === "password";
+  const stateClasses = props.disabled ? "cursor-not-allowed bg-surfaceGray" : "bg-surface";
 
   return (
     <div
-      className={`flex h-10 shrink-0 items-center gap-2 rounded-lg border border-borderGrayStrong bg-surface px-3 ${className}`}
+      className={`flex h-10 shrink-0 items-center gap-2 rounded-lg border border-borderGrayStrong ${stateClasses} px-3 ${className}`}
     >
       {icon ? <Icon name={icon} className="stroke-mutedGray" /> : null}
       <input
         type={isPasswordField && isPasswordVisible ? "text" : type}
-        className="w-full flex-1 border-none bg-transparent text-[15px] text-ink outline-none placeholder:text-mutedGray"
+        className="w-full flex-1 border-none bg-transparent text-[15px] text-ink outline-none placeholder:text-mutedGray disabled:cursor-not-allowed disabled:text-mutedGray"
         {...props}
       />
       {isPasswordField && (

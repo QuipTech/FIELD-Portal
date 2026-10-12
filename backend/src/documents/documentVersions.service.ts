@@ -18,7 +18,9 @@ import { assertCanManageDocument, loadActorAccess } from './documentAccess';
 import { auditDocumentChange } from './documentAudit';
 import { DocumentLifecycleService } from './documentLifecycle.service';
 
-const BUSY_STATES = ['uploading', 'queued', 'indexing'];
+// An abandoned browser upload ('uploading' that never completed) doesn't
+// block a new version — the new one simply supersedes it.
+const BUSY_STATES = ['queued', 'indexing'];
 
 // A new file for an existing document (≤ 20 MB, through the backend). The
 // previous versions and their files stay; the live one keeps serving AI

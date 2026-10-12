@@ -1,4 +1,5 @@
 import { AuthError, fetchAuthSession, signInWithRedirect, signOut } from "aws-amplify/auth";
+import type { SignInMethod } from "../types/authSession";
 import { configureAmplify } from "./amplifyConfig";
 import { logAuthDebug } from "./authDebugLog";
 
@@ -29,20 +30,33 @@ export const signInWithFederatedProvider = async (provider: FederatedProvider): 
   }
 };
 
-export const getCognitoIdToken = async (): Promise<string | null> => {
+export interface CognitoSession {
+  idToken: string;
+  email: string;
+  // Google/Apple tokens carry an `identities` claim; a user-pool
+  // (email/password) sign-in doesn't.
+  signInMethod: SignInMethod;
+}
+
+// Works for every Cognito sign-in: Google/Apple redirects and email/password.
+export const getCognitoSession = async (): Promise<CognitoSession | null> => {
   configureAmplify();
   const { tokens } = await fetchAuthSession();
-  if (tokens?.idToken) {
-    // `picture`, `given_name`, `identities`… exactly as Cognito issued them.
-    logAuthDebug("Cognito ID token claims", tokens.idToken.payload);
-  }
-  return tokens?.idToken?.toString() ?? null;
+  if (!tokens?.idToken) return null;
+  const { payload } = tokens.idToken;
+  // `picture`, `given_name`, `identities`… exactly as Cognito issued them.
+  logAuthDebug("Cognito ID token claims", payload);
+  return {
+    idToken: tokens.idToken.toString(),
+    email: typeof payload.email === "string" ? payload.email : "",
+    signInMethod: payload.identities ? "federated" : "password",
+  };
 };
 
 // Clears Amplify's stored tokens. For a Google/Apple session it also sends
 // the browser through Cognito's hosted-UI logout (back to /login), so the
 // next person on a shared device isn't silently signed in as this user.
-// Without a Cognito session (email/password users) it's a local no-op.
+// For an email/password session it only clears the local tokens.
 export const signOutOfCognito = async (): Promise<void> => {
   configureAmplify();
   await signOut();

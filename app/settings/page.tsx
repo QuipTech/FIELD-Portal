@@ -9,13 +9,19 @@ import { SecuritySettingsSection } from "./components/securitySettingsSection";
 
 const SettingsPage = () => {
   return (
-    <AppShell topBar={<TopBar><span className="text-[15px] text-bodyGray">Profile &amp; settings</span></TopBar>}>
+    <AppShell
+      topBar={
+        <TopBar>
+          <span className="text-[15px] text-bodyGray">Profile &amp; settings</span>
+        </TopBar>
+      }
+    >
       <main className="flex flex-1 flex-col gap-3 overflow-y-auto p-5">
         <h1 className="text-[22px] font-medium text-ink">Profile &amp; settings</h1>
         <ProfileHeaderCard />
 
         <h2 className="text-base font-medium text-ink">Subscription</h2>
-        <SubscriptionSummaryCard captionLine="QuipTech Mining · billed per asset, monthly" showBillingLink />
+        <SubscriptionSummaryCard showBillingLink />
 
         <SecuritySettingsSection />
 
@@ -24,14 +30,14 @@ const SettingsPage = () => {
           <SettingsRow
             icon="download"
             title="Export my data"
-            caption="Download your profile, history entries and case activity"
+            caption="Your profile, history entries, case activity and AI conversations, as a download link"
             trailing={<ExportDataButton />}
           />
           <SettingsRow
             icon="alert"
             tone="danger"
-            title="Delete my account"
-            caption="Removes your profile; asset and configuration records stay on the tenant's CMDB"
+            title="Delete account"
+            caption="Permanently removes your profile and personal data; asset and configuration records stay on the company's CMDB"
             bordered={false}
             trailing={<DeleteAccountButton />}
           />

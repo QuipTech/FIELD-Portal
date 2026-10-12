@@ -21,7 +21,7 @@ export const SignupProfileDialog = ({
   onCancel,
 }: SignupProfileDialogProps) => {
   const [companyName, setCompanyName] = useState("");
-  const [phone, setPhone] = useState<PhoneNumberValue>({ e164: "", isValid: false });
+  const [phone, setPhone] = useState<PhoneNumberValue>({ e164: "", isValid: false, isEmpty: true });
   const [isPhoneTouched, setIsPhoneTouched] = useState(false);
   const isComplete = companyName.trim() !== "" && phone.isValid;
   const showPhoneError = isPhoneTouched && !phone.isValid;

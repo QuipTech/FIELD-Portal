@@ -2,77 +2,71 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Icon } from "@/components/icons/icon";
 import { Button } from "@/components/ui/button";
-import { useDeleteAccount } from "@/lib/auth/useDeleteAccount";
-import { signOutOfCognito } from "@/lib/auth/cognitoFederatedSignIn";
+import { ConfirmDialog } from "@/components/ui/confirmDialog";
+import { Input } from "@/components/ui/input";
+import { deleteAccountRequest, getDeletionEligibilityRequest } from "@/lib/api/accountApi";
+import { useApiResource } from "@/lib/hooks/useApiResource";
+import { requireAccessToken } from "@/lib/api/requireAccessToken";
+import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
+import { endLocalSession } from "@/lib/auth/endLocalSession";
 
-type DeleteStage = "idle" | "confirm" | "done";
+const CONFIRMATION_WORD = "DELETE";
 
+// Permanently deletes the signed-in user's account, then signs them out.
+// Asset and configuration records belong to the company's CMDB, so they
+// stay — just no longer attributed to this user. The organisation's last
+// Owner sees why they can't instead of the button.
 export const DeleteAccountButton = () => {
   const router = useRouter();
-  const [stage, setStage] = useState<DeleteStage>("idle");
-  const { deleteAccount, isDeleting, errorMessage } = useDeleteAccount();
+  const eligibility = useApiResource(getDeletionEligibilityRequest, [], "Couldn't check your account.");
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [typedConfirmation, setTypedConfirmation] = useState("");
 
-  const handleConfirmDelete = async () => {
-    const deleted = await deleteAccount();
-    if (deleted) setStage("done");
+  const closeDialog = () => {
+    setIsConfirming(false);
+    setTypedConfirmation("");
   };
 
-  // Google/Apple users leave via Cognito's hosted-UI logout (which lands on
-  // /login); for everyone else signOutOfCognito resolves and we push.
-  const handleDone = async () => {
-    await signOutOfCognito().catch(() => undefined);
-    router.push("/login");
+  const deleteAccount = async () => {
+    await deleteAccountRequest(requireAccessToken());
+    await endLocalSession(() => router.replace("/login"));
   };
+
+  if (eligibility.data && !eligibility.data.canDelete) {
+    return <span className="max-w-[320px] text-right text-xs text-mutedGray">{eligibility.data.blockedReason}</span>;
+  }
 
   return (
     <>
-      <Button size="sm" variant="danger" onClick={() => setStage("confirm")}>
-        Request deletion
+      <Button size="sm" variant="danger" onClick={() => setIsConfirming(true)} disabled={eligibility.isLoading}>
+        Delete account
       </Button>
-
-      {stage === "confirm" && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-inkStatic/40">
-          <div className="flex w-[380px] flex-col items-center gap-4 rounded-2xl bg-surface p-6 text-center">
-            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-dangerTint text-danger">
-              <Icon name="alert" />
-            </span>
-            <div className="flex flex-col gap-1">
-              <h2 className="text-[17px] font-medium text-ink">Delete your account?</h2>
-              <p className="text-[13px] text-mutedGray">
-                This removes your profile and sign-in. Asset and configuration records stay on the tenant&apos;s
-                CMDB. This can&apos;t be undone.
-              </p>
-            </div>
-            {errorMessage && <span className="text-center text-xs text-danger">{errorMessage}</span>}
-            <div className="flex w-full gap-2">
-              <Button className="flex-1" disabled={isDeleting} onClick={() => setStage("idle")}>
-                No, keep account
-              </Button>
-              <Button variant="danger" className="flex-1" disabled={isDeleting} onClick={handleConfirmDelete}>
-                {isDeleting ? "Deleting…" : "Yes, delete"}
-              </Button>
-            </div>
+      {isConfirming && (
+        <ConfirmDialog
+          title="Delete your account?"
+          confirmLabel="Delete account"
+          onConfirm={deleteAccount}
+          onClose={closeDialog}
+          toErrorMessage={(error) => toApiErrorMessage(error, "Couldn't delete your account. Please try again.")}
+          isConfirmDisabled={typedConfirmation.trim() !== CONFIRMATION_WORD}
+        >
+          <div className="flex flex-col gap-3">
+            <p>
+              This permanently removes your profile, sign-in and AI conversations, and signs you out. It can&apos;t be
+              undone. Asset and configuration records belong to your company&apos;s CMDB and are kept.
+            </p>
+            <p>
+              Type <span className="font-medium text-ink">{CONFIRMATION_WORD}</span> to confirm.
+            </p>
+            <Input
+              aria-label={`Type ${CONFIRMATION_WORD} to confirm`}
+              value={typedConfirmation}
+              onChange={(event) => setTypedConfirmation(event.target.value)}
+              autoComplete="off"
+            />
           </div>
-        </div>
-      )}
-
-      {stage === "done" && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-inkStatic/40">
-          <div className="flex w-[380px] flex-col items-center gap-4 rounded-2xl bg-surface p-6 text-center">
-            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primaryTint text-primary">
-              <Icon name="check" />
-            </span>
-            <div className="flex flex-col gap-1">
-              <h2 className="text-[17px] font-medium text-ink">Your account has been terminated</h2>
-              <p className="text-[13px] text-mutedGray">You&apos;ll be signed out and returned to sign-in.</p>
-            </div>
-            <Button variant="primary" className="w-full" onClick={handleDone}>
-              Done
-            </Button>
-          </div>
-        </div>
+        </ConfirmDialog>
       )}
     </>
   );

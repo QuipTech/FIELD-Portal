@@ -1,5 +1,5 @@
 export type ButtonVariant = "default" | "primary" | "danger" | "ghost";
-export type ButtonSize = "md" | "sm";
+export type ButtonSize = "lg" | "md" | "sm";
 
 export const buttonBaseClasses =
   "inline-flex flex-none items-center justify-center gap-2 rounded-lg border font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50";
@@ -12,6 +12,7 @@ export const buttonVariantClasses: Record<ButtonVariant, string> = {
 };
 
 export const buttonSizeClasses: Record<ButtonSize, string> = {
+  lg: "h-11 px-5 text-[16px]",
   md: "h-9 px-3.5 text-[15px]",
   sm: "h-[30px] px-2.5 text-[13px]",
 };

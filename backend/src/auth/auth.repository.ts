@@ -1,6 +1,7 @@
 import { PoolClient } from 'pg';
 import { DatabaseService } from '../database/database.service';
 import { SessionRow, TenantRow, UserLoginRow, UserRow } from './types/authRows';
+import { getRequestSource } from '../common/requestSource/requestSource';
 
 export const insertTenant = async (
   client: PoolClient,
@@ -11,32 +12,6 @@ export const insertTenant = async (
     `INSERT INTO tenants (name, slug) VALUES ($1, $2)
      RETURNING id, name, slug`,
     [name, slug],
-  );
-  return result.rows[0];
-};
-
-export const insertUser = async (
-  client: PoolClient,
-  params: {
-    tenantId: string;
-    email: string;
-    passwordHash: string;
-    firstName: string;
-    lastName: string;
-  },
-): Promise<UserRow> => {
-  const result = await client.query<UserRow>(
-    `INSERT INTO users (tenant_id, email, password_hash, first_name, last_name)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, tenant_id, email, first_name, last_name, status, avatar_url,
-               avatar_storage_key`,
-    [
-      params.tenantId,
-      params.email,
-      params.passwordHash,
-      params.firstName,
-      params.lastName,
-    ],
   );
   return result.rows[0];
 };
@@ -52,10 +27,12 @@ export const insertAuditLog = async (
     metadata?: Record<string, unknown>;
   },
 ): Promise<void> => {
+  // source is the client app behind the current request (see
+  // common/requestSource), NULL outside a request.
   await client.query(
     `INSERT INTO audit_logs
-       (tenant_id, user_id, action, entity_type, entity_id, metadata)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
+       (tenant_id, user_id, action, entity_type, entity_id, metadata, source)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
     [
       params.tenantId,
       params.userId,
@@ -63,6 +40,7 @@ export const insertAuditLog = async (
       params.entityType ?? 'user',
       params.entityId,
       params.metadata ?? {},
+      getRequestSource() ?? null,
     ],
   );
 };

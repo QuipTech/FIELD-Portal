@@ -8,8 +8,12 @@ export const PERMISSIONS = {
   useAiAssistant: "ai.use",
   raiseSupportCase: "support.create",
   manageSupportCases: "support.manage",
+  // QuipTech support staff (Support Agent, and Owner): the support queue.
+  workSupportCases: "support.agent",
   submitDocuments: "knowledge.submit",
   deleteMachinePhotos: "history.delete_photos",
+  // Owner only: the platform administrator — every organisation + platform screens.
+  managePlatform: "platform.manage",
 } as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -23,8 +27,10 @@ export const permissionLabels: Record<PermissionCode, string> = {
   "ai.use": "Use the AI assistant",
   "support.create": "Raise support cases",
   "support.manage": "Manage support cases",
+  "support.agent": "Work support cases (QuipTech support staff)",
   "knowledge.submit": "Submit knowledge items for review",
   "history.delete_photos": "Delete machine photos",
+  "platform.manage": "Manage the whole platform",
 };
 
 export const describeMissingPermission = (permission: PermissionCode): string =>
