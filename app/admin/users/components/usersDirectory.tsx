@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Icon } from "@/components/icons/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { useApiResource } from "@/lib/hooks/useApiResource";
 import { useSignedInProfile } from "@/lib/auth/useSignedInProfile";
 import { listAdminRolesRequest } from "@/lib/api/adminRolesApi";
 import { listAdminOrganisationsRequest } from "@/lib/api/adminUsersApi";
-import { FilterSelect } from "./filterSelect";
+import { RoleFilterTabs } from "./roleFilterTabs";
 import { UsersTable } from "./usersTable";
 import { InviteUserModal } from "./inviteUserModal";
 import { ChangeRoleModal } from "./changeRoleModal";
@@ -18,10 +18,7 @@ import { useAdminUsers } from "../useAdminUsers";
 
 // Role names, once each: the Owner can see same-named roles in
 // several organisations, and the backend filters by name.
-const toRoleNameOptions = (names: string[]) =>
-  Array.from(new Set(names))
-    .sort((a, b) => a.localeCompare(b))
-    .map((name) => ({ value: name, label: name }));
+const toUniqueRoleNames = (names: string[]) => Array.from(new Set(names)).sort((a, b) => a.localeCompare(b));
 
 export const UsersDirectory = () => {
   const [search, setSearch] = useState("");
@@ -30,11 +27,13 @@ export const UsersDirectory = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [roleTarget, setRoleTarget] = useState<AdminUser | null>(null);
   const [removeTarget, setRemoveTarget] = useState<AdminUser | null>(null);
-  const { users, total, isLoading, errorMessage, reload } = useAdminUsers({ search: search.trim(), role });
+  const { users, total, isLoading, errorMessage, reload } = useAdminUsers(search.trim());
   const roles = useApiResource(listAdminRolesRequest, [], "Couldn't load roles.");
   const organisations = useApiResource(listAdminOrganisationsRequest, [], "Couldn't load organisations.");
   const profile = useSignedInProfile();
   const organisationList = organisations.data ?? [];
+  const visibleUsers = useMemo(() => (role ? users.filter((user) => user.roles.includes(role)) : users), [users, role]);
+  const visibleCount = role ? visibleUsers.length : total;
 
   return (
     <>
@@ -54,17 +53,17 @@ export const UsersDirectory = () => {
           </button>
         </div>
       )}
+      <RoleFilterTabs value={role} roleNames={toUniqueRoleNames((roles.data ?? []).map((item) => item.name))} onChange={setRole} />
       <div className="flex items-center gap-3">
         <Input icon="search" placeholder="Search users" className="w-60" value={search} onChange={(event) => setSearch(event.target.value)} />
-        <FilterSelect label="Role" value={role} options={toRoleNameOptions((roles.data ?? []).map((item) => item.name))} onChange={setRole} />
         {!errorMessage && (
           <span className="ml-auto text-xs text-slate-400">
-            {total} {total === 1 ? "user" : "users"}
+            {visibleCount} {visibleCount === 1 ? "user" : "users"}
           </span>
         )}
       </div>
       <UsersTable
-        users={users}
+        users={visibleUsers}
         isLoading={isLoading}
         errorMessage={errorMessage}
         currentUserId={profile?.user.id ?? null}
