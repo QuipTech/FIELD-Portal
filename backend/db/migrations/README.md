@@ -64,6 +64,7 @@ session (set per-request by `DatabaseService.withTenant`).
 | `0075` | Team assignees — the assign dropdown marks staff by `is_support_staff()`, matching the API |
 | `0076` | Knowledge article — `document_sections` (heading, start page, text per section) and `document_figures` (captions; image key for later) per version, saved by the indexer via `replace_document_sections()` or backfilled from chunks on first view (`backfill_document_sections()`), text index for search-to-section matching, `document_versions.summary` |
 | `0077` | Admin removes a user — `removed_accounts` (email of each removed account, so sign-in says an administrator removed them), SECURITY DEFINER `is_last_active_owner()`, `admin_find_removable_user()`, `admin_remove_user()` (record + audit with the admin + `delete_user_account()`) |
+| `0078` | `list_knowledge_documents()` — SECURITY DEFINER knowledge list (latest version per item) with explicit visibility (shared + own organisation, or every organisation for the Owner), so the Owner's Knowledge screen matches the overview count under `field_app` RLS |
 
 ## Two forward references, resolved across files
 
