@@ -12,13 +12,14 @@ const PAGE_SIZE = 100;
 const SIGNED_OUT_MESSAGE = "Your session has expired. Sign in again to see users.";
 const FALLBACK_ERROR_MESSAGE = "Couldn't load users. Please try again.";
 
-export const useAdminUsers = (filters: { search: string; role: string }) => {
+// Role filtering happens on the client (see usersDirectory), so only the
+// search goes to the backend.
+export const useAdminUsers = (search: string) => {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
-  const { search, role } = filters;
 
   useEffect(() => {
     const accessToken = getAccessToken();
@@ -31,8 +32,10 @@ export const useAdminUsers = (filters: { search: string; role: string }) => {
     // Ignores a slower, older response that lands after a newer search.
     let isCurrent = true;
     setIsLoading(true);
+    // Only typing needs the debounce; the first load and reloads go straight out.
+    const delay = search ? SEARCH_DEBOUNCE_MS : 0;
     const timer = setTimeout(() => {
-      listAdminUsersRequest(accessToken, { search, role, pageSize: PAGE_SIZE })
+      listAdminUsersRequest(accessToken, { search, pageSize: PAGE_SIZE })
         .then((response) => {
           if (!isCurrent) return;
           setUsers(response.users);
@@ -44,13 +47,13 @@ export const useAdminUsers = (filters: { search: string; role: string }) => {
           setErrorMessage(toApiErrorMessage(error, FALLBACK_ERROR_MESSAGE));
         })
         .finally(() => isCurrent && setIsLoading(false));
-    }, SEARCH_DEBOUNCE_MS);
+    }, delay);
 
     return () => {
       isCurrent = false;
       clearTimeout(timer);
     };
-  }, [search, role, reloadCount]);
+  }, [search, reloadCount]);
 
   const reload = () => setReloadCount((count) => count + 1);
 
