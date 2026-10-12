@@ -1,3 +1,4 @@
+import { AppShell } from "@/components/shell/appShell";
 import { TopBar } from "@/components/shell/topBar";
 import { knowledgeDocumentTypes, type KnowledgeDocumentType } from "@/lib/types/adminDocument";
 import type { KnowledgeLibraryFilters } from "@/lib/types/knowledgeLibrary";
@@ -21,16 +22,17 @@ const KnowledgeSearchPage = ({ searchParams }: KnowledgeSearchPageProps) => {
   };
 
   return (
-    <div className="flex h-screen flex-col bg-surfaceGray">
-      <TopBar>
-        <span className="text-[15px] text-bodyGray">Knowledge</span>
-      </TopBar>
-      <div className="flex min-h-0 flex-1">
-        <div className="m-4 flex flex-1 gap-3 overflow-hidden rounded-2xl border border-slate-200/80 bg-surface p-3">
-          <KnowledgeLibraryView initialFilters={initialFilters} />
-        </div>
+    <AppShell
+      topBar={
+        <TopBar>
+          <span className="text-[15px] text-bodyGray">Knowledge</span>
+        </TopBar>
+      }
+    >
+      <div className="m-4 flex min-w-0 flex-1 gap-3 overflow-hidden rounded-2xl border border-slate-200/80 bg-surface p-3">
+        <KnowledgeLibraryView initialFilters={initialFilters} />
       </div>
-    </div>
+    </AppShell>
   );
 };
 
