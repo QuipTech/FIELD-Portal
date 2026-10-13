@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { IconTile } from "@/components/ui/iconTile";
 import { ActionMenu } from "@/components/ui/actionMenu";
+import { IconButton } from "@/components/ui/iconButton";
 import { OwnershipTag } from "@/components/admin/ownershipTag";
 import { usePermissions } from "@/lib/auth/usePermissions";
 import { PERMISSIONS } from "@/lib/auth/permissionCodes";
@@ -23,9 +24,13 @@ interface DocumentsTableProps {
   isLoading: boolean;
   loadError: string | null;
   onAction: (document: KnowledgeDocument, action: DocumentRowAction) => void;
+  onPreview: (document: KnowledgeDocument) => void;
 }
 
 const FAILED_ICON = { icon: "x", tone: "danger" } as const;
+
+// Until the upload finishes there's no file to show.
+const hasStoredFile = (document: KnowledgeDocument) => document.state !== "uploading";
 
 const typeLabel = (type: string) =>
   knowledgeDocumentTypes.find((option) => option.value === type)?.label ?? type.replace(/_/g, " ");
@@ -55,7 +60,7 @@ const DocumentSubtitle = ({ document }: { document: KnowledgeDocument }) => {
   ) : null;
 };
 
-export const DocumentsTable = ({ documents, isLoading, loadError, onAction }: DocumentsTableProps) => {
+export const DocumentsTable = ({ documents, isLoading, loadError, onAction, onPreview }: DocumentsTableProps) => {
   const { can } = usePermissions();
   const canReview = can(PERMISSIONS.managePlatform);
   return (
@@ -67,7 +72,7 @@ export const DocumentsTable = ({ documents, isLoading, loadError, onAction }: Do
         <TableHeaderCell flex={1}>Indexed</TableHeaderCell>
         <TableHeaderCell flex={0.5}>Pages</TableHeaderCell>
         <TableHeaderCell flex={0.8}>State</TableHeaderCell>
-        <TableHeaderCell flex={0.3}>{""}</TableHeaderCell>
+        <TableHeaderCell flex={0.5}>{""}</TableHeaderCell>
       </TableHeaderRow>
       {loadError && <TableMessage><span className="text-danger">{loadError}</span></TableMessage>}
       {!loadError && isLoading && <TableMessage><LoadingSpinner /> Loading documents…</TableMessage>}
@@ -105,7 +110,15 @@ export const DocumentsTable = ({ documents, isLoading, loadError, onAction }: Do
               <TableCell flex={0.8}>
                 <Tag tone={documentStateTone[document.state]}>{documentStateLabel[document.state]}</Tag>
               </TableCell>
-              <TableCell flex={0.3} className="flex justify-end">
+              <TableCell flex={0.5} className="flex items-center justify-end gap-1">
+                {hasStoredFile(document) && (
+                  <IconButton
+                    icon="eye"
+                    aria-label={`Preview ${document.title}`}
+                    title="Preview"
+                    onClick={() => onPreview(document)}
+                  />
+                )}
                 <ActionMenu
                   label={document.title}
                   items={availableRowActions(document, canReview).map((item) => ({

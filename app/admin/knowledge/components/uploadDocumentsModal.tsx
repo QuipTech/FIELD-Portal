@@ -68,7 +68,7 @@ export const UploadDocumentsModal = ({ files, onUpload, onClose }: UploadDocumen
         ))}
         <span className="text-xs text-mutedGray">
           {can(PERMISSIONS.managePlatform)
-            ? "Shared with every organisation once indexed."
+            ? "Shared with every organisation once indexed and approved."
             : "Available to your organisation once indexed."}{" "}
           Files go straight to secure storage.
         </span>

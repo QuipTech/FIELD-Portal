@@ -5,7 +5,10 @@ import * as knowledgeDocumentsRepository from '../knowledge/knowledgeDocuments.r
 import { StorageService } from '../storage/storage.service';
 import { SignedUrl } from '../storage/types/storedFile';
 import { toKnowledgeDocument } from '../knowledge/knowledgeDocumentMapper';
-import { signDocumentDownload } from '../knowledge/signDocumentDownload';
+import {
+  signDocumentDownload,
+  signDocumentPreview,
+} from '../knowledge/signDocumentDownload';
 import {
   canManageKnowledgeDocument,
   toKnowledgeVisibility,
@@ -56,6 +59,15 @@ export class AdminKnowledgeService {
     itemId: string,
   ): Promise<SignedUrl> =>
     signDocumentDownload(
+      this.storageService,
+      await this.findRow(scope, itemId),
+    );
+
+  createPreviewUrl = async (
+    scope: AdminScope,
+    itemId: string,
+  ): Promise<SignedUrl> =>
+    signDocumentPreview(
       this.storageService,
       await this.findRow(scope, itemId),
     );

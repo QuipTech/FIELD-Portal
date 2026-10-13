@@ -91,6 +91,14 @@ export class AdminKnowledgeController {
     return this.adminKnowledgeService.createDownloadUrl(scope, documentId);
   }
 
+  @Get('documents/:documentId/preview')
+  preview(
+    @CurrentAdminScope() scope: AdminScope,
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+  ) {
+    return this.adminKnowledgeService.createPreviewUrl(scope, documentId);
+  }
+
   @Delete('documents/:documentId')
   @HttpCode(HttpStatus.NO_CONTENT)
   // The Owner may delete any document (checked by

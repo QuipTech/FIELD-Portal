@@ -9,10 +9,11 @@ import { UploadDocumentsModal } from "./uploadDocumentsModal";
 import { UploadProgressList } from "./uploadProgressList";
 import { DeleteDocumentDialog } from "./deleteDocumentDialog";
 import { RejectDocumentDialog } from "./rejectDocumentDialog";
+import { DocumentPreviewModal } from "./documentPreviewModal";
 import { useKnowledgeDocuments } from "../useKnowledgeDocuments";
 import { useKnowledgeUploads } from "../useKnowledgeUploads";
 import { useDocumentRowActions } from "../useDocumentRowActions";
-
+import type { KnowledgeDocument } from "@/lib/types/adminDocument";
 
 export const KnowledgeLibrary = () => {
   const { documents, total, isLoading, loadError, reloadDocuments, downloadDocument, runAction, rejectDocument, deleteDocument } =
@@ -21,6 +22,7 @@ export const KnowledgeLibrary = () => {
   const rowActions = useDocumentRowActions({ downloadDocument, runAction, startVersionUpload });
   const [selectedFiles, setSelectedFiles] = useState<File[] | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [documentToPreview, setDocumentToPreview] = useState<KnowledgeDocument | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const chooseFiles = (fileList: FileList | null) => {
@@ -32,7 +34,6 @@ export const KnowledgeLibrary = () => {
     setIsDraggingOver(false);
     chooseFiles(event.dataTransfer.files);
   };
-
 
   return (
     <>
@@ -82,6 +83,7 @@ export const KnowledgeLibrary = () => {
         isLoading={isLoading}
         loadError={loadError}
         onAction={rowActions.handleAction}
+        onPreview={setDocumentToPreview}
       />
       {selectedFiles && (
         <UploadDocumentsModal files={selectedFiles} onUpload={startUploads} onClose={() => setSelectedFiles(null)} />
@@ -91,6 +93,13 @@ export const KnowledgeLibrary = () => {
       )}
       {rowActions.documentToReject && (
         <RejectDocumentDialog document={rowActions.documentToReject} onReject={rejectDocument} onClose={rowActions.closeReject} />
+      )}
+      {documentToPreview && (
+        <DocumentPreviewModal
+          document={documentToPreview}
+          onDownload={() => rowActions.handleAction(documentToPreview, "download")}
+          onClose={() => setDocumentToPreview(null)}
+        />
       )}
       {rowActions.versionPickerInput}
     </>

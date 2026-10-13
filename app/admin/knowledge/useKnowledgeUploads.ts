@@ -16,7 +16,7 @@ export interface UploadProgress {
   id: string;
   fileName: string;
   fraction: number;
-  status: "uploading" | "done" | "failed";
+  status: "uploading" | "failed";
   errorMessage?: string;
 }
 
@@ -26,9 +26,13 @@ const toUploadErrorMessage = (error: unknown): string =>
   error instanceof StorageUploadError ? error.message : toApiErrorMessage(error, UPLOAD_FAILED_MESSAGE);
 
 // Uploads run one after another so a batch of large manuals doesn't
-// saturate the connection; each file reports its own progress.
-export const useKnowledgeUploads = (onUploaded: () => void) => {
+// saturate the connection; each file reports its own progress. A finished
+// upload leaves the progress list once the reloaded table shows it; failed
+// ones stay so the error can be read.
+export const useKnowledgeUploads = (onUploaded: () => Promise<void>) => {
   const [uploads, setUploads] = useState<UploadProgress[]>([]);
+
+  const removeUpload = (id: string) => setUploads((current) => current.filter((upload) => upload.id !== id));
 
   const updateUpload = (id: string, change: Partial<UploadProgress>) =>
     setUploads((current) => current.map((upload) => (upload.id === id ? { ...upload, ...change } : upload)));
@@ -45,11 +49,12 @@ export const useKnowledgeUploads = (onUploaded: () => void) => {
         await uploadKnowledgeDocument(requireAccessToken(), file, { title, type }, (fraction) =>
           updateUpload(id, { fraction }),
         );
-        updateUpload(id, { status: "done", fraction: 1 });
+        await onUploaded();
+        removeUpload(id);
       } catch (error) {
         updateUpload(id, { status: "failed", errorMessage: toUploadErrorMessage(error) });
+        void onUploaded();
       }
-      onUploaded();
     }
   };
 
@@ -59,11 +64,12 @@ export const useKnowledgeUploads = (onUploaded: () => void) => {
     setUploads((current) => [...current, { id, fileName: `${file.name} (new version)`, fraction: 0, status: "uploading" }]);
     try {
       await uploadKnowledgeVersion(requireAccessToken(), documentId, file, (fraction) => updateUpload(id, { fraction }));
-      updateUpload(id, { status: "done", fraction: 1 });
+      await onUploaded();
+      removeUpload(id);
     } catch (error) {
       updateUpload(id, { status: "failed", errorMessage: toUploadErrorMessage(error) });
+      void onUploaded();
     }
-    onUploaded();
   };
 
   const clearFinishedUploads = () => setUploads((current) => current.filter((upload) => upload.status === "uploading"));
