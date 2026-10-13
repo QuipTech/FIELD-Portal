@@ -2,6 +2,7 @@
 
 import { Icon } from "@/components/icons/icon";
 import { ActionMenu } from "@/components/ui/actionMenu";
+import { Button } from "@/components/ui/button";
 import type { ModelComponent, ModelSystem } from "@/lib/types/machineLibrary";
 import type { TreeDialog } from "./systemTreeDialogs";
 
@@ -15,6 +16,7 @@ interface SystemBranchProps {
 }
 
 export const SystemBranch = ({ system, isExpanded, onToggle, onOpenDialog, isEditable }: SystemBranchProps) => {
+  const openAddComponent = () => onOpenDialog({ kind: "addComponent", system });
   const componentMenuItems = (component: ModelComponent) => [
     { label: "Rename", icon: "file" as const, onSelect: () => onOpenDialog({ kind: "renameComponent", component }) },
     {
@@ -39,7 +41,7 @@ export const SystemBranch = ({ system, isExpanded, onToggle, onOpenDialog, isEdi
           <ActionMenu
             label={system.name}
             items={[
-              { label: "Add component", icon: "plus", onSelect: () => onOpenDialog({ kind: "addComponent", system }) },
+              { label: "Add component", icon: "plus", onSelect: openAddComponent },
               { label: "Rename", icon: "file", onSelect: () => onOpenDialog({ kind: "renameSystem", system }) },
               { label: "Delete", icon: "x", tone: "danger", onSelect: () => onOpenDialog({ kind: "deleteSystem", system }) },
             ]}
@@ -49,9 +51,15 @@ export const SystemBranch = ({ system, isExpanded, onToggle, onOpenDialog, isEdi
       {isExpanded && (
         <div className="flex flex-col gap-1 pl-[26px]">
           {system.components.length === 0 && (
-            <span className="text-xs text-mutedGray">
-              {isEditable ? "No components yet. Add one from the ⋯ menu." : "No components yet."}
-            </span>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-mutedGray">No components yet.</span>
+              {isEditable && (
+                <Button size="sm" onClick={openAddComponent}>
+                  <Icon name="plus" />
+                  Add component
+                </Button>
+              )}
+            </div>
           )}
           {system.components.map((component) => (
             <div key={component.id} className="flex items-center gap-2">
