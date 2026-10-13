@@ -20,6 +20,7 @@ export const toMachineSummary = (row: MachineRow): MachineSummary => ({
 
 export const toMachineDetail = (row: MachineDetailRow): MachineDetail => ({
   ...toMachineSummary(row),
+  plantId: row.asset_number || null,
   hoursReadAt: row.operating_hours_read_at ? new Date(row.operating_hours_read_at).toISOString() : null,
   owner: row.owner_id
     ? { id: row.owner_id, name: toPersonName(row.owner_first_name, row.owner_last_name), avatarUrl: row.owner_avatar_url }

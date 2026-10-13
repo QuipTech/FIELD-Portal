@@ -13,6 +13,7 @@ export const toMachine = (response: MachineDetailResponse): Machine => ({
   manufacturer: response.manufacturer,
   model: response.model,
   serialNumber: response.serialNumber,
+  plantId: response.plantId,
   status: OPERATING_STATUSES.find((status) => status === response.status) ?? "running",
   operatingHours: response.operatingHours,
   hoursReadAt: response.hoursReadAt,

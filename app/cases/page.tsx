@@ -2,6 +2,7 @@ import { AppShell } from "@/components/shell/appShell";
 import { TopBar } from "@/components/shell/topBar";
 import { NewCaseButton } from "./components/newCaseButton";
 import { CasesManager } from "./components/casesManager";
+import { AssignedCasesSection } from "./components/assignedCasesSection";
 
 const CasesPage = () => {
   return (
@@ -13,6 +14,7 @@ const CasesPage = () => {
       }
     >
       <main className="m-4 flex flex-1 flex-col gap-3.5 overflow-y-auto rounded-2xl border border-slate-200/80 bg-surface p-5">
+        <AssignedCasesSection />
         <CasesManager />
       </main>
     </AppShell>

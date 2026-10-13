@@ -10,8 +10,8 @@ interface MachineDetailLayoutProps {
 }
 
 // Every machine detail tab (components, history, configuration history)
-// needs "View machines"; without it the whole screen becomes a notice.
-// These screens have no navigation shell, hence the way back.
+// needs "View machines"; without it the whole screen becomes a notice,
+// shown outside the app shell, hence the way back.
 const MachineDetailLayout = ({ children, params }: MachineDetailLayoutProps) => {
   return (
     <PermissionView

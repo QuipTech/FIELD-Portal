@@ -52,6 +52,7 @@ export const toSupportStaffMember = (
   email: row.email,
   avatarUrl: row.avatar_url,
   organisationName: row.organisation_name,
+  roleName: row.role_name,
   isAdmin: row.is_admin,
   isSupportStaff: row.is_support_staff,
   openCaseCount: Number(row.open_case_count),

@@ -16,6 +16,8 @@ export interface Machine {
   manufacturer: string;
   model: string;
   serialNumber: string;
+  // The Plant ID / asset number, when one was entered.
+  plantId: string | null;
   status: OperatingStatus;
   operatingHours: number | null;
   hoursReadAt: string | null;

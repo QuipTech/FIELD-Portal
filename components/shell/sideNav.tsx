@@ -36,16 +36,16 @@ const NavItem = ({ href, label, icon, active, badgeCount = 0 }: NavLink & { acti
   </Link>
 );
 
+// Support staff's assigned cases are listed here too, so its badge counts both.
 const CASES_HREF = "/cases";
-// QuipTech's support team also work customers' cases from here.
-const SUPPORT_QUEUE_HREF = "/admin/cases";
 
 export const SideNav = () => {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const unreadCaseCount = useUnreadCaseCount("customer");
-  const { isStaff } = useSupportStaffAccess();
-  const staffCaseCount = useUnreadCaseCount("staff", isStaff);
+  const { isStaff, isAdmin } = useSupportStaffAccess();
+  // The admin's queue lives in the admin portal; here only assigned cases count.
+  const staffCaseCount = useUnreadCaseCount("staff", isStaff && !isAdmin);
 
   return (
     <div
@@ -65,18 +65,9 @@ export const SideNav = () => {
           {...link}
           label={collapsed ? "" : link.label}
           active={pathname.startsWith(link.href)}
-          badgeCount={link.href === CASES_HREF ? unreadCaseCount : 0}
+          badgeCount={link.href === CASES_HREF ? unreadCaseCount + staffCaseCount : 0}
         />
       ))}
-      {isStaff && (
-        <NavItem
-          href={SUPPORT_QUEUE_HREF}
-          label={collapsed ? "" : "Support queue"}
-          icon="users"
-          active={pathname.startsWith(SUPPORT_QUEUE_HREF)}
-          badgeCount={staffCaseCount}
-        />
-      )}
       <div className="mt-auto flex flex-col gap-0.5 border-t border-white/[0.16] pt-2.5">
         <NavItem
           href="/settings"

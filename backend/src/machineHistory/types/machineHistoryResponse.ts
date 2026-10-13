@@ -12,6 +12,8 @@ export interface MachineSummary {
 }
 
 export interface MachineDetail extends MachineSummary {
+  // The customer's Plant ID / asset number, exactly as entered.
+  plantId: string | null;
   hoursReadAt: string | null;
   // Whoever registered the machine.
   owner: { id: string; name: string; avatarUrl: string | null } | null;
