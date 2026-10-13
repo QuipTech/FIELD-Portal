@@ -8,38 +8,45 @@ import { useCaseAttachmentUploads } from "@/lib/hooks/useCaseAttachmentUploads";
 import type { CaseThreadScope } from "@/lib/api/caseThreadApi";
 import type { NewCaseMessage } from "@/lib/types/caseMessage";
 import { CaseAttachmentPicker } from "./caseAttachmentPicker";
-import { ComposerModeToggle, type ComposerMode } from "./composerModeToggle";
+
+const BAR_CLASSES = "flex-none border-t border-borderGray bg-surface px-6 py-4";
 
 interface CaseComposerProps {
   scope: CaseThreadScope;
   caseNumber: number;
   typingName: string | null;
-  // Why replying is closed (e.g. resolved), or null when it's open.
-  replyClosedReason: string | null;
-  // Staff only: internal notes stay open until the case is closed.
-  canAddInternalNotes?: boolean;
+  // Why writing is closed (e.g. resolved), or null when it's open.
+  closedReason: string | null;
+  // Staff only: a note only support staff see, shown amber.
+  isInternal?: boolean;
+  // False hides the photo/file buttons (e.g. internal notes).
+  allowAttachments?: boolean;
+  hint?: string;
+  // Replaces the bar look under the thread (e.g. a card in the staff panel).
+  className?: string;
   onSend: (message: NewCaseMessage) => Promise<void>;
   onTyping: (isInternal: boolean) => void;
   onError: (message: string) => void;
 }
 
-// The reply box under the thread. Sends with the button or Ctrl/⌘+Enter.
+// A reply or internal-note box. Sends with the button or Ctrl/⌘+Enter.
 export const CaseComposer = ({
   scope,
   caseNumber,
   typingName,
-  replyClosedReason,
-  canAddInternalNotes = false,
+  closedReason,
+  isInternal = false,
+  allowAttachments = true,
+  hint = "",
+  className = BAR_CLASSES,
   onSend,
   onTyping,
   onError,
 }: CaseComposerProps) => {
   const [draft, setDraft] = useState("");
-  const [mode, setMode] = useState<ComposerMode>(replyClosedReason && canAddInternalNotes ? "internal" : "reply");
   const [isSending, setIsSending] = useState(false);
   const uploads = useCaseAttachmentUploads(scope, scope === "staff" ? caseNumber : null);
-  const isInternal = mode === "internal";
-  const isClosed = isInternal ? !canAddInternalNotes : replyClosedReason !== null;
+  const isClosed = closedReason !== null;
   const canSend = !isClosed && !isSending && !uploads.isUploading && draft.trim().length > 0;
 
   const send = async () => {
@@ -63,25 +70,20 @@ export const CaseComposer = ({
     }
   };
 
-  const hint = isInternal
-    ? "Only support staff can see internal notes"
-    : canAddInternalNotes
-      ? "Customer sees replies in the portal and gets an email"
-      : "";
-
   const placeholder = isClosed
-    ? (replyClosedReason ?? "")
+    ? (closedReason ?? "")
     : isInternal
       ? "Add an internal note — only support staff can see it…"
       : "Write a reply…";
 
   return (
-    <div className="flex flex-none flex-col gap-3 border-t border-borderGray bg-surface px-6 py-4">
-      <div className="flex items-center gap-3">
-        {canAddInternalNotes && <ComposerModeToggle mode={mode} onChange={setMode} />}
-        <span className="text-xs text-mutedGray">{typingName ? `${typingName} is typing…` : ""}</span>
-        <span className="ml-auto text-sm text-mutedGray">{hint}</span>
-      </div>
+    <div className={`flex flex-col gap-3 ${className}`}>
+      {(typingName || hint) && (
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-mutedGray">{typingName ? `${typingName} is typing…` : ""}</span>
+          <span className="ml-auto text-sm text-mutedGray">{hint}</span>
+        </div>
+      )}
       <textarea
         rows={3}
         value={draft}
@@ -99,8 +101,10 @@ export const CaseComposer = ({
         }`}
       />
       <div className="flex items-center gap-2">
-        <CaseAttachmentPicker uploads={uploads.uploads} onAdd={uploads.addFiles} onRemove={uploads.remove} disabled={isClosed} />
-        <Button variant="primary" size="lg" className="ml-auto" onClick={send} disabled={!canSend}>
+        {allowAttachments && (
+          <CaseAttachmentPicker uploads={uploads.uploads} onAdd={uploads.addFiles} onRemove={uploads.remove} disabled={isClosed} />
+        )}
+        <Button variant="primary" size={isInternal ? "md" : "lg"} className="ml-auto" onClick={send} disabled={!canSend}>
           <Icon name="send" />
           {isInternal ? "Add note" : "Send reply"}
         </Button>

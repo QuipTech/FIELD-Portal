@@ -55,6 +55,8 @@ export interface SupportCase {
   subject: string;
   description: string | null;
   category: CaseCategory;
+  // The reporter's own type name, for category 'other'.
+  customCategory: string | null;
   status: CaseStatus;
   priority: CasePriority;
   machine: CaseMachine | null;

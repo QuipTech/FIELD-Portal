@@ -15,6 +15,7 @@ export const buildCaseRow = (
   subject: 'Brake pressure alarm on cold start',
   description: 'E-2204 on every cold start.',
   category: 'alarm',
+  custom_category: null,
   status: 'open',
   priority: 'P1',
   created_at: new Date('2026-09-29T08:00:00Z'),

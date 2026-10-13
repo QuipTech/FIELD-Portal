@@ -7,6 +7,7 @@ export interface SupportCaseRow {
   subject: string;
   description: string | null;
   category: string;
+  custom_category: string | null;
   status: string;
   priority: string;
   created_at: Date;

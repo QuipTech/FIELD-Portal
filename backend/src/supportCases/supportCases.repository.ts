@@ -14,6 +14,7 @@ import { StatusCountRow, SupportCaseRow } from './types/supportCaseRows';
 // (0070) rather than a join on users.
 const CASE_SELECT = `
   SELECT c.id, c.tenant_id, c.case_number, c.subject, c.description, c.category,
+         c.custom_category,
          c.status, c.priority, c.created_at, c.updated_at, c.resolved_at, c.closed_at,
          c.sla_due_at, c.sla_paused_at,
          m.id AS machine_id,
@@ -106,6 +107,7 @@ export const insertCase = async (
     subject: string;
     description: string;
     category: CaseCategory;
+    customCategory: string | null;
     priority: CasePriority;
     machineId: string | null;
     slaHours: number;
@@ -113,8 +115,9 @@ export const insertCase = async (
 ): Promise<{ id: string; case_number: string }> => {
   const result = await client.query<{ id: string; case_number: string }>(
     `INSERT INTO support_cases
-       (tenant_id, created_by, subject, description, category, priority, machine_id, status, sla_due_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, 'new', now() + make_interval(hours => $8::int))
+       (tenant_id, created_by, subject, description, category, custom_category, priority, machine_id,
+        status, sla_due_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'new', now() + make_interval(hours => $9::int))
      RETURNING id, case_number`,
     [
       params.tenantId,
@@ -122,6 +125,7 @@ export const insertCase = async (
       params.subject,
       params.description,
       params.category,
+      params.customCategory,
       params.priority,
       params.machineId,
       params.slaHours,

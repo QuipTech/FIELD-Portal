@@ -22,6 +22,7 @@ import {
   SupportCaseList,
   SupportCaseOptions,
 } from './types/supportCaseResponse';
+import { toCaseCategoryFields } from './toCaseCategoryFields';
 
 const UNKNOWN_MACHINE_MESSAGE = 'That machine is not in your organisation.';
 const REOPEN_REFUSED_MESSAGE =
@@ -107,7 +108,7 @@ export class SupportCasesService {
           reporterId: actor.userId,
           subject: dto.subject,
           description: dto.description,
-          category: dto.category,
+          ...toCaseCategoryFields(dto),
           priority: dto.priority,
           machineId: dto.machineId ?? null,
           slaHours: Math.round(this.dashboardConfig.slaHours[dto.priority]),

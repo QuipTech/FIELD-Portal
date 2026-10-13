@@ -40,6 +40,7 @@ export const toSupportCase = (row: SupportCaseRow): SupportCase => ({
   subject: row.subject,
   description: row.description,
   category: row.category as CaseCategory,
+  customCategory: row.custom_category,
   status: row.status as CaseStatus,
   priority: row.priority as CasePriority,
   machine:

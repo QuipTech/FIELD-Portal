@@ -1,13 +1,16 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { SlaTimeLeft } from "@/components/supportCases/slaTimeLeft";
 import { CASE_PRIORITIES, CASE_STATUS_LABELS } from "@/lib/format/caseLabels";
 import { abbreviateName, getInitials } from "@/lib/format/nameInitials";
 import type { AdminSupportCase } from "@/lib/types/adminSupportCase";
+import type { CaseMessage } from "@/lib/types/caseMessage";
 import type { CasePriority, CaseStatus, SupportCaseChanges } from "@/lib/types/supportCase";
 import { isAdminViewer, selectableStatuses } from "../staffCaseRules";
 import { AssigneePicker } from "./assigneePicker";
+import { InternalNotesList } from "./internalNotesList";
 import { PanelField, PanelRow, PanelSection, panelSelectClasses } from "./panelSection";
 
 interface AdminCaseSidePanelProps {
@@ -15,15 +18,25 @@ interface AdminCaseSidePanelProps {
   currentUserId: string | null;
   isSaving: boolean;
   onChange: (changes: SupportCaseChanges) => void;
+  internalNotes: CaseMessage[];
+  // The internal-note box; omitted once the case is closed.
+  noteComposer: ReactNode;
 }
 
 const STATUS_FLOW = "New · Open · Waiting on customer · Resolved · Closed";
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
-// A13b's right panel: customer, handling, linked. Only the admin assigns
+// A13b's right panel: customer, handling, linked, and internal notes. Only the admin assigns
 // or changes priority; the assignee may change the status.
-export const AdminCaseSidePanel = ({ item, currentUserId, isSaving, onChange }: AdminCaseSidePanelProps) => {
+export const AdminCaseSidePanel = ({
+  item,
+  currentUserId,
+  isSaving,
+  onChange,
+  internalNotes,
+  noteComposer,
+}: AdminCaseSidePanelProps) => {
   const isAdmin = isAdminViewer(item);
   const statuses = selectableStatuses(item);
   const statusOptions = statuses.includes(item.status) ? statuses : [item.status, ...statuses];
@@ -97,6 +110,11 @@ export const AdminCaseSidePanel = ({ item, currentUserId, isSaving, onChange }: 
         <span className="text-[15px] text-white">
           {item.machine ? [item.machine.label, item.machine.modelName].filter(Boolean).join(" · ") : "No machine linked"}
         </span>
+      </PanelSection>
+      <PanelSection title="Internal notes">
+        <span className="text-sm leading-snug text-indigo-200/60">Only support staff can see internal notes.</span>
+        {noteComposer}
+        <InternalNotesList notes={internalNotes} />
       </PanelSection>
     </aside>
   );

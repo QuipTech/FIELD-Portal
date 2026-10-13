@@ -26,6 +26,13 @@ export class CreateSupportCaseDto extends AttachmentIdsField {
   @IsIn(CASE_CATEGORIES)
   category: CaseCategory;
 
+  // The reporter's own name for the type, with category 'other'.
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  @MaxLength(80)
+  customCategory?: string;
+
   @IsIn(CASE_PRIORITIES)
   priority: CasePriority;
 

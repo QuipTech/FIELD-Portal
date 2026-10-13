@@ -69,7 +69,7 @@ export const CaseThreadView = ({ caseNumber }: { caseNumber: number }) => {
                 scope="customer"
                 caseNumber={caseNumber}
                 typingName={thread.typingName}
-                replyClosedReason={replyClosedReason(item)}
+                closedReason={replyClosedReason(item)}
                 onSend={thread.sendMessage}
                 onTyping={thread.noteTyping}
                 onError={setToast}
