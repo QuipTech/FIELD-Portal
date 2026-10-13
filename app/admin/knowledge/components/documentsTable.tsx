@@ -5,6 +5,7 @@ import { OwnershipTag } from "@/components/admin/ownershipTag";
 import { usePermissions } from "@/lib/auth/usePermissions";
 import { PERMISSIONS } from "@/lib/auth/permissionCodes";
 import { Tag } from "@/components/ui/tag";
+import { SerialNumber } from "@/components/ui/serialNumber";
 import { LoadingSpinner } from "@/components/ui/loadingSpinner";
 import { Table, TableHeaderRow, TableHeaderCell, TableRow, TableCell } from "@/components/ui/table";
 import { formatDocumentIndexedLabel } from "@/lib/format/documentIndexedLabel";
@@ -60,6 +61,7 @@ export const DocumentsTable = ({ documents, isLoading, loadError, onAction }: Do
   return (
     <Table>
       <TableHeaderRow>
+        <TableHeaderCell flex={0.25}>Sr.</TableHeaderCell>
         <TableHeaderCell flex={3.2}>Document</TableHeaderCell>
         <TableHeaderCell flex={0.8}>Type</TableHeaderCell>
         <TableHeaderCell flex={1}>Indexed</TableHeaderCell>
@@ -73,11 +75,14 @@ export const DocumentsTable = ({ documents, isLoading, loadError, onAction }: Do
         <TableMessage>No documents yet. Upload a manual, bulletin or procedure to start the library.</TableMessage>
       )}
       {!loadError &&
-        documents.map((document) => {
+        documents.map((document, index) => {
           const { icon, tone } =
             document.state === "failed" ? FAILED_ICON : (documentTypeIcon[document.type] ?? documentTypeIcon.manual);
           return (
             <TableRow key={document.id}>
+              <TableCell flex={0.25}>
+                <SerialNumber value={index + 1} />
+              </TableCell>
               <TableCell flex={3.2} className="flex items-center gap-2.5">
                 <IconTile icon={icon} tone={tone} size="sm" />
                 <div className="flex min-w-0 flex-col">
