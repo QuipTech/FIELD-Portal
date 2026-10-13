@@ -12,15 +12,17 @@ import type {
 
 const authorizationHeader = (accessToken: string) => ({ Authorization: `Bearer ${accessToken}` });
 
-const toQueryString = (filters: SupportCaseFilters): string => {
-  const params = new URLSearchParams({ status: filters.status });
+export const CASES_PAGE_SIZE = 25;
+
+const toQueryString = (filters: SupportCaseFilters, page: number): string => {
+  const params = new URLSearchParams({ status: filters.status, page: String(page), pageSize: String(CASES_PAGE_SIZE) });
   if (filters.priority) params.set("priority", filters.priority);
   if (filters.search.trim()) params.set("search", filters.search.trim());
   return params.toString();
 };
 
-export const listSupportCasesRequest = (accessToken: string, filters: SupportCaseFilters) =>
-  apiRequest<SupportCaseList>(`/cases?${toQueryString(filters)}`, {
+export const listSupportCasesRequest = (accessToken: string, filters: SupportCaseFilters, page = 1) =>
+  apiRequest<SupportCaseList>(`/cases?${toQueryString(filters, page)}`, {
     headers: authorizationHeader(accessToken),
   });
 

@@ -44,16 +44,26 @@ export class SupportCasesService {
     query: ListSupportCasesQueryDto,
   ): Promise<SupportCaseList> =>
     this.databaseService.withTenant(actor.tenantId, async (client) => {
-      const rows = await casesRepository.listCases(client, actor.tenantId, {
-        ...query,
-        status: query.status ?? 'active',
-      });
+      const filters = { ...query, status: query.status ?? 'active' };
+      const rows = await casesRepository.listCases(
+        client,
+        actor.tenantId,
+        filters,
+      );
+      const total = await casesRepository.countCases(
+        client,
+        actor.tenantId,
+        filters,
+      );
       const counts = await casesRepository.countCasesByStatus(
         client,
         actor.tenantId,
       );
       return {
         items: rows.map(toSupportCase),
+        total,
+        page: query.page,
+        pageSize: query.pageSize,
         statusCounts: toStatusCounts(counts),
       };
     });

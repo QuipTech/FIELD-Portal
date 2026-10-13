@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useApiResource } from "@/lib/hooks/useApiResource";
 import { useCaseEvents } from "@/lib/hooks/useCaseEvents";
+import { usePageReset } from "@/lib/hooks/usePageReset";
 import { listSupportCasesRequest } from "@/lib/api/supportCasesApi";
 import type { SupportCaseFilters } from "@/lib/types/supportCase";
 
@@ -21,9 +22,11 @@ export const useSupportCases = () => {
     return () => clearTimeout(timer);
   }, [filters.search]);
 
+  const [page, setPage] = usePageReset([filters.status, filters.priority, debouncedSearch]);
+
   const cases = useApiResource(
-    (accessToken) => listSupportCasesRequest(accessToken, { ...filters, search: debouncedSearch }),
-    [filters.status, filters.priority, debouncedSearch],
+    (accessToken) => listSupportCasesRequest(accessToken, { ...filters, search: debouncedSearch }, page),
+    [filters.status, filters.priority, debouncedSearch, page],
     "Couldn't load support cases. Please try again.",
   );
 
@@ -34,5 +37,5 @@ export const useSupportCases = () => {
 
   const isFiltered = filters.status !== "active" || filters.priority !== "" || debouncedSearch.trim() !== "";
 
-  return { filters, updateFilter, isFiltered, cases };
+  return { filters, updateFilter, isFiltered, cases, page, setPage };
 };

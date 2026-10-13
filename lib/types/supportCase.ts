@@ -42,6 +42,10 @@ export interface SupportCase {
 
 export interface SupportCaseList {
   items: SupportCase[];
+  // Matching the filters, across every page.
+  total: number;
+  page: number;
+  pageSize: number;
   // Across the whole organisation, ignoring the list's filters.
   statusCounts: Record<CaseStatus, number>;
 }

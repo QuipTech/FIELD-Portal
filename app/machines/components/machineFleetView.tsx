@@ -1,6 +1,7 @@
 "use client";
 
 import { LoadingSpinner } from "@/components/ui/loadingSpinner";
+import { Pagination } from "@/components/ui/pagination";
 import { useMachineFleet } from "../useMachineFleet";
 import { FeaturedDownMachineCard } from "./featuredDownMachineCard";
 import { MachinesFilterCard } from "./machinesFilterCard";
@@ -12,7 +13,7 @@ interface MachineFleetViewProps {
 }
 
 export const MachineFleetView = ({ search, reloadToken }: MachineFleetViewProps) => {
-  const { filters, updateFilter, clearFilters, fleet, debouncedSearch } = useMachineFleet(search, reloadToken);
+  const { filters, updateFilter, clearFilters, fleet, debouncedSearch, page, setPage } = useMachineFleet(search, reloadToken);
   const data = fleet.data;
 
   const emptyMessage = debouncedSearch.trim()
@@ -34,7 +35,10 @@ export const MachineFleetView = ({ search, reloadToken }: MachineFleetViewProps)
       {data.featuredDown && <FeaturedDownMachineCard featured={data.featuredDown} />}
       {fleet.error && <p className="text-sm text-danger">{fleet.error}</p>}
       <div className="flex min-h-0 flex-1 gap-3.5">
-        <MachinesTable machines={data.items} emptyMessage={emptyMessage} />
+        <div className="flex min-w-0 flex-1 flex-col gap-3">
+          <MachinesTable machines={data.items} emptyMessage={emptyMessage} />
+          <Pagination page={page} pageSize={data.pageSize} total={data.total} onPageChange={setPage} />
+        </div>
         <MachinesFilterCard
           filters={filters}
           facets={data.facets}

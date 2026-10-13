@@ -1,10 +1,9 @@
 import { PoolClient } from 'pg';
 import { escapeLikePattern } from '../common/utils/escapeLikePattern';
+import { toLimitOffset } from '../common/dto/paginationQueryDto';
 import { ListMachinesQueryDto } from './dto/listMachinesQueryDto';
 import { FeaturedDownRow, FleetMachineRow } from './types/machineFleetRows';
 import { OperatingStatus } from './types/machineFleetResponse';
-
-const PAGE_LIMIT = 200;
 
 // Every query filters on tenant_id itself: the backend's database role may
 // bypass RLS.
@@ -55,10 +54,11 @@ export const listMachines = async (
   filters: ListMachinesQueryDto,
 ): Promise<FleetMachineRow[]> => {
   const { where, params } = buildFilter(tenantId, filters);
+  const { limit, offset } = toLimitOffset(filters);
   const result = await client.query<FleetMachineRow>(
     `SELECT ${FLEET_COLUMNS} ${FLEET_FROM} WHERE ${where}
-     ORDER BY label LIMIT ${PAGE_LIMIT}`,
-    params,
+     ORDER BY label, m.id LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    [...params, limit, offset],
   );
   return result.rows;
 };

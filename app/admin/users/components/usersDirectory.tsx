@@ -1,9 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Icon } from "@/components/icons/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Pagination } from "@/components/ui/pagination";
+import { usePageReset } from "@/lib/hooks/usePageReset";
 import { useApiResource } from "@/lib/hooks/useApiResource";
 import { useSignedInProfile } from "@/lib/auth/useSignedInProfile";
 import { listAdminRolesRequest } from "@/lib/api/adminRolesApi";
@@ -14,7 +16,7 @@ import { InviteUserModal } from "./inviteUserModal";
 import { ChangeRoleModal } from "./changeRoleModal";
 import { RemoveUserDialog } from "./removeUserDialog";
 import type { AdminUser } from "@/lib/types/adminUser";
-import { useAdminUsers } from "../useAdminUsers";
+import { USERS_PAGE_SIZE, useAdminUsers } from "../useAdminUsers";
 
 // Role names, once each: the Owner can see same-named roles in
 // several organisations, and the backend filters by name.
@@ -27,13 +29,12 @@ export const UsersDirectory = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [roleTarget, setRoleTarget] = useState<AdminUser | null>(null);
   const [removeTarget, setRemoveTarget] = useState<AdminUser | null>(null);
-  const { users, total, isLoading, errorMessage, reload } = useAdminUsers(search.trim());
+  const [page, setPage] = usePageReset([search, role]);
+  const { users, total, isLoading, errorMessage, reload } = useAdminUsers(search.trim(), role, page);
   const roles = useApiResource(listAdminRolesRequest, [], "Couldn't load roles.");
   const organisations = useApiResource(listAdminOrganisationsRequest, [], "Couldn't load organisations.");
   const profile = useSignedInProfile();
   const organisationList = organisations.data ?? [];
-  const visibleUsers = useMemo(() => (role ? users.filter((user) => user.roles.includes(role)) : users), [users, role]);
-  const visibleCount = role ? visibleUsers.length : total;
 
   return (
     <>
@@ -58,18 +59,19 @@ export const UsersDirectory = () => {
         <Input icon="search" placeholder="Search users" className="w-60" value={search} onChange={(event) => setSearch(event.target.value)} />
         {!errorMessage && (
           <span className="ml-auto text-xs text-slate-400">
-            {visibleCount} {visibleCount === 1 ? "user" : "users"}
+            {total} {total === 1 ? "user" : "users"}
           </span>
         )}
       </div>
       <UsersTable
-        users={visibleUsers}
+        users={users}
         isLoading={isLoading}
         errorMessage={errorMessage}
         currentUserId={profile?.user.id ?? null}
         onChangeRole={setRoleTarget}
         onRemove={setRemoveTarget}
       />
+      {!errorMessage && <Pagination page={page} pageSize={USERS_PAGE_SIZE} total={total} onPageChange={setPage} />}
       {isInviteOpen && roles.data && (
         <InviteUserModal
           roles={roles.data}
