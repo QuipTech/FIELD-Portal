@@ -36,7 +36,7 @@ export const assertCanManageDocument = (
   }
 };
 
-// Approving/rejecting bulletins and policies is a QuipTech (Owner)
+// Approving/rejecting shared-library documents is a QuipTech (Owner)
 // decision.
 export const assertCanReview = (access: UserAccess): void => {
   if (!access.permissions.includes(PLATFORM_PERMISSION_CODE)) {

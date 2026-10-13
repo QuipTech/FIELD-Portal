@@ -55,6 +55,8 @@ export interface SupportCase {
   subject: string;
   description: string | null;
   category: CaseCategory;
+  // The reporter's own type name, for category 'other'.
+  customCategory: string | null;
   status: CaseStatus;
   priority: CasePriority;
   machine: CaseMachine | null;
@@ -89,6 +91,8 @@ export interface CaseMessage {
   id: string;
   body: string;
   createdAt: string;
+  // Internal notes only: when a staff member last changed it.
+  editedAt: string | null;
   // null once the author's account is deleted.
   author: CasePerson | null;
   authorRole: CaseAuthorRole;

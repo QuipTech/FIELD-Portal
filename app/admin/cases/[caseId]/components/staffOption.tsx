@@ -24,7 +24,11 @@ export const StaffOption = ({ member, isSelected, onSelect }: StaffOptionProps) 
     aria-disabled={!member.isSupportStaff}
     disabled={!member.isSupportStaff}
     onClick={onSelect}
-    title={member.isSupportStaff ? undefined : "Customers can't be assigned cases. QuipTech's team and Support Agents can."}
+    title={
+      member.isSupportStaff
+        ? undefined
+        : "Only Technical Managers, Field Technicians, Support Agents and Knowledge Managers can be assigned cases."
+    }
     className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left disabled:cursor-not-allowed disabled:opacity-50 ${
       isSelected ? "bg-primaryTint" : "enabled:hover:bg-fillGray"
     }`}

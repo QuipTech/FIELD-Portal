@@ -46,6 +46,12 @@ export const getKnowledgeDownloadUrlRequest = (accessToken: string, documentId: 
     headers: authorizationHeader(accessToken),
   });
 
+// Like the download link, but opens in the browser for the preview.
+export const getKnowledgePreviewUrlRequest = (accessToken: string, documentId: string): Promise<SignedUrl> =>
+  apiRequest<SignedUrl>(`/admin/knowledge/documents/${documentId}/preview`, {
+    headers: authorizationHeader(accessToken),
+  });
+
 export const deleteKnowledgeDocumentRequest = (accessToken: string, documentId: string): Promise<void> =>
   apiRequest<void>(`/admin/knowledge/documents/${documentId}`, {
     method: "DELETE",

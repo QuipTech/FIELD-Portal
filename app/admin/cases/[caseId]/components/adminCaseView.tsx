@@ -20,11 +20,14 @@ import { AdminCaseSidePanel } from "./adminCaseSidePanel";
 // A13b: one case for staff — the shared thread (with internal notes) and
 // the case's controls.
 export const AdminCaseView = ({ caseNumber }: { caseNumber: number }) => {
-  const { supportCase, thread, updateCase } = useAdminCase(caseNumber);
+  const { supportCase, thread, updateCase, updateNote, deleteNote } = useAdminCase(caseNumber);
   const profile = useSignedInProfile();
   const [toast, setToast] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const item = supportCase.data;
+  // Notes live in the side panel, not the chat.
+  const chatMessages = thread.messages.filter((message) => !message.isInternal);
+  const internalNotes = thread.messages.filter((message) => message.isInternal);
 
   const change = async (changes: SupportCaseChanges) => {
     setIsSaving(true);
@@ -81,7 +84,7 @@ export const AdminCaseView = ({ caseNumber }: { caseNumber: number }) => {
                 <CaseThreadSkeleton />
               ) : (
                 <CaseThread
-                  messages={thread.messages}
+                  messages={chatMessages}
                   events={thread.events}
                   perspective="staff"
                   companyName={item.company.name}
@@ -93,8 +96,8 @@ export const AdminCaseView = ({ caseNumber }: { caseNumber: number }) => {
               scope="staff"
               caseNumber={caseNumber}
               typingName={thread.typingName}
-              replyClosedReason={staffReplyClosedReason(item)}
-              canAddInternalNotes={item.status !== "closed"}
+              closedReason={staffReplyClosedReason(item)}
+              hint="Customer sees replies in the portal and gets an email"
               onSend={thread.sendMessage}
               onTyping={thread.noteTyping}
               onError={setToast}
@@ -105,6 +108,25 @@ export const AdminCaseView = ({ caseNumber }: { caseNumber: number }) => {
             currentUserId={profile?.user.id ?? null}
             isSaving={isSaving}
             onChange={change}
+            internalNotes={internalNotes}
+            onUpdateNote={updateNote}
+            onDeleteNote={deleteNote}
+            noteComposer={
+              item.status !== "closed" && (
+                <CaseComposer
+                  scope="staff"
+                  caseNumber={caseNumber}
+                  typingName={null}
+                  closedReason={null}
+                  isInternal
+                  allowAttachments={false}
+                  className="rounded-xl bg-surface p-3"
+                  onSend={thread.sendMessage}
+                  onTyping={thread.noteTyping}
+                  onError={setToast}
+                />
+              )
+            }
           />
         </div>
       )}

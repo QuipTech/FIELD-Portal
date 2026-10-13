@@ -20,6 +20,8 @@ interface CaseEventHandlers {
   onMessage?: (caseNumber: number, message: CaseMessage) => void;
   onEvent?: (caseNumber: number, event: CaseEvent) => void;
   onTyping?: (event: CaseTypingEvent) => void;
+  // Staff only: an internal note was deleted (an edit arrives as onMessage).
+  onNoteDeleted?: (caseNumber: number, noteId: string) => void;
 }
 
 // Live case events for the page. With `caseNumber` it also joins that
@@ -50,6 +52,9 @@ export const useCaseEvents = (handlers: CaseEventHandlers, caseNumber?: number) 
       handlersRef.current.onEvent?.(event.caseNumber, event.event),
     );
     socket.on(CASE_SOCKET_EVENTS.typing, (event: CaseTypingEvent) => handlersRef.current.onTyping?.(event));
+    socket.on(CASE_SOCKET_EVENTS.noteDeleted, (event: { caseNumber: number; noteId: string }) =>
+      handlersRef.current.onNoteDeleted?.(event.caseNumber, event.noteId),
+    );
     return () => {
       socket.disconnect();
       socketRef.current = null;

@@ -27,6 +27,14 @@ const appendById = <T extends { id: string }>(items: T[] | null, item: T): T[] =
   return current.some((existing) => existing.id === item.id) ? current : [...current, item];
 };
 
+// An edited note comes back with the same id: swap it in place.
+const upsertById = <T extends { id: string }>(items: T[] | null, item: T): T[] => {
+  const current = items ?? [];
+  return current.some((existing) => existing.id === item.id)
+    ? current.map((existing) => (existing.id === item.id ? item : existing))
+    : [...current, item];
+};
+
 // One case's thread (messages + system lines), kept live over the socket
 // and marked read as it's seen. The same for customers and staff; scope
 // picks the API routes, and the API decides what each may receive.
@@ -66,12 +74,15 @@ export const useLiveCaseThread = (
       },
       onMessage: (messageCaseNumber, message) => {
         if (messageCaseNumber !== caseNumber) return;
-        messages.setData((current) => appendById(current, message));
+        messages.setData((current) => upsertById(current, message));
         setTypingName(null);
         if (document.visibilityState === "visible") markRead();
       },
       onEvent: (eventCaseNumber, event) => {
         if (eventCaseNumber === caseNumber) events.setData((current) => appendById(current, event));
+      },
+      onNoteDeleted: (noteCaseNumber, noteId) => {
+        if (noteCaseNumber === caseNumber) removeMessage(noteId);
       },
       onTyping: (event) => {
         if (event.caseNumber !== caseNumber || event.userId === signedInProfile?.user.id) return;
@@ -89,6 +100,10 @@ export const useLiveCaseThread = (
     // A reply can change the case (e.g. waiting on customer → open).
     events.reload();
   };
+
+  const replaceMessage = (message: CaseMessage) => messages.setData((current) => upsertById(current, message));
+  const removeMessage = (messageId: string) =>
+    messages.setData((current) => (current ?? []).filter((message) => message.id !== messageId));
 
   const noteTyping = (isInternal: boolean) => {
     const now = Date.now();
@@ -114,6 +129,8 @@ export const useLiveCaseThread = (
     typingName,
     isLive: isConnected,
     sendMessage,
+    replaceMessage,
+    removeMessage,
     noteTyping,
   };
 };
