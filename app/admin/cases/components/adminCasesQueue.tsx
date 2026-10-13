@@ -9,7 +9,7 @@ import { QUEUE_PAGE_SIZE, useAdminCaseQueue } from "../useAdminCaseQueue";
 import { CaseQueueStats } from "./caseQueueStats";
 import { CaseQueueTabs } from "./caseQueueTabs";
 import { CaseQueueFilters } from "./caseQueueFilters";
-import { CaseQueueTable } from "./caseQueueTable";
+import { CaseQueueTable } from "@/components/supportCases/caseQueueTable";
 
 const EMPTY_TITLES = {
   unassigned: "Nothing waiting to be assigned",

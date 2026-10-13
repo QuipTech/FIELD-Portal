@@ -112,6 +112,7 @@ export interface SupportStaffRow {
   email: string;
   avatar_url: string | null;
   organisation_name: string;
+  role_name: string | null;
   is_admin: boolean;
   is_support_staff: boolean;
   open_case_count: string;

@@ -11,7 +11,15 @@ import { CasePersonCell } from "./casePersonCell";
 
 const COLUMNS = { number: 0.5, subject: 2.2, company: 1.2, reporter: 1.1, assignee: 1.2, status: 1.1, priority: 0.6, sla: 0.9, updated: 0.9 };
 
-export const CaseQueueTable = ({ items }: { items: AdminSupportCaseListItem[] }) => (
+interface CaseQueueTableProps {
+  items: AdminSupportCaseListItem[];
+  // Where a row opens; the client portal keeps assigned cases in its own shell.
+  caseHref?: (caseNumber: number) => string;
+}
+
+const adminCaseHref = (caseNumber: number) => `/admin/cases/${caseNumber}`;
+
+export const CaseQueueTable = ({ items, caseHref = adminCaseHref }: CaseQueueTableProps) => (
   <Table className="flex-none">
     <TableHeaderRow>
       <TableHeaderCell flex={COLUMNS.number}>#</TableHeaderCell>
@@ -25,7 +33,7 @@ export const CaseQueueTable = ({ items }: { items: AdminSupportCaseListItem[] })
       <TableHeaderCell flex={COLUMNS.updated}>Updated</TableHeaderCell>
     </TableHeaderRow>
     {items.map((item) => (
-      <Link key={item.id} href={`/admin/cases/${item.caseNumber}`}>
+      <Link key={item.id} href={caseHref(item.caseNumber)}>
         <TableRow className="hover:bg-surfaceGray">
           <TableCell flex={COLUMNS.number} className="text-bodyGray">
             {item.caseNumber}

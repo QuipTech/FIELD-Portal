@@ -13,13 +13,20 @@ import { CaseComposer } from "@/components/supportCases/caseComposer";
 import { useSignedInProfile } from "@/lib/auth/useSignedInProfile";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import type { SupportCaseChanges } from "@/lib/types/supportCase";
-import { useAdminCase } from "../useAdminCase";
-import { canMarkWaiting, canResolve, staffReplyClosedReason } from "../staffCaseRules";
+import { useAdminCase } from "./useAdminCase";
+import { canMarkWaiting, canResolve, staffReplyClosedReason } from "./staffCaseRules";
 import { AdminCaseSidePanel } from "./adminCaseSidePanel";
 
 // A13b: one case for staff — the shared thread (with internal notes) and
 // the case's controls.
-export const AdminCaseView = ({ caseNumber }: { caseNumber: number }) => {
+interface AdminCaseViewProps {
+  caseNumber: number;
+  // The list the breadcrumb returns to: the admin queue, or the client
+  // portal's Support cases for assigned staff.
+  backHref?: string;
+}
+
+export const AdminCaseView = ({ caseNumber, backHref = "/admin/cases" }: AdminCaseViewProps) => {
   const { supportCase, thread, updateCase, updateNote, deleteNote } = useAdminCase(caseNumber);
   const profile = useSignedInProfile();
   const [toast, setToast] = useState<string | null>(null);
@@ -55,7 +62,7 @@ export const AdminCaseView = ({ caseNumber }: { caseNumber: number }) => {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <CaseHeaderBar
-        backHref="/admin/cases"
+        backHref={backHref}
         backLabel="Support cases"
         caseNumber={caseNumber}
         item={item}
@@ -70,7 +77,7 @@ export const AdminCaseView = ({ caseNumber }: { caseNumber: number }) => {
           ) : (
             <p className="text-sm">
               {supportCase.error ?? "This case doesn't exist."}{" "}
-              <Link href="/admin/cases" className="text-primary hover:underline">
+              <Link href={backHref} className="text-primary hover:underline">
                 Back to support cases
               </Link>
             </p>

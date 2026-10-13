@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import { AdminShell } from "@/components/shell/adminShell";
 import { AdminTopBar } from "@/components/shell/adminTopBar";
 import { SupportStaffView } from "@/components/supportCases/supportStaffView";
-import { AdminCaseView } from "./components/adminCaseView";
+import { RedirectNonAdminStaff } from "@/components/supportCases/redirectNonAdminStaff";
+import { AdminCaseView } from "@/components/supportCases/staffCase/adminCaseView";
 
 interface AdminCasePageProps {
   params: { caseId: string };
@@ -16,6 +17,7 @@ const AdminCasePage = ({ params }: AdminCasePageProps) => {
 
   return (
     <AdminShell topBar={<AdminTopBar label="Support cases" />}>
+      <RedirectNonAdminStaff to={`/cases/assigned/${caseNumber}`} />
       <SupportStaffView className="m-8">
         <AdminCaseView caseNumber={caseNumber} />
       </SupportStaffView>

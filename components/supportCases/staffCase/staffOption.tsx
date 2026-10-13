@@ -11,7 +11,7 @@ interface StaffOptionProps {
 
 const describeMember = (member: SupportStaffMember) =>
   member.isSupportStaff
-    ? `${member.isAdmin ? "Admin" : "Support agent"} · ${member.openCaseCount} open`
+    ? `${member.isAdmin ? "Admin" : (member.roleName ?? "Support staff")} · ${member.openCaseCount} open`
     : `${member.organisationName} · customer`;
 
 // One person in the assign dropdown: "T. Meyer — Admin · 3 open".

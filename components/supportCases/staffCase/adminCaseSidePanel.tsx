@@ -8,7 +8,7 @@ import { abbreviateName, getInitials } from "@/lib/format/nameInitials";
 import type { AdminSupportCase } from "@/lib/types/adminSupportCase";
 import type { CaseMessage } from "@/lib/types/caseMessage";
 import type { CasePriority, CaseStatus, SupportCaseChanges } from "@/lib/types/supportCase";
-import { isAdminViewer, selectableStatuses } from "../staffCaseRules";
+import { isAdminViewer, selectableStatuses } from "./staffCaseRules";
 import { AssigneePicker } from "./assigneePicker";
 import { InternalNotesList } from "./internalNotesList";
 import { PanelField, PanelRow, PanelSection, panelSelectClasses } from "./panelSection";
