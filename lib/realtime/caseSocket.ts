@@ -7,6 +7,7 @@ export const CASE_SOCKET_EVENTS = {
   message: "case:message",
   event: "case:event",
   typing: "case:typing",
+  noteDeleted: "case:noteDeleted",
   join: "case:join",
   leave: "case:leave",
 } as const;

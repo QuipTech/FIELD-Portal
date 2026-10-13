@@ -35,6 +35,7 @@ export interface CaseMessageRow {
   id: string;
   note: string;
   created_at: Date;
+  edited_at: Date | null;
   author_role: string;
   is_internal: boolean;
   author_id: string | null;

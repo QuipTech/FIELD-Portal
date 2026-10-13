@@ -46,6 +46,7 @@ export const buildMessageRow = (
   id: 'message-1',
   note: 'E-2204 on every cold start.',
   created_at: new Date('2026-09-29T08:00:00Z'),
+  edited_at: null,
   author_role: 'customer',
   is_internal: false,
   author_id: 'customer-1',

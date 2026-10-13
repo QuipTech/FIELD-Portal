@@ -15,6 +15,8 @@ export interface CaseMessage {
   id: string;
   body: string;
   createdAt: string;
+  // Internal notes only: when a staff member last changed it.
+  editedAt: string | null;
   // null once the author's account is deleted.
   author: CasePerson | null;
   authorRole: CaseAuthorRole;

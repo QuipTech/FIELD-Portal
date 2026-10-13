@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { DatabaseService } from '../database/database.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
@@ -14,6 +10,7 @@ import { markCaseRead } from './caseReads.repository';
 import { requireSupportCase } from './requireSupportCase';
 import { recordCaseChange } from './recordCaseChange';
 import { postMessageToCase } from './postMessageToCase';
+import { withStaffCase } from './withStaffCase';
 import { CaseAccessService, StaffCaseAccess } from './caseAccess.service';
 import { CaseAttachmentsService } from './caseAttachments.service';
 import { CaseAnnouncer } from './caseAnnouncer.service';
@@ -26,14 +23,11 @@ import { AdminSupportCase } from './types/adminSupportCaseResponse';
 import { CaseAttachment, CaseMessage } from './types/supportCaseResponse';
 import { SupportCaseRow } from './types/supportCaseRows';
 
-const CASE_NOT_FOUND_MESSAGE = 'Support case not found.';
 const NOT_SUPPORT_STAFF_MESSAGE =
   "That person isn't support staff, so they can't take cases.";
 
-// Staff changes to a case, made under the case's own organisation (its RLS
-// and audit log). Who may change what is caseAccessPolicy; the case is
-// re-read inside the transaction, so an assignee who was just reassigned
-// away can't keep working on it.
+// Staff changes to a case, made under the case's own organisation
+// (withStaffCase). Who may change what is caseAccessPolicy.
 @Injectable()
 export class AdminCaseUpdatesService {
   constructor(
@@ -161,25 +155,7 @@ export class AdminCaseUpdatesService {
     actor: AuthenticatedUser,
     access: StaffCaseAccess,
     work: (client: PoolClient, supportCase: SupportCaseRow) => Promise<T>,
-  ): Promise<T> =>
-    this.databaseService.withActor(
-      { tenantId: access.caseTenantId, userId: actor.userId },
-      async (client) => {
-        const caseNumber = Number(access.supportCase.case_number);
-        const supportCase = await requireSupportCase(
-          client,
-          access.caseTenantId,
-          caseNumber,
-        );
-        if (
-          access.role === 'assignee' &&
-          supportCase.assignee_id !== actor.userId
-        ) {
-          throw new NotFoundException(CASE_NOT_FOUND_MESSAGE);
-        }
-        return work(client, supportCase);
-      },
-    );
+  ): Promise<T> => withStaffCase(this.databaseService, actor, access, work);
 
   private assertIsSupportStaff = async (userId: string): Promise<void> => {
     const staff = await listSupportStaff(this.databaseService);

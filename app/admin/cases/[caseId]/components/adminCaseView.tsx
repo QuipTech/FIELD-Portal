@@ -20,7 +20,7 @@ import { AdminCaseSidePanel } from "./adminCaseSidePanel";
 // A13b: one case for staff — the shared thread (with internal notes) and
 // the case's controls.
 export const AdminCaseView = ({ caseNumber }: { caseNumber: number }) => {
-  const { supportCase, thread, updateCase } = useAdminCase(caseNumber);
+  const { supportCase, thread, updateCase, updateNote, deleteNote } = useAdminCase(caseNumber);
   const profile = useSignedInProfile();
   const [toast, setToast] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -109,6 +109,8 @@ export const AdminCaseView = ({ caseNumber }: { caseNumber: number }) => {
             isSaving={isSaving}
             onChange={change}
             internalNotes={internalNotes}
+            onUpdateNote={updateNote}
+            onDeleteNote={deleteNote}
             noteComposer={
               item.status !== "closed" && (
                 <CaseComposer

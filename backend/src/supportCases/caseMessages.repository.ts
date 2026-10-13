@@ -3,7 +3,7 @@ import { CaseAuthorRole } from './types/supportCaseResponse';
 import { CaseMessageRow } from './types/supportCaseRows';
 
 const MESSAGE_SELECT = `
-  SELECT u.id, u.note, u.created_at, u.author_role, u.is_internal,
+  SELECT u.id, u.note, u.created_at, u.edited_at, u.author_role, u.is_internal,
          a.id AS author_id, a.first_name AS author_first_name,
          a.last_name AS author_last_name, a.avatar_url AS author_avatar_url
   FROM support_updates u
@@ -17,7 +17,7 @@ export const listCaseMessages = async (
 ): Promise<CaseMessageRow[]> => {
   const result = await client.query<CaseMessageRow>(
     `${MESSAGE_SELECT}
-     WHERE u.tenant_id = $1 AND u.support_case_id = $2
+     WHERE u.tenant_id = $1 AND u.support_case_id = $2 AND u.deleted_at IS NULL
        AND ($3::boolean OR NOT u.is_internal)
      ORDER BY u.created_at, u.id`,
     [params.tenantId, params.caseId, params.includeInternal],
@@ -49,9 +49,16 @@ export const insertCaseMessage = async (
       params.isInternal,
     ],
   );
+  return findCaseMessage(client, inserted.rows[0].id);
+};
+
+export const findCaseMessage = async (
+  client: PoolClient,
+  messageId: string,
+): Promise<CaseMessageRow> => {
   const result = await client.query<CaseMessageRow>(
     `${MESSAGE_SELECT} WHERE u.id = $1`,
-    [inserted.rows[0].id],
+    [messageId],
   );
   return result.rows[0];
 };

@@ -19,6 +19,8 @@ interface AdminCaseSidePanelProps {
   isSaving: boolean;
   onChange: (changes: SupportCaseChanges) => void;
   internalNotes: CaseMessage[];
+  onUpdateNote: (noteId: string, body: string) => Promise<void>;
+  onDeleteNote: (noteId: string) => Promise<void>;
   // The internal-note box; omitted once the case is closed.
   noteComposer: ReactNode;
 }
@@ -35,6 +37,8 @@ export const AdminCaseSidePanel = ({
   isSaving,
   onChange,
   internalNotes,
+  onUpdateNote,
+  onDeleteNote,
   noteComposer,
 }: AdminCaseSidePanelProps) => {
   const isAdmin = isAdminViewer(item);
@@ -114,7 +118,13 @@ export const AdminCaseSidePanel = ({
       <PanelSection title="Internal notes">
         <span className="text-sm leading-snug text-indigo-200/60">Only support staff can see internal notes.</span>
         {noteComposer}
-        <InternalNotesList notes={internalNotes} />
+        <InternalNotesList
+          notes={internalNotes}
+          currentUserId={currentUserId}
+          isAdmin={isAdmin}
+          onUpdate={onUpdateNote}
+          onDelete={onDeleteNote}
+        />
       </PanelSection>
     </aside>
   );

@@ -1,10 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
   ParseIntPipe,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -28,9 +30,11 @@ import {
 } from './supportStaff.guard';
 import { AdminSupportCasesService } from './adminSupportCases.service';
 import { AdminCaseUpdatesService } from './adminCaseUpdates.service';
+import { AdminCaseNotesService } from './adminCaseNotes.service';
 import { ListAdminSupportCasesQueryDto } from './dto/listAdminSupportCasesQueryDto';
 import { UpdateSupportCaseDto } from './dto/updateSupportCaseDto';
 import { PostStaffCaseMessageDto } from './dto/postStaffCaseMessageDto';
+import { UpdateCaseNoteDto } from './dto/updateCaseNoteDto';
 
 // The support queue and case screens for QuipTech staff, across every
 // organisation. The admin (platform.manage) works every case; a Support
@@ -41,6 +45,7 @@ export class AdminSupportCasesController {
   constructor(
     private readonly adminSupportCasesService: AdminSupportCasesService,
     private readonly adminCaseUpdatesService: AdminCaseUpdatesService,
+    private readonly adminCaseNotesService: AdminCaseNotesService,
   ) {}
 
   // ?tab=unassigned|mine|open|resolved&company=&priority=&status=&search=
@@ -125,6 +130,32 @@ export class AdminSupportCasesController {
     @Body() dto: PostStaffCaseMessageDto,
   ) {
     return this.adminCaseUpdatesService.postMessage(actor, caseNumber, dto);
+  }
+
+  // Internal notes only: the author or the support admin.
+  @Patch('cases/:caseNumber/notes/:noteId')
+  updateNote(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('caseNumber', ParseIntPipe) caseNumber: number,
+    @Param('noteId', ParseUUIDPipe) noteId: string,
+    @Body() dto: UpdateCaseNoteDto,
+  ) {
+    return this.adminCaseNotesService.updateNote(
+      actor,
+      caseNumber,
+      noteId,
+      dto.body,
+    );
+  }
+
+  @Delete('cases/:caseNumber/notes/:noteId')
+  @HttpCode(204)
+  deleteNote(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('caseNumber', ParseIntPipe) caseNumber: number,
+    @Param('noteId', ParseUUIDPipe) noteId: string,
+  ) {
+    return this.adminCaseNotesService.deleteNote(actor, caseNumber, noteId);
   }
 
   @Post('cases/:caseNumber/attachments')

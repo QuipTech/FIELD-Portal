@@ -78,6 +78,7 @@ export const toCaseMessage = (
   id: row.id,
   body: row.note,
   createdAt: row.created_at.toISOString(),
+  editedAt: toIso(row.edited_at),
   author: toPerson(
     row.author_id,
     row.author_first_name,

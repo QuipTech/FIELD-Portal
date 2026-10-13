@@ -25,6 +25,7 @@ export const CASE_EVENTS = {
   message: 'case:message',
   event: 'case:event',
   typing: 'case:typing',
+  noteDeleted: 'case:noteDeleted',
 } as const;
 
 // Pushes case changes to connected portals. Services call it after a
@@ -62,6 +63,13 @@ export class CaseEventsPublisher {
       ? caseStaffRoom(caseNumber)
       : caseRoom(caseNumber);
     this.namespace?.to(room).emit(CASE_EVENTS.message, { caseNumber, message });
+  };
+
+  // An edited note goes out again as a message; staff replace it by id.
+  publishNoteDeleted = (caseNumber: number, noteId: string): void => {
+    this.namespace
+      ?.to(caseStaffRoom(caseNumber))
+      .emit(CASE_EVENTS.noteDeleted, { caseNumber, noteId });
   };
 
   publishEvents = (caseNumber: number, events: CaseEvent[]): void => {
