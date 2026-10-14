@@ -38,6 +38,7 @@ export interface CaseListFilters extends PaginationQueryDto {
   status: CaseStatusFilter;
   priority?: CasePriority;
   search?: string;
+  machineId?: string;
 }
 
 const STATUS_CONDITIONS: Record<CaseStatusFilter, string | null> = {
@@ -59,6 +60,10 @@ const buildCaseFilter = (tenantId: string, filters: CaseListFilters) => {
   if (filters.priority) {
     params.push(filters.priority);
     conditions.push(`c.priority = $${params.length}`);
+  }
+  if (filters.machineId) {
+    params.push(filters.machineId);
+    conditions.push(`c.machine_id = $${params.length}`);
   }
   if (filters.search) {
     const caseNumber = filters.search.replace(/^#/, '');

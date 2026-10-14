@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Icon } from "@/components/icons/icon";
 import { Tag } from "@/components/ui/tag";
-import { buildArticleHref, type KnowledgeListContext } from "@/lib/knowledge/knowledgeLinks";
+import type { ArticleNavigation } from "@/lib/knowledge/knowledgeLinks";
 import { documentTypeIcon, knowledgeDocumentTypes } from "@/lib/types/adminDocument";
 import type { KnowledgeArticle } from "@/lib/types/knowledgeArticle";
 
@@ -15,11 +15,11 @@ const bulletinLabel = (title: string) => {
 
 interface ArticleTagsProps {
   article: KnowledgeArticle;
-  listContext: KnowledgeListContext;
+  navigation: ArticleNavigation;
 }
 
 // Type, machine model, revision, source, and each bulletin that applies.
-export const ArticleTags = ({ article, listContext }: ArticleTagsProps) => {
+export const ArticleTags = ({ article, navigation }: ArticleTagsProps) => {
   const { icon, tone } = documentTypeIcon[article.type] ?? documentTypeIcon.manual;
   const model = [article.machineMake, article.machineModel].filter(Boolean).join(" ");
   return (
@@ -32,7 +32,7 @@ export const ArticleTags = ({ article, listContext }: ArticleTagsProps) => {
       <Tag>Rev {article.revision}</Tag>
       {article.source === "quiptech_library" && <Tag tone="primary">QuipTech library</Tag>}
       {article.appliesBulletins.map((bulletin) => (
-        <Link key={bulletin.id} href={buildArticleHref(bulletin.id, listContext)} title={bulletin.title}>
+        <Link key={bulletin.id} href={navigation.articleHref(bulletin.id)} title={bulletin.title}>
           <Tag tone="amber">
             <Icon name="alert" className="h-3.5 w-3.5" />
             {bulletinLabel(bulletin.title)}

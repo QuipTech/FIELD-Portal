@@ -54,6 +54,8 @@ export interface SupportCaseFilters {
   status: CaseStatusFilter;
   priority: CasePriority | "";
   search: string;
+  // Only cases about this machine.
+  machineId?: string;
 }
 
 export interface SupportCaseOptions {

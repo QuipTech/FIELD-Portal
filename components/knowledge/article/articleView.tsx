@@ -6,10 +6,10 @@ import { Tag } from "@/components/ui/tag";
 import { requireAccessToken } from "@/lib/api/requireAccessToken";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import { getDocumentDownloadUrlRequest } from "@/lib/api/documentsApi";
-import { buildKnowledgeListHref, type KnowledgeListContext } from "@/lib/knowledge/knowledgeLinks";
-import { useKnowledgeArticle } from "../useKnowledgeArticle";
-import { useOfflineCopy } from "../useOfflineCopy";
-import { useActiveSection } from "../useActiveSection";
+import type { ArticleNavigation } from "@/lib/knowledge/knowledgeLinks";
+import { useKnowledgeArticle } from "./useKnowledgeArticle";
+import { useOfflineCopy } from "./useOfflineCopy";
+import { useActiveSection } from "./useActiveSection";
 import { ArticleHeaderBar } from "./articleHeaderBar";
 import { ArticleSkeleton } from "./articleSkeleton";
 import { ArticleStateNotice } from "./articleStateNotice";
@@ -22,12 +22,14 @@ const HIGHLIGHT_MS = 2_500;
 
 interface ArticleViewProps {
   documentId: string;
-  listContext: KnowledgeListContext;
+  navigation: ArticleNavigation;
   // Opened from a search result: scroll to and highlight this section.
   initialSectionId: string | null;
+  // Inside another page (a machine's Manuals tab) rather than full screen.
+  isEmbedded?: boolean;
 }
 
-export const ArticleView = ({ documentId, listContext, initialSectionId }: ArticleViewProps) => {
+export const ArticleView = ({ documentId, navigation, initialSectionId, isEmbedded = false }: ArticleViewProps) => {
   const { state, reload } = useKnowledgeArticle(documentId);
   const article = state.kind === "ready" ? state.article : null;
   const offline = useOfflineCopy(article);
@@ -74,7 +76,8 @@ export const ArticleView = ({ documentId, listContext, initialSectionId }: Artic
           kind={state.kind}
           status={state.kind === "notLive" ? state.status : undefined}
           message={state.kind === "error" ? state.message : undefined}
-          backHref={buildKnowledgeListHref(listContext)}
+          backHref={navigation.listHref}
+          backLabel={navigation.listLabel}
           onRetried={reload}
         />
       );
@@ -83,7 +86,7 @@ export const ArticleView = ({ documentId, listContext, initialSectionId }: Artic
     return (
       <div className="flex flex-col gap-4 p-6">
         <h1 className="text-[22px] font-medium text-ink">{loaded.title}</h1>
-        <ArticleTags article={loaded} listContext={listContext} />
+        <ArticleTags article={loaded} navigation={navigation} />
         {state.isOfflineCopy && <Tag className="w-fit">Offline copy</Tag>}
         {loaded.summary && <p className="text-[15px] leading-relaxed text-bodyGray">{loaded.summary}</p>}
         {loaded.sections.length === 0 ? (
@@ -98,11 +101,17 @@ export const ArticleView = ({ documentId, listContext, initialSectionId }: Artic
   };
 
   return (
-    <div className="flex h-screen flex-col bg-surfaceGray">
+    <div
+      className={
+        isEmbedded
+          ? "flex h-[75vh] min-h-[480px] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-surfaceGray"
+          : "flex h-screen flex-col bg-surfaceGray"
+      }
+    >
       <ArticleHeaderBar
         title={article?.title ?? "Document"}
         article={article}
-        listContext={listContext}
+        navigation={navigation}
         offline={{ ...offline, save: saveOffline, remove: () => void offline.remove() }}
         onDownload={download}
       />
@@ -112,7 +121,7 @@ export const ArticleView = ({ documentId, listContext, initialSectionId }: Artic
             {renderBody()}
           </main>
           {article && article.sections.length > 0 && (
-            <ArticleTocRail article={article} activeSectionId={activeSectionId} listContext={listContext} onJump={jumpTo} />
+            <ArticleTocRail article={article} activeSectionId={activeSectionId} navigation={navigation} onJump={jumpTo} />
           )}
         </div>
       </div>

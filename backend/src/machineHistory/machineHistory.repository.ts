@@ -38,7 +38,7 @@ export const findMachineDetail = async (
   const result = await client.query<MachineDetailRow>(
     `SELECT m.id, m.serial_number, m.fleet_number, m.status,
             ${MACHINE_LABEL_SQL} AS label, m.asset_number, m.site, m.operating_hours, m.operating_hours_read_at,
-            mf.name AS manufacturer_name, mm.name AS model_name,
+            mf.name AS manufacturer_name, mm.name AS model_name, mm.id AS model_id,
             u.id AS owner_id, u.first_name AS owner_first_name, u.last_name AS owner_last_name,
             u.avatar_url AS owner_avatar_url,
             (SELECT count(*)::int FROM support_cases sc

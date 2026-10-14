@@ -18,6 +18,7 @@ const toQueryString = (filters: SupportCaseFilters, page: number): string => {
   const params = new URLSearchParams({ status: filters.status, page: String(page), pageSize: String(CASES_PAGE_SIZE) });
   if (filters.priority) params.set("priority", filters.priority);
   if (filters.search.trim()) params.set("search", filters.search.trim());
+  if (filters.machineId) params.set("machineId", filters.machineId);
   return params.toString();
 };
 

@@ -9,7 +9,7 @@ interface MachineDetailLayoutProps {
   params: { machineId: string };
 }
 
-// Every machine detail tab (components, history, configuration history)
+// Every machine detail tab (components, history, configuration history, manuals, cases)
 // needs "View machines"; without it the whole screen becomes a notice,
 // shown outside the app shell, hence the way back.
 const MachineDetailLayout = ({ children, params }: MachineDetailLayoutProps) => {

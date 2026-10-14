@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { OrganisationDocument } from "@/lib/api/documentsApi";
+import { knowledgeArticleNavigation } from "@/lib/knowledge/knowledgeLinks";
 import type { KnowledgeResult } from "@/lib/types/knowledgeLibrary";
 import { OrganisationDocumentRow } from "./organisationDocumentRow";
-import { KnowledgeResultCard } from "./knowledgeResultCard";
+import { KnowledgeResultCard } from "@/components/knowledge/knowledgeResultCard";
 
 const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
@@ -89,18 +90,18 @@ describe("Documents card row", () => {
 
 describe("Search result card", () => {
   it("opens the article at the matching section, with the search kept", () => {
-    render(<KnowledgeResultCard result={RESULT} listContext={{ q: "strainer", type: "bulletin" }} />);
+    render(<KnowledgeResultCard result={RESULT} navigation={knowledgeArticleNavigation({ q: "strainer", type: "bulletin" })} />);
     fireEvent.click(screen.getByText(RESULT.title));
     expect(push).toHaveBeenCalledWith("/knowledge/doc-1?q=strainer&type=bulletin&section=s4");
   });
 
   it("shows the matched page, not page 1", () => {
-    render(<KnowledgeResultCard result={RESULT} listContext={{}} />);
+    render(<KnowledgeResultCard result={RESULT} navigation={knowledgeArticleNavigation({})} />);
     expect(screen.getByText("CAT 793F · p. 2 · Rev 1")).toBeTruthy();
   });
 
   it("doesn't open the article from its tags", () => {
-    render(<KnowledgeResultCard result={RESULT} listContext={{}} />);
+    render(<KnowledgeResultCard result={RESULT} navigation={knowledgeArticleNavigation({})} />);
     fireEvent.click(screen.getByText("QuipTech library"));
     expect(push).not.toHaveBeenCalled();
   });

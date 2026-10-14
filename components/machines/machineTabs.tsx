@@ -9,14 +9,14 @@ interface MachineTabsProps {
   openCaseCount: number | null;
 }
 
-// Manuals and cases open the knowledge library and cases screens.
+// Every tab stays inside the machine page; a case row then opens the case.
 export const MachineTabs = ({ machineId, active, openCaseCount }: MachineTabsProps) => {
   const tabs: { key: MachineTab; label: string; href: string }[] = [
     { key: "components", label: "Components", href: `/machines/${machineId}` },
     { key: "history", label: "History", href: `/machines/${machineId}/history` },
     { key: "config-history", label: "Configuration history", href: `/machines/${machineId}/config-history` },
-    { key: "manuals", label: "Manuals", href: "/knowledge" },
-    { key: "cases", label: "Open cases", href: "/cases" },
+    { key: "manuals", label: "Manuals", href: `/machines/${machineId}/manuals` },
+    { key: "cases", label: "Open cases", href: `/machines/${machineId}/cases` },
   ];
 
   return (

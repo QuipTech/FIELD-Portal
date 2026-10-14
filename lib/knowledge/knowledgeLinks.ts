@@ -37,3 +37,25 @@ export const readListContext = (params: URLSearchParams): KnowledgeListContext =
   });
   return context;
 };
+
+// Where an article's links lead: back to its list, and on to other
+// documents. The Knowledge screen, or a machine's Manuals tab.
+export interface ArticleNavigation {
+  listHref: string;
+  listLabel: string;
+  articleHref: (documentId: string, section?: string | null) => string;
+}
+
+export const knowledgeArticleNavigation = (context: KnowledgeListContext): ArticleNavigation => ({
+  listHref: buildKnowledgeListHref(context),
+  listLabel: "Knowledge",
+  articleHref: (documentId, section) => buildArticleHref(documentId, context, section),
+});
+
+// /machines/:id/manuals/:documentId — the document inside the machine page.
+export const machineManualsNavigation = (machineId: string): ArticleNavigation => ({
+  listHref: `/machines/${machineId}/manuals`,
+  listLabel: "Manuals",
+  articleHref: (documentId, section) =>
+    `/machines/${machineId}/manuals/${documentId}${toQuery({ section: section ?? undefined })}`,
+});

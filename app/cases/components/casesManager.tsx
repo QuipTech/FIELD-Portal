@@ -6,7 +6,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { CaseListSkeleton } from "@/components/supportCases/caseListSkeleton";
 import { useSupportCases } from "../useSupportCases";
 import { CasesFilterBar } from "./casesFilterBar";
-import { CasesTable } from "./casesTable";
+import { CasesTable } from "@/components/supportCases/casesTable";
 import { NewCaseButton } from "./newCaseButton";
 
 export const CasesManager = () => {

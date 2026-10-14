@@ -15,6 +15,8 @@ export interface Machine {
   assetId: string;
   manufacturer: string;
   model: string;
+  // The machine model's id, for its manuals; null from an older backend.
+  modelId: string | null;
   serialNumber: string;
   // The Plant ID / asset number, when one was entered.
   plantId: string | null;

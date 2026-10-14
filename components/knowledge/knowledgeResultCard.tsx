@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons/icon";
 import { Tag } from "@/components/ui/tag";
 import { ClickableRow } from "@/components/ui/clickableRow";
-import { buildArticleHref, type KnowledgeListContext } from "@/lib/knowledge/knowledgeLinks";
+import type { ArticleNavigation } from "@/lib/knowledge/knowledgeLinks";
 import { documentTypeIcon, knowledgeDocumentTypes } from "@/lib/types/adminDocument";
 import type { KnowledgeResult } from "@/lib/types/knowledgeLibrary";
 
@@ -17,18 +17,18 @@ const formatMeta = (result: KnowledgeResult) =>
 
 interface KnowledgeResultCardProps {
   result: KnowledgeResult;
-  listContext: KnowledgeListContext;
+  navigation: ArticleNavigation;
 }
 
 // Opens the document's article, at the section that matched the search.
-export const KnowledgeResultCard = ({ result, listContext }: KnowledgeResultCardProps) => {
+export const KnowledgeResultCard = ({ result, navigation }: KnowledgeResultCardProps) => {
   const router = useRouter();
   const { icon, tone } = documentTypeIcon[result.type] ?? documentTypeIcon.manual;
 
   return (
     <ClickableRow
       label={`Open ${result.title}`}
-      onOpen={() => router.push(buildArticleHref(result.id, listContext, result.sectionId))}
+      onOpen={() => router.push(navigation.articleHref(result.id, result.sectionId))}
       className="flex flex-col gap-2 rounded-xl border border-borderGray bg-surface p-3.5 text-left transition-colors hover:border-borderGrayStrong"
     >
       <div className="flex w-full items-center gap-2">

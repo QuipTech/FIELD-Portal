@@ -1,7 +1,7 @@
 import { Transform } from 'class-transformer';
 import { trimToUndefined } from '../../common/utils/trimTransforms';
 import { PaginationQueryDto } from '../../common/dto/paginationQueryDto';
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import {
   CASE_PRIORITIES,
   CASE_STATUSES,
@@ -27,4 +27,9 @@ export class ListSupportCasesQueryDto extends PaginationQueryDto {
   @IsString()
   @MaxLength(200)
   search?: string;
+
+  // Only cases about this machine (a machine's Open cases tab).
+  @IsOptional()
+  @IsUUID()
+  machineId?: string;
 }
