@@ -20,9 +20,11 @@ import { MachineSpecList } from "./machineSpecList";
 import { SystemsTabs } from "./systemsTabs";
 import { AppShell } from "@/components/shell/appShell";
 
+const ROUTED_TABS: MachineTab[] = ["history", "config-history", "manuals", "cases"];
+
 const toActiveTab = (pathname: string, machineId: string): MachineTab => {
   const section = pathname.slice(`/machines/${machineId}`.length).split("/")[1];
-  return section === "history" || section === "config-history" ? section : "components";
+  return ROUTED_TABS.find((tab) => tab === section) ?? "components";
 };
 
 // Everything above the tab content, shared by every machine detail tab:

@@ -7,14 +7,12 @@ import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import type { AdminUser } from "@/lib/types/adminUser";
 
 const SEARCH_DEBOUNCE_MS = 300;
-// The table has no pager yet, so fetch the backend's maximum page.
-const PAGE_SIZE = 100;
+export const USERS_PAGE_SIZE = 25;
 const SIGNED_OUT_MESSAGE = "Your session has expired. Sign in again to see users.";
 const FALLBACK_ERROR_MESSAGE = "Couldn't load users. Please try again.";
 
-// Role filtering happens on the client (see usersDirectory), so only the
-// search goes to the backend.
-export const useAdminUsers = (search: string) => {
+// One page of users for the search and role tab (role "" = all).
+export const useAdminUsers = (search: string, role: string, page: number) => {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
@@ -35,7 +33,7 @@ export const useAdminUsers = (search: string) => {
     // Only typing needs the debounce; the first load and reloads go straight out.
     const delay = search ? SEARCH_DEBOUNCE_MS : 0;
     const timer = setTimeout(() => {
-      listAdminUsersRequest(accessToken, { search, pageSize: PAGE_SIZE })
+      listAdminUsersRequest(accessToken, { search, role, page, pageSize: USERS_PAGE_SIZE })
         .then((response) => {
           if (!isCurrent) return;
           setUsers(response.users);
@@ -53,7 +51,7 @@ export const useAdminUsers = (search: string) => {
       isCurrent = false;
       clearTimeout(timer);
     };
-  }, [search, reloadCount]);
+  }, [search, role, page, reloadCount]);
 
   const reload = () => setReloadCount((count) => count + 1);
 

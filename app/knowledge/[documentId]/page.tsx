@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
-import { readListContext } from "@/lib/knowledge/knowledgeLinks";
-import { ArticleView } from "./components/articleView";
+import { knowledgeArticleNavigation, readListContext } from "@/lib/knowledge/knowledgeLinks";
+import { ArticleView } from "@/components/knowledge/article/articleView";
 
 interface KnowledgeArticlePageProps {
   params: { documentId: string };
@@ -20,7 +20,7 @@ const KnowledgeArticlePage = ({ params, searchParams }: KnowledgeArticlePageProp
   return (
     <ArticleView
       documentId={params.documentId}
-      listContext={readListContext(query)}
+      navigation={knowledgeArticleNavigation(readListContext(query))}
       initialSectionId={query.get("section")}
     />
   );

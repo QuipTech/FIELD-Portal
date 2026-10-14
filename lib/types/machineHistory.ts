@@ -16,6 +16,8 @@ export interface MachineSummary {
 }
 
 export interface MachineDetailResponse extends MachineSummary {
+  // Missing from older backends.
+  modelId?: string;
   plantId: string | null;
   hoursReadAt: string | null;
   owner: { id: string; name: string; avatarUrl: string | null } | null;

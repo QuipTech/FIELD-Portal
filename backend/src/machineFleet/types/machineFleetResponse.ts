@@ -23,8 +23,10 @@ export interface FeaturedDownMachine {
 
 export interface MachineFleetList {
   items: FleetMachine[];
-  // Matching the filters (items stops at the page limit).
+  // Matching the filters, across every page.
   total: number;
+  page: number;
+  pageSize: number;
   // Choices for the filter panel, from the organisation's whole fleet.
   facets: {
     sites: string[];

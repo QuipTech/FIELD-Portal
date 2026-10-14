@@ -27,14 +27,18 @@ interface CaseMessageBubbleProps {
   // Shown beside the customer's name, e.g. "QuipTech Mining · Customer".
   companyName?: string;
   perspective: ThreadPerspective;
+  // Staff screens: only the signed-in staff member's own messages go right.
+  currentUserId?: string | null;
 }
 
-// Like any chat, your side's messages sit on the right, highlighted: the
-// customer's on their screen, staff replies on the admin screen. Staff are
+// Like any chat, your messages sit on the right, highlighted: the
+// customer's on their screen, your own replies on a staff screen (other
+// staff, e.g. the assignee vs an admin, stay on the left). Staff are
 // labelled Support or Admin; internal notes (staff only) are amber.
-export const CaseMessageBubble = ({ message, companyName, perspective }: CaseMessageBubbleProps) => {
+export const CaseMessageBubble = ({ message, companyName, perspective, currentUserId }: CaseMessageBubbleProps) => {
   const isCustomer = message.authorRole === "customer";
-  const isOwnSide = (perspective === "customer") === isCustomer;
+  const isOwnSide =
+    perspective === "customer" ? isCustomer : Boolean(currentUserId) && message.author?.id === currentUserId;
   const authorName = message.author?.name || FORMER_USER_NAME;
   const roleMeta = [isCustomer ? companyName : undefined, ROLE_LABELS[message.authorRole]].filter(Boolean).join(" · ");
 

@@ -21,7 +21,10 @@ export interface FeaturedDownMachine {
 
 export interface MachineFleetList {
   items: FleetMachine[];
+  // Matching the filters, across every page.
   total: number;
+  page: number;
+  pageSize: number;
   facets: {
     sites: string[];
     makes: { id: string; name: string }[];

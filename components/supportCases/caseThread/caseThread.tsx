@@ -21,11 +21,13 @@ interface CaseThreadProps {
   events: CaseEvent[];
   // Whose screen this is: their own messages go on the right.
   perspective: ThreadPerspective;
+  // The signed-in user, so staff screens put only their own messages right.
+  currentUserId?: string | null;
   // Staff see the customer's company beside their name.
   companyName?: string;
 }
 
-export const CaseThread = ({ messages, events, perspective, companyName }: CaseThreadProps) => {
+export const CaseThread = ({ messages, events, perspective, currentUserId, companyName }: CaseThreadProps) => {
   const endRef = useRef<HTMLDivElement>(null);
   const timeline = useMemo(() => toTimeline(messages, events), [messages, events]);
 
@@ -41,7 +43,13 @@ export const CaseThread = ({ messages, events, perspective, companyName }: CaseT
     <div className="flex flex-col gap-5" aria-live="polite">
       {timeline.map((entry) =>
         entry.kind === "message" ? (
-          <CaseMessageBubble key={`m-${entry.item.id}`} message={entry.item} perspective={perspective} companyName={companyName} />
+          <CaseMessageBubble
+            key={`m-${entry.item.id}`}
+            message={entry.item}
+            perspective={perspective}
+            currentUserId={currentUserId}
+            companyName={companyName}
+          />
         ) : (
           <CaseEventLine key={`e-${entry.item.id}`} event={entry.item} />
         ),

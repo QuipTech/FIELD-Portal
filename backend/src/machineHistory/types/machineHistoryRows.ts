@@ -12,6 +12,7 @@ export interface MachineRow {
 }
 
 export interface MachineDetailRow extends MachineRow {
+  model_id: string;
   asset_number: string | null;
   operating_hours_read_at: Date | null;
   owner_id: string | null;

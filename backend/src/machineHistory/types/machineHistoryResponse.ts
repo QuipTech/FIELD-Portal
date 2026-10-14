@@ -12,6 +12,8 @@ export interface MachineSummary {
 }
 
 export interface MachineDetail extends MachineSummary {
+  // The machine model's id, e.g. to find its manuals in the knowledge library.
+  modelId: string;
   // The customer's Plant ID / asset number, exactly as entered.
   plantId: string | null;
   hoursReadAt: string | null;

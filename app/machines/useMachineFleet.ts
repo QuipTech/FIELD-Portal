@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useApiResource } from "@/lib/hooks/useApiResource";
+import { usePageReset } from "@/lib/hooks/usePageReset";
 import { EMPTY_MACHINE_FILTERS, listMachinesRequest } from "@/lib/api/machineFleetApi";
 import type { MachineFleetFilters } from "@/lib/types/machineFleet";
 
@@ -18,9 +19,11 @@ export const useMachineFleet = (search: string, reloadToken: number) => {
     return () => clearTimeout(timer);
   }, [search]);
 
+  const [page, setPage] = usePageReset([filters.site, filters.make, filters.status, filters.machineClass, debouncedSearch]);
+
   const fleet = useApiResource(
-    (accessToken) => listMachinesRequest(accessToken, filters, debouncedSearch),
-    [filters.site, filters.make, filters.status, filters.machineClass, debouncedSearch, reloadToken],
+    (accessToken) => listMachinesRequest(accessToken, filters, debouncedSearch, page),
+    [filters.site, filters.make, filters.status, filters.machineClass, debouncedSearch, reloadToken, page],
     "Couldn't load machines. Please try again.",
   );
 
@@ -30,5 +33,5 @@ export const useMachineFleet = (search: string, reloadToken: number) => {
 
   const clearFilters = () => setFilters(EMPTY_MACHINE_FILTERS);
 
-  return { filters, updateFilter, clearFilters, fleet, debouncedSearch };
+  return { filters, updateFilter, clearFilters, fleet, debouncedSearch, page, setPage };
 };

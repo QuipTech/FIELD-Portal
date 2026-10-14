@@ -1,5 +1,9 @@
 import { PoolClient } from 'pg';
 import { escapeLikePattern } from '../common/utils/escapeLikePattern';
+import {
+  PaginationQueryDto,
+  toLimitOffset,
+} from '../common/dto/paginationQueryDto';
 import { CaseStatusFilter } from './dto/listSupportCasesQueryDto';
 import {
   CaseCategory,
@@ -30,10 +34,11 @@ const CASE_SELECT = `
   LEFT JOIN LATERAL support_case_person(c.assigned_to) a ON true
   LEFT JOIN LATERAL support_case_person(c.created_by) r ON true`;
 
-export interface CaseListFilters {
+export interface CaseListFilters extends PaginationQueryDto {
   status: CaseStatusFilter;
   priority?: CasePriority;
   search?: string;
+  machineId?: string;
 }
 
 const STATUS_CONDITIONS: Record<CaseStatusFilter, string | null> = {
@@ -46,11 +51,8 @@ const STATUS_CONDITIONS: Record<CaseStatusFilter, string | null> = {
   all: null,
 };
 
-export const listCases = async (
-  client: PoolClient,
-  tenantId: string,
-  filters: CaseListFilters,
-): Promise<SupportCaseRow[]> => {
+// WHERE clause and its parameters for the list's filters ($1 = tenant).
+const buildCaseFilter = (tenantId: string, filters: CaseListFilters) => {
   const params: unknown[] = [tenantId];
   const conditions = ['c.tenant_id = $1', 'c.deleted_at IS NULL'];
   const statusCondition = STATUS_CONDITIONS[filters.status];
@@ -59,6 +61,10 @@ export const listCases = async (
     params.push(filters.priority);
     conditions.push(`c.priority = $${params.length}`);
   }
+  if (filters.machineId) {
+    params.push(filters.machineId);
+    conditions.push(`c.machine_id = $${params.length}`);
+  }
   if (filters.search) {
     const caseNumber = filters.search.replace(/^#/, '');
     params.push(`%${escapeLikePattern(filters.search)}%`, caseNumber);
@@ -66,12 +72,36 @@ export const listCases = async (
       `(c.subject ILIKE $${params.length - 1} OR c.case_number::text = $${params.length})`,
     );
   }
+  return { where: conditions.join(' AND '), params };
+};
+
+export const listCases = async (
+  client: PoolClient,
+  tenantId: string,
+  filters: CaseListFilters,
+): Promise<SupportCaseRow[]> => {
+  const { where, params } = buildCaseFilter(tenantId, filters);
+  const { limit, offset } = toLimitOffset(filters);
   const result = await client.query<SupportCaseRow>(
-    `${CASE_SELECT} WHERE ${conditions.join(' AND ')}
-     ORDER BY c.updated_at DESC LIMIT 200`,
-    params,
+    `${CASE_SELECT} WHERE ${where}
+     ORDER BY c.updated_at DESC, c.id
+     LIMIT $${params.length + 1} OFFSET $${params.length + 2}`,
+    [...params, limit, offset],
   );
   return result.rows;
+};
+
+export const countCases = async (
+  client: PoolClient,
+  tenantId: string,
+  filters: CaseListFilters,
+): Promise<number> => {
+  const { where, params } = buildCaseFilter(tenantId, filters);
+  const result = await client.query<{ count: string }>(
+    `SELECT count(*) FROM support_cases c WHERE ${where}`,
+    params,
+  );
+  return Number(result.rows[0].count);
 };
 
 export const countCasesByStatus = async (

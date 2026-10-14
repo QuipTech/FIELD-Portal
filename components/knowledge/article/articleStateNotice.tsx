@@ -17,6 +17,7 @@ interface ArticleStateNoticeProps {
   status?: DocumentStatus | null;
   message?: string;
   backHref: string;
+  backLabel: string;
   onRetried: () => void;
 }
 
@@ -28,12 +29,12 @@ const NOT_LIVE_TEXT: Partial<Record<DocumentStatus["state"], string>> = {
 
 // Not found, still indexing, failed (Retry for those who manage
 // documents; the API decides who may), or couldn't load.
-export const ArticleStateNotice = ({ documentId, kind, status, message, backHref, onRetried }: ArticleStateNoticeProps) => {
+export const ArticleStateNotice = ({ documentId, kind, status, message, backHref, backLabel, onRetried }: ArticleStateNoticeProps) => {
   const { can } = usePermissions();
   const [retryError, setRetryError] = useState<string | null>(null);
   const backLink = (
     <Link href={backHref} className="text-sm text-primary hover:underline">
-      Back to Knowledge
+      Back to {backLabel}
     </Link>
   );
 

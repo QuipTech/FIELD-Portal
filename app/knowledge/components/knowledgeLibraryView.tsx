@@ -2,11 +2,11 @@
 
 import { LoadingSpinner } from "@/components/ui/loadingSpinner";
 import type { KnowledgeLibraryFilters } from "@/lib/types/knowledgeLibrary";
-import { toListContext } from "@/lib/knowledge/knowledgeLinks";
+import { knowledgeArticleNavigation, toListContext } from "@/lib/knowledge/knowledgeLinks";
 import { useKnowledgeLibrary } from "../useKnowledgeLibrary";
 import { KnowledgeFilterNav } from "./knowledgeFilterNav";
 import { KnowledgeFilterPills } from "./knowledgeFilterPills";
-import { KnowledgeResultCard } from "./knowledgeResultCard";
+import { KnowledgeResultCard } from "@/components/knowledge/knowledgeResultCard";
 import { KnowledgeSearchBar } from "./knowledgeSearchBar";
 import { OrganisationDocuments } from "./organisationDocuments";
 
@@ -33,7 +33,9 @@ export const KnowledgeLibraryView = ({ initialFilters }: { initialFilters: Knowl
         </p>
       );
     }
-    return data.items.map((result) => <KnowledgeResultCard key={result.id} result={result} listContext={listContext} />);
+    return data.items.map((result) => (
+      <KnowledgeResultCard key={result.id} result={result} navigation={knowledgeArticleNavigation(listContext)} />
+    ));
   };
 
   return (

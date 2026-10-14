@@ -35,7 +35,13 @@ describe("a customer can't read another company's case", () => {
     const { tenantA, tenantB, caseNumber } = world;
     expect(await findCaseByNumber(asPool, tenantB, caseNumber)).toBeNull();
     expect(await findCaseByNumber(asPool, tenantA, caseNumber)).toBeNull();
-    expect(await listCases(asPool, tenantA, { status: 'all' })).toEqual([]);
+    expect(
+      await listCases(asPool, tenantA, {
+        status: 'all',
+        page: 1,
+        pageSize: 25,
+      }),
+    ).toEqual([]);
     const raw = await client.query(
       'SELECT 1 FROM support_cases WHERE id = $1',
       [world.caseId],
