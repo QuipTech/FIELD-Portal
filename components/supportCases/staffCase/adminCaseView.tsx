@@ -94,6 +94,7 @@ export const AdminCaseView = ({ caseNumber, backHref = "/admin/cases" }: AdminCa
                   messages={chatMessages}
                   events={thread.events}
                   perspective="staff"
+                  currentUserId={profile?.user.id ?? null}
                   companyName={item.company.name}
                 />
               )}
