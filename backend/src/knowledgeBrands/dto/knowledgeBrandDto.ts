@@ -42,13 +42,6 @@ export class KnowledgeCategoryDto {
   @IsOptional() @IsUUID() parentId?: string | null;
   @IsOptional() @IsInt() sortOrder?: number;
 }
-export class OrganisationBrandAccessDto {
-  @IsArray()
-  @ArrayUnique()
-  @ArrayMaxSize(1000)
-  @IsUUID('4', { each: true })
-  brandIds: string[];
-}
 export class KnowledgeClassificationDto {
   @IsOptional() @IsIn(KNOWLEDGE_DOCUMENT_TYPES) documentType?: string;
   @IsUUID() brandId: string;

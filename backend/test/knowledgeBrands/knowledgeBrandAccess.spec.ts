@@ -20,7 +20,6 @@ import {
 } from '../../src/knowledgeLibrary/knowledgeLibrary.repository';
 import { searchLiveChunks } from '../../src/knowledgeSearch/knowledgeSearch.repository';
 
-import { OrganisationBrandAccessService } from '../../src/knowledgeBrands/organisationBrandAccess.service';
 import { KnowledgeBrandsService } from '../../src/knowledgeBrands/knowledgeBrands.service';
 
 import { setupKnowledgeFixtures } from './knowledgeFixtures';
@@ -142,13 +141,29 @@ describe('Knowledge brand isolation with field_app RLS', () => {
     );
     expect(rows.map((row) => row.id)).toEqual([catDoc.itemId]);
   });
-  it('applies revocation on the next query without a new token', async () => {
-    const { fixture, catDoc, articles, asClient } = context();
-    const access = new OrganisationBrandAccessService(fixture.database);
-    await access.set(fixture.admin, fixture.actor.tenantId, []);
+  it('shows every active brand to every organisation without any grant', async () => {
+    const { fixture, cat, catDoc, articles } = context();
+    const grants = await fixture.db.query(
+      'SELECT 1 FROM organisation_brand_access WHERE organisation_id=$1 AND brand_id=$2',
+      [fixture.actor.tenantId, cat.id],
+    );
+    expect(grants.rows).toHaveLength(0);
     expect(
       await getAccessibleBrandIds(fixture.database, fixture.actor),
-    ).toEqual([]);
+    ).toContain(cat.id);
+    expect(
+      (await articles().getArticle(fixture.actor, catDoc.itemId)).title,
+    ).toBe('D10T manual');
+  });
+  it('hides a brand on the next query once it is deactivated', async () => {
+    const { fixture, cat, catDoc, articles, asClient } = context();
+    await fixture.db.query(
+      'UPDATE knowledge_brands SET is_active=false WHERE id=$1',
+      [cat.id],
+    );
+    expect(
+      await getAccessibleBrandIds(fixture.database, fixture.actor),
+    ).not.toContain(cat.id);
     await expect(
       articles().getArticle(fixture.actor, catDoc.itemId),
     ).rejects.toBeInstanceOf(NotFoundException);
@@ -160,7 +175,9 @@ describe('Knowledge brand isolation with field_app RLS', () => {
         limit: 20,
       }),
     );
-    expect(ai).toEqual([]);
+    expect(ai.map((chunk) => chunk.knowledge_item_id)).not.toContain(
+      catDoc.itemId,
+    );
   });
   it('lets the platform administrator see all brands and documents', async () => {
     const { fixture, komatsu, komatsuDoc, articles } = context();

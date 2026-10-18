@@ -5,6 +5,8 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   'user:create': 'Signed up',
   'user:update': 'Updated user',
   'user:delete': 'Deleted account',
+  'user_passkey:create': 'Added Face ID / Touch ID sign-in',
+  'user_passkey:delete': 'Removed Face ID / Touch ID sign-in',
   'role:create': 'Created role',
   'role:update': 'Changed role',
   'role:delete': 'Deleted role',

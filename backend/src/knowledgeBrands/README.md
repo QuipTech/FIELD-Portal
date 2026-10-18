@@ -9,13 +9,16 @@ continues using `knowledge_item_machine_models` and preserves explicit links.
 ## Access
 
 `Owner` with `platform.manage` is the existing platform administrator. No new
-role is introduced. Clients need an `organisation_brand_access` grant and an
-active brand. A grant never exposes another organisation's private documents.
+role is introduced. Every organisation sees every active brand (migration
+0093); inactive brands are visible only to platform administrators. This never
+exposes another organisation's private documents. Per-organisation grants
+(`organisation_brand_access`, 0086) are no longer checked; the table is kept,
+unused, so they can be restored by bringing back 0086's predicate.
 
 SQL `knowledge_has_brand_access` and `knowledge_can_read_document` are the
 shared checks for RLS and all query paths. `knowledgeAccess.ts` exposes helpers
-for scope validation and accessible brand IDs. Read current grants on each
-request, never cache them in tokens. Hidden document IDs return 404 before
+for scope validation and accessible brand IDs. Read brand state on each
+request, never cache it in tokens. Hidden document IDs return 404 before
 storage signing. Only a live version is searchable by clients.
 
 Request queries run in `withActor` so `app.tenant_id` and `app.user_id` are local
@@ -34,7 +37,6 @@ mobile. Administrative routes also require the existing platform admin guard.
 | `/admin/knowledge/brands/:id/logo` | POST multipart `file`, PNG/JPG/SVG <=2 MB |
 | `/admin/knowledge/brands/:brandId/categories` | GET tree rows, POST category |
 | `/admin/knowledge/brands/:brandId/categories/:id` | PATCH edit/parent/order, DELETE empty folder |
-| `/admin/organisations/:id/brand-access` | GET grants, PUT `{brandIds: string[]}` |
 | `/admin/knowledge/documents/:id` | PATCH brand/category/documentType/machineModelIds |
 | `/knowledge/brands` | GET accessible brands, published counts, signed logos |
 | `/knowledge/brands/:brandId/categories` | GET accessible categories |
@@ -74,11 +76,11 @@ The database reserves version numbers under a document lock. Versions store
 the exact full key; category/brand moves never relocate existing S3 objects.
 The bucket stays private. Existing `documents/...` keys continue working.
 
-Revocation prevents new API reads, retrieval and URL issuance immediately.
+Deactivating a brand prevents new API reads, retrieval and URL issuance immediately.
 Already issued S3 URLs expire after 15 minutes; downloaded files cannot be
 recalled. Knowledge offline fallback/save controls are disabled and legacy
 IndexedDB copies are cleared when an article loads. Mobile clients must also
-revalidate access and discard cached content after revocation; this repository
+revalidate access and discard cached content after a brand is deactivated; this repository
 contains the portal and shared API, not a native mobile app.
 
 ## Migration and rollout
@@ -89,9 +91,9 @@ Migrations 0084-0091 add the schema, backfill, access policies, consistency
 triggers, document list function, metadata updates, numeric version reservation,
 and saved AI provenance. The runner skips recorded versions.
 
-Existing documents/chunks are assigned to Uncategorised > General. Existing
-organisations receive Uncategorised access to preserve their current access;
-new organisations get no automatic grants. Tenant ownership still applies.
+Existing documents/chunks are assigned to Uncategorised > General. Since 0093
+every organisation, including new ones, sees all active brands, so no grants
+are needed. Tenant ownership still applies.
 Document/version/chunk IDs, live/review states, embedding vectors, legacy types
 and S3 keys are preserved. No re-embedding or object migration is required.
 
@@ -113,6 +115,6 @@ prefixes. Keep S3 Block Public Access enabled.
 - Root `npm test`, `npx tsc --noEmit`, `npm run build`: portal checks.
 
 Integration checks cover cross-brand denial for browsing, direct IDs, signed
-URLs, keyword/vector search, machine manuals, AI sources/history, revocation,
+URLs, keyword/vector search, machine manuals, AI sources/history, deactivation,
 platform access, category moves, legacy files/embeddings, category constraints,
 manual model links, inactive brands, version keys and review state.

@@ -46,7 +46,7 @@ export const BrandEditor = ({ brand, onSaved }: { brand: KnowledgeBrand | null; 
   const remove = async () => {
     if (
       !brand ||
-      !window.confirm(`Delete ${brand.name}? Move its documents and remove categories/access grants first.`)
+      !window.confirm(`Delete ${brand.name}? Move its documents and remove its categories first.`)
     )
       return;
     setBusy(true);

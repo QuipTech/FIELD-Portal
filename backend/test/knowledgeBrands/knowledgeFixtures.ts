@@ -38,9 +38,10 @@ export const setupKnowledgeFixtures = () => {
       komatsu.id,
       komatsu.categoryId,
     );
+    // Every organisation sees active brands; Komatsu is the hidden one.
     await fixture.db.query(
-      'INSERT INTO organisation_brand_access(organisation_id,brand_id) VALUES($1,$2)',
-      [fixture.actor.tenantId, cat.id],
+      'UPDATE knowledge_brands SET is_active=false WHERE id=$1',
+      [komatsu.id],
     );
     sign.mockClear();
   });
