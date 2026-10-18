@@ -1,6 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { KnowledgeBrandsModule } from './knowledgeBrands/knowledgeBrands.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { DatabaseModule } from './database/database.module';
@@ -74,6 +75,7 @@ import { RequestSourceMiddleware } from './common/requestSource/requestSource.mi
     SupportCasesModule,
     MachineFleetModule,
     KnowledgeLibraryModule,
+    KnowledgeBrandsModule,
     KnowledgeArticleModule,
     AiAssistantModule,
     DashboardModule,

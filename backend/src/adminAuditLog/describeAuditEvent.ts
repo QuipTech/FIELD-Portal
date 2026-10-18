@@ -76,6 +76,15 @@ const describeDocumentUpdate = (
   metadata: Metadata,
   title: string | undefined,
 ) => {
+  if (metadata.event === 'document_moved')
+    return {
+      actionLabel: 'Moved / updated document',
+      target: joinParts(
+        title,
+        text(metadata.brandId),
+        text(metadata.categoryId),
+      ),
+    };
   const transition = text(metadata.transition);
   if (transition) {
     return {

@@ -1,6 +1,9 @@
 // One knowledge item with its best-matching chunk. bigint arrives from pg
 // as a string; score is a float.
 export interface KnowledgeResultRow {
+  brand_id?: string;
+  category_id?: string;
+  document_type?: string;
   id: string;
   title: string;
   type: string;

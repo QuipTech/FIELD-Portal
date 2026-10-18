@@ -1,3 +1,4 @@
+import { assertDocumentAccess } from '../knowledge/knowledgeAccess';
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
@@ -48,14 +49,18 @@ export class AiAskService {
     prepared: PreparedQuestion,
     stream: EventStream,
   ): Promise<void> => {
-    stream.send({
-      event: 'start',
-      data: {
-        conversationId: prepared.conversationId,
-        sources: chunksToSources(prepared.chunks),
-      },
-    });
     try {
+      for (const id of new Set(
+        prepared.chunks.map((chunk) => chunk.documentId),
+      ))
+        await assertDocumentAccess(this.databaseService, actor, id);
+      stream.send({
+        event: 'start',
+        data: {
+          conversationId: prepared.conversationId,
+          sources: chunksToSources(prepared.chunks),
+        },
+      });
       const response = await this.bedrockService.generateTechnicalResponse(
         prepared.question,
         {
@@ -100,7 +105,7 @@ export class AiAskService {
     prepared: PreparedQuestion,
     response: TechnicalResponse,
   ): Promise<SaveOutcome> =>
-    this.databaseService.withTenant(actor.tenantId, async (client) => {
+    this.databaseService.withActor(actor, async (client) => {
       const tenantId = actor.tenantId;
       const conversationId = prepared.conversationId;
       if (prepared.isNewConversation) {

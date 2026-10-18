@@ -4,6 +4,7 @@ import { KnowledgeLibraryService } from './knowledgeLibrary.service';
 
 @Module({
   controllers: [KnowledgeLibraryController],
+  exports: [KnowledgeLibraryService],
   providers: [KnowledgeLibraryService],
 })
 export class KnowledgeLibraryModule {}

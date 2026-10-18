@@ -26,6 +26,7 @@ export const toSafeFileName = (fileName: string): string =>
     .replace(/-{2,}/g, '-')
     .replace(/-\./g, '.')
     .replace(/^-|-$/g, '')
+    .replace(/^\.+$/, '')
     .slice(-MAX_KEY_FILE_NAME_LENGTH) || 'file';
 
 export const buildDocumentKey = (tenantId: string, fileName: string) =>
@@ -78,3 +79,13 @@ export const buildDataExportKey = (
 export const isTenantOwnedKey = (key: string, tenantId: string): boolean =>
   !key.split('/').some((segment) => segment === '..' || segment === '') &&
   STORAGE_FOLDERS.some((folder) => key.startsWith(`${folder}/${tenantId}/`));
+
+// IDs survive brand/category renames and document moves.
+export const buildKnowledgeDocumentKey = (
+  brandId: string,
+  categoryId: string,
+  documentId: string,
+  version: number,
+  fileName: string,
+) =>
+  `knowledge/brands/${brandId}/${categoryId}/${documentId}/v${version}/${toSafeFileName(fileName)}`;

@@ -26,6 +26,9 @@ export interface ArticleDocumentLink {
 
 // GET /documents/:id/article
 export interface KnowledgeArticle {
+  brandId?: string;
+  categoryId?: string;
+  documentType?: string;
   id: string;
   title: string;
   type: string;

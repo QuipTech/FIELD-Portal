@@ -52,6 +52,8 @@ export interface AttachedPhoto {
 }
 
 export interface AskAssistantInput {
+  brandId?: string;
+  categoryId?: string;
   question: string;
   conversationId?: string;
   machineId?: string;

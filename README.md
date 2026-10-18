@@ -48,6 +48,8 @@ without the full `node_modules`.
 - **Machine detail (`app/machines/[machineId]/`):** the layout's shell shares the machine and `machineDetailService` (`lib/api/machineDetail/`) through `useMachineDetail()`; tabs are sub-routes (`/`, `/history`, `/config-history`; the components tab's system is `?system=`). Tab content renders without waiting for the machine, and the shell prefetches every tab's first view. Reads go through `useCachedResource` (`lib/machineDetail/`), an in-memory cache keyed per machine (`machineDetailCacheKeys.ts`): cached data shows at once and is refreshed when older than 30 s; after a write, `invalidateCached(machineKeyPrefix(id))`. History entries saved offline are queued in IndexedDB and synced when the connection returns. Systems/components come from the machine's installed tree, seeded from its model in the Machine library (backend migration `0068`).
 - **File uploads:** use the shared uploaders in `components/uploads/` (`DocumentUploader`, `AvatarUploader`; history-entry photos go up with the entry, via the machine detail service) — each posts to its backend endpoint with progress via `lib/api/multipartUpload.ts` + `lib/uploads/useFileUpload.ts`. Files are private in S3: never build S3 links; show the `signedUrl`/`downloadUrl` the API returns (valid 15 minutes — reload the record for a fresh one). Upload responses share the `UploadedFile` type (`lib/types/uploadedFile.ts`).
 
+Knowledge organisation, access rules, APIs, migration rollout, and tests are documented in [Brand-scoped Knowledge](backend/src/knowledgeBrands/README.md).
+
 ## Authentication
 
 Two sign-in paths, both ending in the same FIELD session (access + refresh

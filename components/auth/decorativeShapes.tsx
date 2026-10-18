@@ -1,3 +1,5 @@
+import styles from "./decorativeShapes.module.css";
+
 const TEAL = "#2CB8A6";
 
 const DOT_GRID_SIZE = 5;
@@ -24,16 +26,20 @@ export const DecorativeShapes = () => {
       >
         <g stroke="currentColor" strokeWidth="1.5">
           <circle cx="260" cy="260" r="120" opacity="0.22" />
-          <circle cx="260" cy="260" r="175" opacity="0.14" strokeDasharray="4 10" />
+          <circle className={styles.orbitDashed} cx="260" cy="260" r="175" opacity="0.14" strokeDasharray="4 10" />
           <circle cx="260" cy="260" r="235" opacity="0.1" />
         </g>
-        <circle cx="320" cy="364" r="6" fill="currentColor" opacity="0.5" />
-        <circle cx="42" cy="210" r="3.5" fill={TEAL} opacity="0.7" />
+        <g className={styles.orbitDot}>
+          <circle cx="320" cy="364" r="6" fill="currentColor" opacity="0.5" />
+        </g>
+        <g className={styles.orbitAccent}>
+          <circle cx="42" cy="210" r="3.5" fill={TEAL} opacity="0.7" />
+        </g>
       </svg>
 
       {/* Hexagon, top left. */}
       <svg
-        className="absolute left-[8%] top-[9%] hidden h-24 w-24 rotate-12 text-primary sm:block"
+        className={`${styles.hexagon} absolute left-[8%] top-[9%] hidden h-24 w-24 text-primary sm:block`}
         viewBox="0 0 100 100"
         fill="none"
       >
@@ -48,7 +54,7 @@ export const DecorativeShapes = () => {
       </svg>
 
       {/* Rotated squares, bottom left. */}
-      <svg className="absolute -bottom-36 -left-36 h-[340px] w-[340px]" viewBox="0 0 340 340" fill="none">
+      <svg className={`${styles.squares} absolute -bottom-36 -left-36 h-[340px] w-[340px]`} viewBox="0 0 340 340" fill="none">
         <rect
           x="70"
           y="70"
@@ -74,7 +80,7 @@ export const DecorativeShapes = () => {
 
       {/* Dot grid, left middle. */}
       <svg
-        className="absolute left-[6%] top-[48%] hidden text-ink sm:block"
+        className={`${styles.dotGrid} absolute left-[6%] top-[48%] hidden text-ink sm:block`}
         width={DOT_GRID_GAP * (DOT_GRID_SIZE - 1) + 4}
         height={DOT_GRID_GAP * (DOT_GRID_SIZE - 1) + 4}
         fill="currentColor"
@@ -99,19 +105,19 @@ export const DecorativeShapes = () => {
         strokeWidth="1.5"
         strokeLinecap="round"
       >
-        <g opacity="0.35">
+        <g className={styles.plus} opacity="0.35">
           <PlusMark x={20} y={20} />
         </g>
-        <g opacity="0.22">
+        <g className={styles.plus} opacity="0.22">
           <PlusMark x={96} y={64} size={14} />
         </g>
-        <g opacity="0.3">
+        <g className={styles.plus} opacity="0.3">
           <PlusMark x={44} y={132} size={8} />
         </g>
       </svg>
 
       {/* Small accent ring, bottom right. */}
-      <div className="absolute -bottom-10 right-[22%] h-28 w-28 rounded-full border-[1.5px] border-primary/20" />
+      <div className={`${styles.accentRing} absolute -bottom-10 right-[22%] h-28 w-28 rounded-full border-[1.5px] border-primary/20`} />
     </div>
   );
 };

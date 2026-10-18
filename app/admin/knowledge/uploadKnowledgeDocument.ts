@@ -1,3 +1,4 @@
+import type { KnowledgeClassification } from "@/lib/types/knowledgeBrand";
 import {
   completeKnowledgeUploadRequest,
   createKnowledgeUploadRequest,
@@ -31,7 +32,7 @@ const putAndComplete = async (
 export const uploadKnowledgeDocument = async (
   accessToken: string,
   file: File,
-  details: { title: string; type: KnowledgeDocumentType },
+  details: KnowledgeClassification & { title: string; type: KnowledgeDocumentType },
   onProgress: (fraction: number) => void,
 ): Promise<KnowledgeDocument> => {
   const ticket = await createKnowledgeUploadRequest(accessToken, { ...details, ...describeFile(file) });

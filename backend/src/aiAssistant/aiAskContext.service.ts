@@ -1,3 +1,4 @@
+import { assertKnowledgeScope } from '../knowledge/knowledgeAccess';
 import { randomUUID } from 'crypto';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
@@ -62,15 +63,16 @@ export class AiAskContextService {
     actor: AuthenticatedUser,
     dto: AskAssistantDto,
   ): Promise<PreparedQuestion> => {
-    const thread = await this.databaseService.withTenant(
-      actor.tenantId,
-      (client) => this.loadThread(client, actor, dto),
+    await assertKnowledgeScope(this.databaseService, actor, dto);
+    const thread = await this.databaseService.withActor(actor, (client) =>
+      this.loadThread(client, actor, dto),
     );
     const chunks = await this.retrieveChunks(
       actor,
       dto.question,
       thread.machine,
       dto.documentId,
+      { brandId: dto.brandId, categoryId: dto.categoryId },
     );
     return {
       conversationId: thread.conversationId,
@@ -84,7 +86,8 @@ export class AiAskContextService {
         question: dto.question,
         chunks,
         image: dto.image,
-        history: thread.history,
+        history:
+          dto.brandId || dto.categoryId || dto.documentId ? [] : thread.history,
         systemPrompt: thread.systemPrompt,
         machineContext: thread.machineContext,
       },
@@ -160,6 +163,7 @@ export class AiAskContextService {
     question: string,
     machine: MachineRow | null,
     documentId?: string,
+    scope?: { brandId?: string; categoryId?: string },
   ): Promise<RetrievedChunk[]> => {
     const query = machine
       ? `${machine.manufacturer_name} ${machine.model_name}: ${question}`
@@ -169,6 +173,7 @@ export class AiAskContextService {
       query,
       RETRIEVAL_LIMIT,
       documentId,
+      scope,
     );
     return matches
       .filter((match) => documentId || match.score >= MIN_SOURCE_SCORE)

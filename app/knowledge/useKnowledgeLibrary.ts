@@ -30,17 +30,30 @@ export const useKnowledgeLibrary = (initialFilters: KnowledgeLibraryFilters) => 
     if (`${pathname}${window.location.search}` !== href) router.replace(href, { scroll: false });
     // router is stable; only the filters decide the URL.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedSearch, filters.type, filters.make, filters.model]);
+  }, [debouncedSearch, filters.type, filters.make, filters.model, filters.brandId, filters.categoryId, filters.page]);
 
   const results = useApiResource(
     (accessToken) => searchKnowledgeLibraryRequest(accessToken, { ...filters, search: debouncedSearch }),
-    [debouncedSearch, filters.type, filters.make, filters.model, filters.sort],
+    [
+      debouncedSearch,
+      filters.type,
+      filters.make,
+      filters.model,
+      filters.sort,
+      filters.brandId,
+      filters.categoryId,
+      filters.page,
+    ],
     "Couldn't search the knowledge library. Please try again.",
   );
 
   // Values come from the screen's own controls, so they're valid.
   const updateFilter = (key: keyof KnowledgeLibraryFilters, value: string) =>
-    setFilters((current) => ({ ...current, [key]: value }) as KnowledgeLibraryFilters);
+    setFilters(
+      (current) => ({ ...current, [key]: value, ...(key === "page" ? {} : { page: "1" }) }) as KnowledgeLibraryFilters,
+    );
 
-  return { filters, updateFilter, results, hasSearch: debouncedSearch.trim() !== "" };
+  const updateScope = (brandId: string, categoryId: string) =>
+    setFilters((current) => ({ ...current, brandId, categoryId, page: "1" }));
+  return { filters, updateScope, updateFilter, results, hasSearch: debouncedSearch.trim() !== "" };
 };

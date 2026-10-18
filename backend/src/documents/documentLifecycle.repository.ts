@@ -1,3 +1,4 @@
+import { toSafeFileName } from '../storage/storageKeys';
 import { DatabaseService } from '../database/database.service';
 
 export type DocumentTransition = 'approve' | 'reject' | 'archive' | 'retry';
@@ -32,28 +33,28 @@ export const createDocumentVersion = async (
     versionId: string;
     userId: string;
     bucket: string;
-    key: string;
     fileName: string;
     contentType: string;
     sizeBytes: number;
-    isUploaded: boolean;
   },
-): Promise<number | null> => {
-  const result = await databaseService.query<{ version_number: number | null }>(
-    `SELECT create_document_version($1, $2, $3, $4, $5, $6, $7, $8, $9) AS version_number`,
-    [
-      params.itemId,
-      params.versionId,
-      params.userId,
-      params.bucket,
-      params.key,
-      params.fileName,
-      params.contentType,
-      params.sizeBytes,
-      params.isUploaded,
-    ],
-  );
-  return result.rows[0].version_number;
+): Promise<{ versionNumber: number; key: string } | null> => {
+  const result = await databaseService.query<{
+    version_number: number;
+    storage_key: string;
+  }>(`SELECT * FROM reserve_knowledge_version($1,$2,$3,$4,$5,$6,$7,$8)`, [
+    params.itemId,
+    params.versionId,
+    params.userId,
+    params.bucket,
+    params.fileName,
+    toSafeFileName(params.fileName),
+    params.contentType,
+    params.sizeBytes,
+  ]);
+  const row = result.rows[0];
+  return row
+    ? { versionNumber: row.version_number, key: row.storage_key }
+    : null;
 };
 
 // Returns every version's S3 key so the caller can delete the files.

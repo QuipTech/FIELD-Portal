@@ -1,4 +1,8 @@
 import {
+  validateIncomingFile,
+  DOCUMENT_RULE,
+} from '../storage/storageFileRules';
+import {
   ConflictException,
   Injectable,
   NotFoundException,
@@ -8,7 +12,7 @@ import { DatabaseService } from '../database/database.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { StorageService } from '../storage/storage.service';
 import { SharedLibraryStorageService } from '../storage/sharedLibraryStorage.service';
-import { IncomingFile, StoredFile } from '../storage/types/storedFile';
+import { IncomingFile } from '../storage/types/storedFile';
 import { IndexingWorkerService } from '../knowledgeIndexing/indexingWorker.service';
 import { toKnowledgeDocument } from '../knowledge/knowledgeDocumentMapper';
 import { KnowledgeDocumentRow } from '../knowledge/types/knowledgeDocumentRows';
@@ -48,64 +52,51 @@ export class DocumentVersionsService {
     );
     assertAcceptsNewVersion(row);
 
+    const { contentType } = validateIncomingFile(file, DOCUMENT_RULE);
     const versionId = randomUUID();
-    const stored = await this.storeFile(row, versionId, file);
-    const versionNumber = await lifecycleRepository
-      .createDocumentVersion(this.databaseService, {
+    const reserved = await lifecycleRepository.createDocumentVersion(
+      this.databaseService,
+      {
         itemId,
         versionId,
         userId: actor.userId,
         bucket: this.storageService.requireBucket(),
-        key: stored.key,
-        fileName: stored.fileName,
-        contentType: stored.contentType,
-        sizeBytes: stored.sizeBytes,
-        isUploaded: true,
-      })
-      .catch(async (error: unknown) => {
-        await this.removeFile(row, stored.key);
-        throw error;
-      });
-    if (versionNumber === null) {
-      await this.removeFile(row, stored.key);
-      throw new NotFoundException('Document not found.');
+        fileName: file!.originalname,
+        contentType,
+        sizeBytes: file!.size,
+      },
+    );
+    if (!reserved) throw new NotFoundException('Document not found.');
+    try {
+      await this.sharedLibraryStorage.uploadSharedDocument(file, reserved.key);
+      await this.databaseService.query(
+        'SELECT admin_finish_knowledge_upload($1,true)',
+        [versionId],
+      );
+    } catch (error) {
+      await this.databaseService.query(
+        'SELECT admin_finish_knowledge_upload($1,false)',
+        [versionId],
+      );
+      await this.sharedLibraryStorage
+        .deleteSharedDocumentFile(reserved.key)
+        .catch(() => undefined);
+      throw error;
     }
 
     await auditDocumentChange(this.databaseService, actor, {
       itemId,
       action: 'update',
-      metadata: { newVersion: versionNumber, fileName: stored.fileName },
+      metadata: {
+        newVersion: reserved.versionNumber,
+        fileName: file!.originalname,
+      },
     });
     this.indexingWorker.requestRun();
     return toKnowledgeDocument(
       await this.lifecycle.findVisibleRow(actor, itemId),
     );
   };
-
-  private storeFile = (
-    row: KnowledgeDocumentRow,
-    versionId: string,
-    file: IncomingFile | undefined,
-  ): Promise<StoredFile> =>
-    row.tenant_id === null
-      ? this.sharedLibraryStorage.uploadSharedDocument(
-          file,
-          this.sharedLibraryStorage.buildVersionKey(
-            row.document_id,
-            versionId,
-            file?.originalname ?? 'document',
-          ),
-        )
-      : this.storageService.uploadDocument(file, row.tenant_id);
-
-  private removeFile = (
-    row: KnowledgeDocumentRow,
-    key: string,
-  ): Promise<void> =>
-    (row.tenant_id === null
-      ? this.sharedLibraryStorage.deleteSharedDocumentFile(key)
-      : this.storageService.deleteFile(key, row.tenant_id)
-    ).catch(() => undefined);
 }
 
 // One version in flight at a time; archived documents stay archived.

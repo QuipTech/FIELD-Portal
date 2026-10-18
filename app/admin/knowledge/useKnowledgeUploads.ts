@@ -4,6 +4,7 @@ import { useState } from "react";
 import { requireAccessToken } from "@/lib/api/requireAccessToken";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import { StorageUploadError } from "@/lib/api/signedUrlUpload";
+import type { KnowledgeClassification } from "@/lib/types/knowledgeBrand";
 import type { KnowledgeDocumentType } from "@/lib/types/adminDocument";
 import { uploadKnowledgeDocument, uploadKnowledgeVersion } from "./uploadKnowledgeDocument";
 
@@ -37,7 +38,11 @@ export const useKnowledgeUploads = (onUploaded: () => Promise<void>) => {
   const updateUpload = (id: string, change: Partial<UploadProgress>) =>
     setUploads((current) => current.map((upload) => (upload.id === id ? { ...upload, ...change } : upload)));
 
-  const startUploads = async (pending: PendingUpload[], type: KnowledgeDocumentType) => {
+  const startUploads = async (
+    pending: PendingUpload[],
+    type: KnowledgeDocumentType,
+    classification: KnowledgeClassification,
+  ) => {
     const batch = pending.map((item) => ({ ...item, id: crypto.randomUUID() }));
     setUploads((current) => [
       ...current,
@@ -46,7 +51,7 @@ export const useKnowledgeUploads = (onUploaded: () => Promise<void>) => {
 
     for (const { id, file, title } of batch) {
       try {
-        await uploadKnowledgeDocument(requireAccessToken(), file, { title, type }, (fraction) =>
+        await uploadKnowledgeDocument(requireAccessToken(), file, { title, type, ...classification }, (fraction) =>
           updateUpload(id, { fraction }),
         );
         await onUploaded();
@@ -61,9 +66,14 @@ export const useKnowledgeUploads = (onUploaded: () => Promise<void>) => {
   // A new version of one existing document, shown in the same progress list.
   const startVersionUpload = async (documentId: string, file: File) => {
     const id = crypto.randomUUID();
-    setUploads((current) => [...current, { id, fileName: `${file.name} (new version)`, fraction: 0, status: "uploading" }]);
+    setUploads((current) => [
+      ...current,
+      { id, fileName: `${file.name} (new version)`, fraction: 0, status: "uploading" },
+    ]);
     try {
-      await uploadKnowledgeVersion(requireAccessToken(), documentId, file, (fraction) => updateUpload(id, { fraction }));
+      await uploadKnowledgeVersion(requireAccessToken(), documentId, file, (fraction) =>
+        updateUpload(id, { fraction }),
+      );
       await onUploaded();
       removeUpload(id);
     } catch (error) {

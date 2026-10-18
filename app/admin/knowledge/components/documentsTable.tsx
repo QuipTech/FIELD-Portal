@@ -25,6 +25,7 @@ interface DocumentsTableProps {
   loadError: string | null;
   onAction: (document: KnowledgeDocument, action: DocumentRowAction) => void;
   onPreview: (document: KnowledgeDocument) => void;
+  onEditMetadata: (document: KnowledgeDocument) => void;
 }
 
 const FAILED_ICON = { icon: "x", tone: "danger" } as const;
@@ -60,7 +61,14 @@ const DocumentSubtitle = ({ document }: { document: KnowledgeDocument }) => {
   ) : null;
 };
 
-export const DocumentsTable = ({ documents, isLoading, loadError, onAction, onPreview }: DocumentsTableProps) => {
+export const DocumentsTable = ({
+  documents,
+  isLoading,
+  loadError,
+  onAction,
+  onPreview,
+  onEditMetadata,
+}: DocumentsTableProps) => {
   const { can } = usePermissions();
   const canReview = can(PERMISSIONS.managePlatform);
   return (
@@ -74,8 +82,16 @@ export const DocumentsTable = ({ documents, isLoading, loadError, onAction, onPr
         <TableHeaderCell flex={0.8}>State</TableHeaderCell>
         <TableHeaderCell flex={0.5}>{""}</TableHeaderCell>
       </TableHeaderRow>
-      {loadError && <TableMessage><span className="text-danger">{loadError}</span></TableMessage>}
-      {!loadError && isLoading && <TableMessage><LoadingSpinner /> Loading documents…</TableMessage>}
+      {loadError && (
+        <TableMessage>
+          <span className="text-danger">{loadError}</span>
+        </TableMessage>
+      )}
+      {!loadError && isLoading && (
+        <TableMessage>
+          <LoadingSpinner /> Loading documents…
+        </TableMessage>
+      )}
       {!loadError && !isLoading && documents.length === 0 && (
         <TableMessage>No documents yet. Upload a manual, bulletin or procedure to start the library.</TableMessage>
       )}
@@ -98,8 +114,12 @@ export const DocumentsTable = ({ documents, isLoading, loadError, onAction, onPr
                   <DocumentSubtitle document={document} />
                 </div>
               </TableCell>
-              <TableCell flex={0.8} className="text-bodyGray">{typeLabel(document.type)}</TableCell>
-              <TableCell flex={1} className="text-xs text-mutedGray">{formatDocumentIndexedLabel(document)}</TableCell>
+              <TableCell flex={0.8} className="text-bodyGray">
+                {typeLabel(document.type)}
+              </TableCell>
+              <TableCell flex={1} className="text-xs text-mutedGray">
+                {formatDocumentIndexedLabel(document)}
+              </TableCell>
               <TableCell flex={0.5} className="text-bodyGray">
                 {document.isPageCountPending ? (
                   <span className="text-xs text-mutedGray">Counting…</span>
@@ -121,12 +141,23 @@ export const DocumentsTable = ({ documents, isLoading, loadError, onAction, onPr
                 )}
                 <ActionMenu
                   label={document.title}
-                  items={availableRowActions(document, canReview).map((item) => ({
-                    label: item.label,
-                    icon: item.icon,
-                    tone: item.tone,
-                    onSelect: () => onAction(document, item.action),
-                  }))}
+                  items={[
+                    ...(canReview && document.isEditable
+                      ? [
+                          {
+                            label: "Move / edit metadata",
+                            icon: "file" as const,
+                            onSelect: () => onEditMetadata(document),
+                          },
+                        ]
+                      : []),
+                    ...availableRowActions(document, canReview).map((item) => ({
+                      label: item.label,
+                      icon: item.icon,
+                      tone: item.tone,
+                      onSelect: () => onAction(document, item.action),
+                    })),
+                  ]}
                 />
               </TableCell>
             </TableRow>

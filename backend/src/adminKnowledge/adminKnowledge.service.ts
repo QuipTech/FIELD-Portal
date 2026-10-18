@@ -40,6 +40,10 @@ export class AdminKnowledgeService {
       this.databaseService,
       {
         ...toKnowledgeVisibility(scope),
+        brandId: query.brandId,
+        categoryId: query.categoryId,
+        machineModelId: query.machineModelId,
+        status: query.status,
         search: query.search,
         type: query.type,
         limit: query.pageSize,
@@ -67,10 +71,7 @@ export class AdminKnowledgeService {
     scope: AdminScope,
     itemId: string,
   ): Promise<SignedUrl> =>
-    signDocumentPreview(
-      this.storageService,
-      await this.findRow(scope, itemId),
-    );
+    signDocumentPreview(this.storageService, await this.findRow(scope, itemId));
 
   // 404 for documents outside the caller's scope.
   findRow = async (

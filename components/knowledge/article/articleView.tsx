@@ -8,7 +8,6 @@ import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import { getDocumentDownloadUrlRequest } from "@/lib/api/documentsApi";
 import type { ArticleNavigation } from "@/lib/knowledge/knowledgeLinks";
 import { useKnowledgeArticle } from "./useKnowledgeArticle";
-import { useOfflineCopy } from "./useOfflineCopy";
 import { useActiveSection } from "./useActiveSection";
 import { ArticleHeaderBar } from "./articleHeaderBar";
 import { ArticleSkeleton } from "./articleSkeleton";
@@ -32,13 +31,15 @@ interface ArticleViewProps {
 export const ArticleView = ({ documentId, navigation, initialSectionId, isEmbedded = false }: ArticleViewProps) => {
   const { state, reload } = useKnowledgeArticle(documentId);
   const article = state.kind === "ready" ? state.article : null;
-  const offline = useOfflineCopy(article);
   const [scrollRoot, setScrollRoot] = useState<HTMLElement | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const hasJumped = useRef(false);
   const sections = article?.sections ?? [];
-  const activeSectionId = useActiveSection(sections.map((section) => section.id), scrollRoot);
+  const activeSectionId = useActiveSection(
+    sections.map((section) => section.id),
+    scrollRoot,
+  );
 
   const jumpTo = (sectionId: string, behavior: ScrollBehavior = "smooth") => {
     scrollRoot?.querySelector(`#${CSS.escape(sectionId)}`)?.scrollIntoView({ behavior, block: "start" });
@@ -63,9 +64,6 @@ export const ArticleView = ({ documentId, navigation, initialSectionId, isEmbedd
       setToast(toApiErrorMessage(error, "Couldn't download this document."));
     }
   };
-
-  const saveOffline = () =>
-    offline.save().catch((error: unknown) => setToast(toApiErrorMessage(error, "Couldn't save it for offline use.")));
 
   const renderBody = () => {
     if (state.kind === "loading") return <ArticleSkeleton />;
@@ -112,7 +110,6 @@ export const ArticleView = ({ documentId, navigation, initialSectionId, isEmbedd
         title={article?.title ?? "Document"}
         article={article}
         navigation={navigation}
-        offline={{ ...offline, save: saveOffline, remove: () => void offline.remove() }}
         onDownload={download}
       />
       <div className="flex min-h-0 flex-1">
@@ -121,7 +118,12 @@ export const ArticleView = ({ documentId, navigation, initialSectionId, isEmbedd
             {renderBody()}
           </main>
           {article && article.sections.length > 0 && (
-            <ArticleTocRail article={article} activeSectionId={activeSectionId} navigation={navigation} onJump={jumpTo} />
+            <ArticleTocRail
+              article={article}
+              activeSectionId={activeSectionId}
+              navigation={navigation}
+              onJump={jumpTo}
+            />
           )}
         </div>
       </div>

@@ -1,3 +1,7 @@
+import { SharedLibraryStorageService } from '../storage/sharedLibraryStorage.service';
+import { KnowledgeMetadataService } from '../knowledge/knowledgeMetadata.service';
+import { setUploadClassification } from '../knowledge/knowledgeAccess';
+import { buildKnowledgeDocumentKey } from '../storage/storageKeys';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DatabaseService } from '../database/database.service';
@@ -28,6 +32,8 @@ export type ListedDocument = KnowledgeDocument & { downloadUrl: string | null };
 @Injectable()
 export class DocumentsService {
   constructor(
+    private readonly knowledgeStorage: SharedLibraryStorageService,
+    private readonly metadata: KnowledgeMetadataService,
     private readonly databaseService: DatabaseService,
     private readonly storageService: StorageService,
     private readonly documentPageCount: DocumentPageCountService,
@@ -41,16 +47,26 @@ export class DocumentsService {
     file: IncomingFile | undefined,
     dto: UploadDocumentDto,
   ): Promise<{ document: KnowledgeDocument; file: UploadedFile }> => {
+    await this.metadata.validate(actor, dto);
+    const documentId = randomUUID();
     const stored = await this.storageService.uploadDocument(
       file,
       actor.tenantId,
+      buildKnowledgeDocumentKey(
+        dto.brandId,
+        dto.categoryId,
+        documentId,
+        1,
+        file?.originalname ?? 'document',
+      ),
     );
     const itemId = randomUUID();
     try {
-      await this.databaseService.withTenant(actor.tenantId, async (client) => {
+      await this.databaseService.withActor(actor, async (client) => {
+        await setUploadClassification(client, dto.brandId, dto.categoryId);
         await documentsRepository.insertTenantDocument(client, {
           itemId,
-          documentId: randomUUID(),
+          documentId,
           versionId: randomUUID(),
           tenantId: actor.tenantId,
           userId: actor.userId,
@@ -58,6 +74,10 @@ export class DocumentsService {
           type: dto.type,
           bucket: this.storageService.requireBucket(),
           stored,
+        });
+        await this.metadata.apply(client, actor, itemId, {
+          ...dto,
+          documentType: dto.type,
         });
         await authRepository.insertAuditLog(client, {
           tenantId: actor.tenantId,
@@ -69,8 +89,8 @@ export class DocumentsService {
         });
       });
     } catch (error) {
-      await this.storageService
-        .deleteFile(stored.key, actor.tenantId)
+      await this.knowledgeStorage
+        .deleteSharedDocumentFile(stored.key)
         .catch(() => undefined);
       throw error;
     }
@@ -96,6 +116,11 @@ export class DocumentsService {
       this.databaseService,
       {
         visibleToTenantId: actor.tenantId,
+        userId: actor.userId,
+        brandId: query.brandId,
+        categoryId: query.categoryId,
+        machineModelId: query.machineModelId,
+        status: query.status,
         search: query.search,
         type: query.type,
         limit: query.pageSize,
@@ -144,6 +169,8 @@ export class DocumentsService {
       this.databaseService,
       itemId,
       actor.tenantId,
+      false,
+      actor.userId,
     );
     if (!row) throw new NotFoundException(DOCUMENT_NOT_FOUND_MESSAGE);
     return row;

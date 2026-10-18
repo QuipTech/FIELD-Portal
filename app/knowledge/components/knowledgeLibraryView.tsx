@@ -1,5 +1,12 @@
 "use client";
 
+import { listKnowledgeModelsRequest } from "@/lib/api/knowledgeBrandsApi";
+import { useApiResource } from "@/lib/hooks/useApiResource";
+import { Tag } from "@/components/ui/tag";
+import { knowledgeDocumentTypes } from "@/lib/types/adminDocument";
+import { BrandNavigation } from "@/components/knowledge/brandNavigation";
+import { Pagination } from "@/components/ui/pagination";
+import { SelectInput } from "@/components/ui/selectInput";
 import { LoadingSpinner } from "@/components/ui/loadingSpinner";
 import type { KnowledgeLibraryFilters } from "@/lib/types/knowledgeLibrary";
 import { knowledgeArticleNavigation, toListContext } from "@/lib/knowledge/knowledgeLinks";
@@ -8,16 +15,17 @@ import { KnowledgeFilterNav } from "./knowledgeFilterNav";
 import { KnowledgeFilterPills } from "./knowledgeFilterPills";
 import { KnowledgeResultCard } from "@/components/knowledge/knowledgeResultCard";
 import { KnowledgeSearchBar } from "./knowledgeSearchBar";
-import { OrganisationDocuments } from "./organisationDocuments";
 
 export const KnowledgeLibraryView = ({ initialFilters }: { initialFilters: KnowledgeLibraryFilters }) => {
-  const { filters, updateFilter, results, hasSearch } = useKnowledgeLibrary(initialFilters);
+  const { filters, updateScope, updateFilter, results, hasSearch } = useKnowledgeLibrary(initialFilters);
+  const models = useApiResource(listKnowledgeModelsRequest, [], "Couldn't load models.");
   const data = results.data;
-  const isNarrowed = hasSearch || Boolean(filters.type || filters.make || filters.model);
+  const isNarrowed =
+    hasSearch || Boolean(filters.type || filters.make || filters.model || filters.brandId || filters.categoryId);
   const listContext = toListContext(filters);
 
   const renderResults = () => {
-    if (!data) {
+    if (!data || results.isLoading || results.error) {
       return results.isLoading ? (
         <div className="flex justify-center py-10 text-mutedGray">
           <LoadingSpinner size="md" />
@@ -48,7 +56,29 @@ export const KnowledgeLibraryView = ({ initialFilters }: { initialFilters: Knowl
         onMakeChange={(make) => updateFilter("make", make)}
       />
       <main className="flex flex-1 flex-col gap-3 overflow-y-auto p-2">
+        <BrandNavigation brandId={filters.brandId ?? ""} categoryId={filters.categoryId ?? ""} onChange={updateScope} />
         <KnowledgeSearchBar value={filters.search} onChange={(search) => updateFilter("search", search)} />
+        <SelectInput
+          aria-label="Filter by machine model"
+          value={filters.model}
+          onChange={(event) => updateFilter("model", event.target.value)}
+        >
+          <option value="">All machine models</option>
+          {(models.data ?? []).map((model) => (
+            <option key={model.id} value={model.id}>
+              {model.displayName}
+            </option>
+          ))}
+        </SelectInput>
+        {models.error && <p className="text-xs text-danger">{models.error}</p>}
+        {filters.type && (
+          <Tag tone="primary" className="w-fit">
+            {knowledgeDocumentTypes.find((type) => type.value === filters.type)?.label ?? filters.type}
+            <button type="button" aria-label="Clear document type filter" onClick={() => updateFilter("type", "")}>
+              ×
+            </button>
+          </Tag>
+        )}
         <KnowledgeFilterPills
           sort={filters.sort}
           hasSearch={hasSearch}
@@ -58,9 +88,17 @@ export const KnowledgeLibraryView = ({ initialFilters }: { initialFilters: Knowl
           onSortChange={(sort) => updateFilter("sort", sort)}
           onClearModel={() => updateFilter("model", "")}
         />
-        <OrganisationDocuments listContext={listContext} />
+
         {results.error && <p className="text-sm text-danger">{results.error}</p>}
         {renderResults()}
+        {!results.isLoading && !results.error && (
+          <Pagination
+            page={Number(filters.page ?? 1)}
+            pageSize={50}
+            total={data?.total ?? 0}
+            onPageChange={(page) => updateFilter("page", String(page))}
+          />
+        )}
       </main>
     </>
   );

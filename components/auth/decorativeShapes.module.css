@@ -1,0 +1,81 @@
+.orbitDashed,
+.orbitDot,
+.orbitAccent {
+  transform-origin: 260px 260px;
+  animation: orbit 70s linear infinite;
+}
+
+.orbitDot {
+  animation-duration: 38s;
+}
+
+.orbitAccent {
+  animation-duration: 58s;
+  animation-direction: reverse;
+}
+
+.hexagon {
+  transform: rotate(12deg);
+  animation: hexagonFloat 16s ease-in-out infinite;
+}
+
+.squares {
+  animation: float 22s ease-in-out -7s infinite;
+}
+
+.dotGrid {
+  animation: float 18s ease-in-out -5s infinite reverse;
+}
+
+.plus {
+  animation: float 12s ease-in-out infinite;
+}
+
+.plus:nth-child(2) {
+  animation-delay: -4s;
+}
+
+.plus:nth-child(3) {
+  animation-delay: -8s;
+}
+
+.accentRing {
+  animation: float 20s ease-in-out -10s infinite;
+}
+
+@keyframes orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(8px, -14px);
+  }
+}
+
+@keyframes hexagonFloat {
+  0%, 100% {
+    transform: translateY(0) rotate(12deg);
+  }
+  50% {
+    transform: translateY(-16px) rotate(30deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orbitDashed,
+  .orbitDot,
+  .orbitAccent,
+  .hexagon,
+  .squares,
+  .dotGrid,
+  .plus,
+  .accentRing {
+    animation: none;
+  }
+}
