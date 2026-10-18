@@ -3,6 +3,8 @@
 // (S3 keys: storage/storageKeys.ts buildSharedDocumentKey.)
 
 export const KNOWLEDGE_DOCUMENT_TYPES = [
+  'guide',
+  'knownIssue',
   'manual',
   'bulletin',
   'procedure',

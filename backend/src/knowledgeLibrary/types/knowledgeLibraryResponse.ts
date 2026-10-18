@@ -4,6 +4,10 @@ export type LibrarySearchMode = 'semantic' | 'keyword' | 'browse';
 
 export interface KnowledgeResult {
   // The knowledge item (what /documents/:id/download takes).
+  brandId?: string;
+  categoryId?: string;
+  documentType?: string;
+  highlights?: string[];
   id: string;
   title: string;
   type: string;

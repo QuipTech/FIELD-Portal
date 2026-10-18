@@ -13,6 +13,8 @@ interface KnowledgeFilterNavProps {
 
 const docTypeLinks: { value: KnowledgeDocumentType | ""; label: string; icon: IconName }[] = [
   { value: "", label: "All types", icon: "file" },
+  { value: "guide", label: "Guides", icon: "file" },
+  { value: "knownIssue", label: "Known issues", icon: "alert" },
   { value: "manual", label: "Manuals", icon: "book" },
   { value: "procedure", label: "Procedures", icon: "tool" },
   { value: "bulletin", label: "Bulletins", icon: "alert" },
@@ -22,7 +24,17 @@ const docTypeLinks: { value: KnowledgeDocumentType | ""; label: string; icon: Ic
 
 const sectionLabelClasses = "px-2.5 pb-2 text-xs font-semibold uppercase tracking-wider text-indigo-300/70";
 
-const NavButton = ({ label, icon, isActive, onClick }: { label: string; icon: IconName; isActive: boolean; onClick: () => void }) => (
+const NavButton = ({
+  label,
+  icon,
+  isActive,
+  onClick,
+}: {
+  label: string;
+  icon: IconName;
+  isActive: boolean;
+  onClick: () => void;
+}) => (
   <button
     type="button"
     onClick={onClick}
@@ -38,7 +50,10 @@ const NavButton = ({ label, icon, isActive, onClick }: { label: string; icon: Ic
 
 export const KnowledgeFilterNav = ({ type, make, makes, onTypeChange, onMakeChange }: KnowledgeFilterNavProps) => {
   return (
-    <nav aria-label="Knowledge filters" className="flex w-[200px] flex-none flex-col gap-0.5 overflow-y-auto rounded-2xl bg-[#2D1B69] p-3">
+    <nav
+      aria-label="Knowledge filters"
+      className="flex w-[200px] flex-none flex-col gap-0.5 overflow-y-auto rounded-2xl bg-[#2D1B69] p-3"
+    >
       <span className={`pt-1 ${sectionLabelClasses}`}>Document type</span>
       {docTypeLinks.map((link) => (
         <NavButton

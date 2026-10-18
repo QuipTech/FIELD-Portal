@@ -1,5 +1,8 @@
 // Rows read by the knowledge article repositories.
 export interface ArticleDocumentRow {
+  brand_id?: string;
+  category_id?: string;
+  document_type?: string;
   id: string;
   title: string;
   type: string;

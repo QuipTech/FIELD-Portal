@@ -7,6 +7,11 @@ export interface KnowledgeDocumentFilter {
   visibleToTenantId: string | null;
   // The Owner (platform admin): every organisation's documents too.
   includeAllTenants?: boolean;
+  userId?: string;
+  brandId?: string;
+  categoryId?: string;
+  machineModelId?: string;
+  status?: string;
   search?: string;
   type?: string;
   limit: number;
@@ -22,7 +27,7 @@ const queryKnowledgeDocuments = (
   params: unknown[],
 ) =>
   databaseService.query<KnowledgeDocumentRow>(
-    `SELECT * FROM list_knowledge_documents($1, $2, $3, $4, $5, $6, $7)`,
+    `SELECT * FROM list_knowledge_documents($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
     params,
   );
 
@@ -38,6 +43,11 @@ export const listKnowledgeDocuments = async (
     filter.offset,
     filter.visibleToTenantId,
     filter.includeAllTenants ?? false,
+    filter.userId ?? null,
+    filter.brandId ?? null,
+    filter.categoryId ?? null,
+    filter.machineModelId ?? null,
+    filter.status ?? null,
   ]);
   return result.rows;
 };
@@ -47,6 +57,7 @@ export const findKnowledgeDocument = async (
   itemId: string,
   visibleToTenantId: string | null,
   includeAllTenants = false,
+  userId?: string,
 ): Promise<KnowledgeDocumentRow | null> => {
   const result = await queryKnowledgeDocuments(databaseService, [
     itemId,
@@ -56,6 +67,11 @@ export const findKnowledgeDocument = async (
     0,
     visibleToTenantId,
     includeAllTenants,
+    userId ?? null,
+    null,
+    null,
+    null,
+    null,
   ]);
   return result.rows[0] ?? null;
 };

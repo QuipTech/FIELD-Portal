@@ -135,6 +135,8 @@ then point that environment's `DATABASE_URL` at `field_app` instead of
 `postgres` — the app should never run as the migration/superuser role
 outside local dev.
 
+Brand-scoped Knowledge (migrations 0084–0091) supersedes the shared-library visibility described below. See [Knowledge access and rollout](src/knowledgeBrands/README.md) before deploying.
+
 ## Key conventions specific to this app
 
 - Follows the root `CLAUDE.md` NestJS suffix conventions: `<name>.module.ts`,
@@ -626,6 +628,7 @@ read as "not found" rather than "access denied"):
       "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
       "Resource": [
         "arn:aws:s3:::<bucket>/documents/*",
+        "arn:aws:s3:::<bucket>/knowledge/*",
         "arn:aws:s3:::<bucket>/photos/*",
         "arn:aws:s3:::<bucket>/avatars/*",
         "arn:aws:s3:::<bucket>/branding/*",

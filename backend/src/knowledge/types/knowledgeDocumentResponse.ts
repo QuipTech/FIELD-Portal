@@ -2,6 +2,10 @@ import { KnowledgeDocumentState } from '../knowledgeFileRules';
 import { SignedUrl } from '../../storage/types/storedFile';
 
 export interface KnowledgeDocument {
+  brandId: string;
+  categoryId: string;
+  documentType: string;
+  machineModelIds: string[];
   id: string;
   // True for the QuipTech library every organisation shares.
   isShared: boolean;

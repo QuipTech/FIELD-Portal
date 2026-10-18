@@ -6,7 +6,7 @@ import { requireAccessToken } from "@/lib/api/requireAccessToken";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import { getKnowledgeArticleRequest } from "@/lib/api/knowledgeArticleApi";
 import { getDocumentStatusRequest } from "@/lib/api/documentLifecycleApi";
-import { findOfflineArticle } from "@/lib/knowledge/offlineArticleStore";
+import { clearOfflineArticles } from "@/lib/knowledge/offlineArticleStore";
 import type { DocumentStatus } from "@/lib/types/adminDocument";
 import type { KnowledgeArticle } from "@/lib/types/knowledgeArticle";
 
@@ -21,9 +21,6 @@ export type ArticleLoadState =
   | { kind: "notLive"; status: DocumentStatus | null }
   | { kind: "error"; message: string };
 
-// No response at all (offline), as opposed to an error the API sent.
-const isUnreachable = (error: unknown) => !(error instanceof ApiError) || error.status === 0;
-
 // The article, or why it can't be shown. While the document is indexing
 // its status is polled and the article loads as soon as it goes live.
 // Offline, a copy saved with "Save offline" is shown instead.
@@ -34,6 +31,8 @@ export const useKnowledgeArticle = (documentId: string) => {
 
   useEffect(() => {
     let isCurrent = true;
+    setState({ kind: "loading" });
+    void clearOfflineArticles().catch(() => undefined);
     const load = async () => {
       try {
         const article = await getKnowledgeArticleRequest(requireAccessToken(), documentId);
@@ -45,13 +44,7 @@ export const useKnowledgeArticle = (documentId: string) => {
           const status = await getDocumentStatusRequest(requireAccessToken(), documentId).catch(() => null);
           return isCurrent && setState({ kind: "notLive", status });
         }
-        const saved = isUnreachable(error) ? await findOfflineArticle(documentId).catch(() => null) : null;
-        if (!isCurrent) return;
-        setState(
-          saved
-            ? { kind: "ready", article: saved.article, isOfflineCopy: true }
-            : { kind: "error", message: toApiErrorMessage(error, LOAD_FAILED_MESSAGE) },
-        );
+        setState({ kind: "error", message: toApiErrorMessage(error, LOAD_FAILED_MESSAGE) });
       }
     };
     void load();

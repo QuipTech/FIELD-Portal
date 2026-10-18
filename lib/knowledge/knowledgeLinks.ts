@@ -2,14 +2,24 @@ import type { KnowledgeLibraryFilters } from "../types/knowledgeLibrary";
 
 // The /knowledge filters an article keeps in its own URL, so its
 // breadcrumb (and Back) return to the same results.
-const KEPT_FILTERS = { q: "search", type: "type", make: "make", model: "model" } as const;
+const KEPT_FILTERS = {
+  q: "search",
+  type: "type",
+  make: "make",
+  model: "model",
+  brandId: "brandId",
+  categoryId: "categoryId",
+  page: "page",
+} as const;
 
 export type KnowledgeListContext = Partial<Record<keyof typeof KEPT_FILTERS, string>>;
 
-export const toListContext = (filters: Pick<KnowledgeLibraryFilters, "search" | "type" | "make" | "model">): KnowledgeListContext => {
+export const toListContext = (
+  filters: Pick<KnowledgeLibraryFilters, "search" | "type" | "make" | "model" | "brandId" | "categoryId" | "page">,
+): KnowledgeListContext => {
   const context: KnowledgeListContext = {};
   (Object.keys(KEPT_FILTERS) as (keyof typeof KEPT_FILTERS)[]).forEach((param) => {
-    const value = filters[KEPT_FILTERS[param]].trim();
+    const value = filters[KEPT_FILTERS[param]]?.trim();
     if (value) context[param] = value;
   });
   return context;

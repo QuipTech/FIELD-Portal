@@ -19,7 +19,7 @@ const FIRST_PASSAGE_SQL = `
 
 // No query: every visible document, newest first, with its opening passage.
 export const browseKnowledge = async (
-  databaseService: DatabaseService,
+  databaseService: Pick<DatabaseService, 'query'>,
   tenantId: string,
   filters: SearchKnowledgeLibraryQueryDto,
 ): Promise<KnowledgeResultRow[]> => {
@@ -30,7 +30,7 @@ export const browseKnowledge = async (
      SELECT ${RESULT_COLUMNS}, NULL::float AS score
      FROM visible vi
      LEFT JOIN LATERAL (${FIRST_PASSAGE_SQL}) b ON true
-     ${orderBy('newest')} LIMIT ${RESULT_LIMIT}`,
+     ${orderBy('newest')} LIMIT ${Math.min(filters.pageSize ?? RESULT_LIMIT, 100)} OFFSET ${((filters.page ?? 1) - 1) * (filters.pageSize ?? RESULT_LIMIT)}`,
     params,
   );
   return result.rows;
@@ -41,7 +41,7 @@ export const browseKnowledge = async (
 // only some of them); documents matching more words rank higher. Each
 // document shows its best passage, or its opening one for a title match.
 export const keywordSearchKnowledge = async (
-  databaseService: DatabaseService,
+  databaseService: Pick<DatabaseService, 'query'>,
   tenantId: string,
   filters: SearchKnowledgeLibraryQueryDto & { search: string },
 ): Promise<KnowledgeResultRow[]> => {
@@ -76,7 +76,7 @@ export const keywordSearchKnowledge = async (
        (${FIRST_PASSAGE_SQL.replace('WHERE', 'WHERE h.document_id IS NULL AND')})
      ) b ON true
      WHERE h.document_id IS NOT NULL OR vi.title_rank > 0
-     ${orderBy(filters.sort)} LIMIT ${RESULT_LIMIT}`,
+     ${orderBy(filters.sort)} LIMIT ${Math.min(filters.pageSize ?? RESULT_LIMIT, 100)} OFFSET ${((filters.page ?? 1) - 1) * (filters.pageSize ?? RESULT_LIMIT)}`,
     params,
   );
   return result.rows;
@@ -85,7 +85,7 @@ export const keywordSearchKnowledge = async (
 // Nearest passages to the query embedding (HNSW index, migration 0013),
 // grouped to each document's closest passage; score is cosine similarity.
 export const semanticSearchKnowledge = async (
-  databaseService: DatabaseService,
+  databaseService: Pick<DatabaseService, 'query'>,
   tenantId: string,
   filters: SearchKnowledgeLibraryQueryDto & { queryVector: string },
 ): Promise<KnowledgeResultRow[]> => {
@@ -109,7 +109,7 @@ export const semanticSearchKnowledge = async (
      SELECT ${RESULT_COLUMNS}, b.similarity AS score
      FROM best b
      JOIN visible vi ON vi.document_id = b.document_id
-     ${orderBy(filters.sort)} LIMIT ${RESULT_LIMIT}`,
+     ${orderBy(filters.sort)} LIMIT ${Math.min(filters.pageSize ?? RESULT_LIMIT, 100)} OFFSET ${((filters.page ?? 1) - 1) * (filters.pageSize ?? RESULT_LIMIT)}`,
     params,
   );
   return result.rows;

@@ -5,7 +5,7 @@ import { UsersDirectory } from "./components/usersDirectory";
 const UsersPage = () => {
   return (
     <AdminShell topBar={<AdminTopBar label="Users" />}>
-      <main className="m-4 flex flex-1 flex-col gap-3.5 overflow-y-auto rounded-2xl border border-slate-200/80 bg-surface p-6">
+      <main className="m-4 flex min-w-0 flex-1 flex-col gap-3.5 overflow-y-auto rounded-2xl border border-slate-200/80 bg-surface p-6">
         <UsersDirectory />
       </main>
     </AdminShell>

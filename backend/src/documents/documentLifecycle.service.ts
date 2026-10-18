@@ -122,7 +122,7 @@ export class DocumentLifecycleService {
     });
     for (const key of keys) {
       const deletion =
-        row.tenant_id === null
+        row.tenant_id === null || key.startsWith('knowledge/brands/')
           ? this.sharedLibraryStorage.deleteSharedDocumentFile(key)
           : this.storageService.deleteFile(key, row.tenant_id);
       await deletion.catch((error: unknown) =>
@@ -143,6 +143,7 @@ export class DocumentLifecycleService {
       itemId,
       actor.tenantId,
       access.permissions.includes(PLATFORM_PERMISSION_CODE),
+      actor.userId,
     );
     if (!row) throw new NotFoundException(DOCUMENT_NOT_FOUND_MESSAGE);
     return row;

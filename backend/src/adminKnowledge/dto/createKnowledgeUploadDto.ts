@@ -1,4 +1,5 @@
-import { Transform } from 'class-transformer';
+import { KnowledgeClassificationDto } from '../../knowledgeBrands/dto/knowledgeBrandDto';
+import { Expose, Transform } from 'class-transformer';
 import {
   IsIn,
   IsInt,
@@ -20,13 +21,15 @@ const trimString = ({ value }: { value: unknown }) =>
 
 // Describes the file the browser is about to upload; the backend answers
 // with a signed S3 URL to PUT it to.
-export class CreateKnowledgeUploadDto {
+export class CreateKnowledgeUploadDto extends KnowledgeClassificationDto {
   @Transform(trimString)
   @IsString()
   @MinLength(1)
   @MaxLength(300)
   title: string;
 
+  @Expose()
+  @Transform(({ value, obj }) => value ?? obj.documentType)
   @IsIn(KNOWLEDGE_DOCUMENT_TYPES)
   type: KnowledgeDocumentType;
 

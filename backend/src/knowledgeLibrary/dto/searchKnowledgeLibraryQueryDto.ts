@@ -1,5 +1,14 @@
-import { Transform } from 'class-transformer';
-import { IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import {
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  IsInt,
+  Min,
+  Max,
+} from 'class-validator';
 import { trimToUndefined } from '../../common/utils/trimTransforms';
 import {
   KNOWLEDGE_DOCUMENT_TYPES,
@@ -11,6 +20,26 @@ export type LibrarySort = (typeof LIBRARY_SORTS)[number];
 
 // Every filter is optional; blank values count as "any".
 export class SearchKnowledgeLibraryQueryDto {
+  @IsOptional() @Transform(trimToUndefined) @IsUUID() brandId?: string;
+  @IsOptional() @Transform(trimToUndefined) @IsUUID() categoryId?: string;
+  @IsOptional() @Transform(trimToUndefined) @IsUUID() machineModelId?: string;
+  @IsOptional()
+  @Transform(trimToUndefined)
+  @IsIn(KNOWLEDGE_DOCUMENT_TYPES)
+  documentType?: KnowledgeDocumentType;
+  @IsOptional()
+  @Transform(trimToUndefined)
+  @IsString()
+  @MaxLength(500)
+  q?: string;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) page: number = 1;
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  pageSize: number = 50;
+
   @IsOptional()
   @Transform(trimToUndefined)
   @IsString()

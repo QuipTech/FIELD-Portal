@@ -6,6 +6,10 @@ export type LibrarySearchMode = "semantic" | "keyword" | "browse";
 export type LibrarySort = "relevance" | "newest";
 
 export interface KnowledgeResult {
+  highlights?: string[];
+  brandId?: string;
+  categoryId?: string;
+  documentType?: string;
   // The knowledge item; opened with the documents download endpoint.
   id: string;
   title: string;
@@ -34,6 +38,10 @@ export interface KnowledgeLibraryResults {
 
 // "" means any.
 export interface KnowledgeLibraryFilters {
+  brandId?: string;
+  categoryId?: string;
+  page?: string;
+  pageSize?: string;
   search: string;
   type: KnowledgeDocumentType | "";
   make: string;

@@ -15,14 +15,17 @@ export const findMatchingSections = async (
   databaseService: DatabaseService,
   params: {
     tenantId: string;
+    userId: string;
     search: string;
     matches: { versionId: string; chunkPage: number | null }[];
   },
 ): Promise<MatchingSectionRow[]> => {
   if (!params.matches.length) return [];
-  const result = await databaseService.withTenant(params.tenantId, (client) =>
-    client.query<MatchingSectionRow>(
-      `WITH q AS (
+  const result = await databaseService.withActor(
+    { tenantId: params.tenantId, userId: params.userId },
+    (client) =>
+      client.query<MatchingSectionRow>(
+        `WITH q AS (
          SELECT replace(plainto_tsquery('english', $3)::text, '&', '|')::tsquery AS query
        )
        SELECT DISTINCT ON (s.document_version_id)
@@ -31,18 +34,18 @@ export const findMatchingSections = async (
        JOIN unnest($1::uuid[], $2::int[]) AS r(version_id, chunk_page)
          ON r.version_id = s.document_version_id
        CROSS JOIN q
-       WHERE s.tenant_id IS NULL OR s.tenant_id = $4
+       WHERE EXISTS(SELECT 1 FROM document_versions v WHERE v.id=s.document_version_id AND knowledge_can_read_document(v.document_id,$4))
        ORDER BY s.document_version_id,
                 ts_rank(to_tsvector('english', coalesce(s.heading, '') || ' ' || s.content), q.query) DESC,
                 abs(coalesce(s.page_number, 0) - coalesce(r.chunk_page, 0)),
                 s.ordinal`,
-      [
-        params.matches.map((match) => match.versionId),
-        params.matches.map((match) => match.chunkPage),
-        params.search,
-        params.tenantId,
-      ],
-    ),
+        [
+          params.matches.map((match) => match.versionId),
+          params.matches.map((match) => match.chunkPage),
+          params.search,
+          params.tenantId,
+        ],
+      ),
   );
   return result.rows;
 };

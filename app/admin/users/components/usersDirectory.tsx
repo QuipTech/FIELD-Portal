@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Icon } from "@/components/icons/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,10 +19,11 @@ import type { AdminUser } from "@/lib/types/adminUser";
 import { USERS_PAGE_SIZE, useAdminUsers } from "../useAdminUsers";
 
 // Role names, once each: the Owner can see same-named roles in
-// several organisations, and the backend filters by name.
+// several organisations. Tabs filter the loaded directory by role name.
 const toUniqueRoleNames = (names: string[]) => Array.from(new Set(names)).sort((a, b) => a.localeCompare(b));
 
 export const UsersDirectory = () => {
+  const panelId = useId();
   const [search, setSearch] = useState("");
   const [role, setRole] = useState("");
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -35,6 +36,7 @@ export const UsersDirectory = () => {
   const organisations = useApiResource(listAdminOrganisationsRequest, [], "Couldn't load organisations.");
   const profile = useSignedInProfile();
   const organisationList = organisations.data ?? [];
+  const roleNames = toUniqueRoleNames((roles.data ?? []).map((item) => item.name));
 
   return (
     <>
@@ -54,24 +56,32 @@ export const UsersDirectory = () => {
           </button>
         </div>
       )}
-      <RoleFilterTabs value={role} roleNames={toUniqueRoleNames((roles.data ?? []).map((item) => item.name))} onChange={setRole} />
-      <div className="flex items-center gap-3">
-        <Input icon="search" placeholder="Search users" className="w-60" value={search} onChange={(event) => setSearch(event.target.value)} />
-        {!errorMessage && (
-          <span className="ml-auto text-xs text-slate-400">
-            {total} {total === 1 ? "user" : "users"}
-          </span>
-        )}
+      <RoleFilterTabs panelId={panelId} value={role} roleNames={roleNames} onChange={(nextRole) => { setPage(1); setRole(nextRole); }} />
+      <div
+        id={panelId}
+        role="tabpanel"
+        aria-busy={isLoading}
+        aria-labelledby={`${panelId}-tab-${role ? roleNames.indexOf(role) + 1 : 0}`}
+        className="flex min-w-0 flex-col gap-3.5"
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          <Input icon="search" placeholder="Search users" className="w-60" value={search} onChange={(event) => { setPage(1); setSearch(event.target.value); }} />
+          {!errorMessage && !isLoading && (
+            <span className="ml-auto text-xs text-slate-400">
+              {total} {total === 1 ? "user" : "users"}
+            </span>
+          )}
+        </div>
+        <UsersTable
+          users={users}
+          isLoading={isLoading}
+          errorMessage={errorMessage}
+          currentUserId={profile?.user.id ?? null}
+          onChangeRole={setRoleTarget}
+          onRemove={setRemoveTarget}
+        />
+        {!errorMessage && !isLoading && <Pagination page={page} pageSize={USERS_PAGE_SIZE} total={total} onPageChange={setPage} />}
       </div>
-      <UsersTable
-        users={users}
-        isLoading={isLoading}
-        errorMessage={errorMessage}
-        currentUserId={profile?.user.id ?? null}
-        onChangeRole={setRoleTarget}
-        onRemove={setRemoveTarget}
-      />
-      {!errorMessage && <Pagination page={page} pageSize={USERS_PAGE_SIZE} total={total} onPageChange={setPage} />}
       {isInviteOpen && roles.data && (
         <InviteUserModal
           roles={roles.data}

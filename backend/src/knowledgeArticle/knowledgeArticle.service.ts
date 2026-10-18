@@ -35,11 +35,12 @@ export class KnowledgeArticleService {
     actor: AuthenticatedUser,
     itemId: string,
   ): Promise<KnowledgeArticle> =>
-    this.databaseService.withTenant(actor.tenantId, async (client) => {
+    this.databaseService.withActor(actor, async (client) => {
       const row = await articleRepository.findArticleDocument(
         client,
         itemId,
         actor.tenantId,
+        actor.userId,
       );
       if (!row) throw new NotFoundException(NOT_FOUND_MESSAGE);
       const blocker = findArticleBlocker(row);
@@ -69,6 +70,9 @@ export class KnowledgeArticleService {
       );
       return {
         id: row.id,
+        brandId: row.brand_id,
+        categoryId: row.category_id,
+        documentType: row.document_type,
         title,
         type: row.type,
         machineMake: row.make_name,

@@ -1,5 +1,7 @@
 "use client";
 
+import { KnowledgeClassificationFields } from "@/components/knowledge/knowledgeClassificationFields";
+import { useKnowledgeBrands } from "@/lib/knowledge/knowledgeBrandStore";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/shell/appShell";
 import { TopBar } from "@/components/shell/topBar";
@@ -24,8 +26,14 @@ import { DocumentContextTag } from "./documentContextTag";
 const TITLE_MAX_LENGTH = 80;
 
 export const AssistantWorkspace = () => {
+  const [scope, setScope] = useState({ brandId: "", categoryId: "" });
+  const brands = useKnowledgeBrands();
   const threads = useAssistantThreads();
-  const machines = useApiResource((token) => listMachinesRequest(token, EMPTY_MACHINE_FILTERS, ""), [], "Couldn't load machines.");
+  const machines = useApiResource(
+    (token) => listMachinesRequest(token, EMPTY_MACHINE_FILTERS, ""),
+    [],
+    "Couldn't load machines.",
+  );
   const [newThreadMachineId, setNewThreadMachineId] = useState("");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [launchPrompt, setLaunchPrompt] = useState("");
@@ -47,9 +55,11 @@ export const AssistantWorkspace = () => {
 
   const asker = useAskAssistant({
     activeThread,
+    brandId: scope.brandId,
+    categoryId: scope.categoryId,
     machineId: newThreadMachineId,
     documentId: sourceDocument?.id ?? null,
-    onDocumentUsed: () => setSourceDocument(null),
+    onDocumentUsed: () => {},
     setMessages: threads.setMessages,
     onThreadSaved: (conversationId, question) =>
       threads.adoptThread({
@@ -78,7 +88,9 @@ export const AssistantWorkspace = () => {
           showUserMenu={false}
           actions={
             <>
-              {sourceDocument && <DocumentContextTag title={sourceDocument.title} onClear={() => setSourceDocument(null)} />}
+              {sourceDocument && (
+                <DocumentContextTag title={sourceDocument.title} onClear={() => setSourceDocument(null)} />
+              )}
               <MachineContextPicker
                 fixedMachine={activeThread?.machine ?? null}
                 isThreadOpen={activeThread !== null}
@@ -117,6 +129,20 @@ export const AssistantWorkspace = () => {
           }}
         />
         <main className="flex min-w-0 flex-1 flex-col gap-3.5 p-5">
+          <KnowledgeClassificationFields
+            value={scope}
+            onChange={(next) => {
+              asker.cancel();
+              setScope(next);
+            }}
+          />
+          <p className="text-xs text-mutedGray">
+            Searching in:{" "}
+            {sourceDocument?.title ??
+              brands.data?.find((brand) => brand.id === scope.brandId)?.name ??
+              "all accessible brands"}
+            {scope.categoryId ? " · selected category" : ""}
+          </p>
           <ChatMessageList
             messages={threads.messages}
             machine={contextMachine}

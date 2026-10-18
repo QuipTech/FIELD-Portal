@@ -36,7 +36,13 @@ const fetchWithSessionRefresh = async (path: string, init: RequestInit): Promise
 export const apiRequest = async <TResponse>(path: string, options: RequestInit = {}): Promise<TResponse> => {
   const response = await fetchWithSessionRefresh(path, {
     ...options,
-    headers: { "Content-Type": "application/json", ...CLIENT_HEADERS, ...options.headers },
+    headers: {
+      ...(typeof FormData !== "undefined" && options.body instanceof FormData
+        ? {}
+        : { "Content-Type": "application/json" }),
+      ...CLIENT_HEADERS,
+      ...options.headers,
+    },
   });
 
   const body = await response.json().catch(() => null);
