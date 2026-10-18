@@ -5,7 +5,6 @@ import {
   listMessageSources,
 } from '../../src/aiAssistant/aiConversations.repository';
 import { KnowledgeMetadataService } from '../../src/knowledge/knowledgeMetadata.service';
-import { OrganisationBrandAccessService } from '../../src/knowledgeBrands/organisationBrandAccess.service';
 
 import { setupKnowledgeFixtures } from './knowledgeFixtures';
 const context = setupKnowledgeFixtures();
@@ -51,8 +50,8 @@ describe('Knowledge metadata and saved answers', () => {
       'documents/shared/legacy/v1/legacy.pdf',
     );
   });
-  it('withholds previous answer text and citations after revocation', async () => {
-    const { fixture, catDoc, asClient } = context();
+  it('withholds previous answer text and citations once the brand is deactivated', async () => {
+    const { fixture, cat, catDoc, asClient } = context();
     const conversationId = randomUUID();
     const messageId = randomUUID();
     await fixture.db.query(
@@ -71,10 +70,9 @@ describe('Knowledge metadata and saved answers', () => {
       'INSERT INTO ai_source_references(tenant_id,message_id,chunk_id) SELECT $1,$2,id FROM document_chunks WHERE document_id=$3',
       [fixture.actor.tenantId, messageId, catDoc.documentId],
     );
-    await new OrganisationBrandAccessService(fixture.database).set(
-      fixture.admin,
-      fixture.actor.tenantId,
-      [],
+    await fixture.db.query(
+      'UPDATE knowledge_brands SET is_active=false WHERE id=$1',
+      [cat.id],
     );
     const messages = await asClient((client) =>
       listMessages(client, {

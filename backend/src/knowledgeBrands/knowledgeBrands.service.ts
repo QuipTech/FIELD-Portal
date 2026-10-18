@@ -125,6 +125,13 @@ export class KnowledgeBrandsService {
         actor,
         'This name is already in use.',
         async (client) => {
+          // Grants from before 0093 are no longer used or editable; they
+          // would otherwise block deleting the brand.
+          if (kind === 'brand')
+            await client.query(
+              'DELETE FROM organisation_brand_access WHERE brand_id=$1',
+              [id],
+            );
           const result =
             kind === 'brand'
               ? await client.query(

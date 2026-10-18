@@ -714,7 +714,11 @@ archived, and only the caller's organisation + the shared library
 - `DATABASE_URL` — Postgres connection string, `sslmode=verify-full`
 - `JWT_SECRET` — signs access tokens
 - `JWT_REFRESH_SECRET` — signs refresh tokens (must differ from `JWT_SECRET`)
-- `PORTAL_ORIGIN` — allowed CORS origin(s) for the frontend, comma-separated
+- `PORTAL_ORIGIN` — allowed CORS origin(s) for the frontend, comma-separated;
+  also the only pages Face ID / Touch ID (passkey) sign-in is accepted from
+- `WEBAUTHN_RP_ID` — optional; the domain passkeys belong to (defaults to the
+  first `PORTAL_ORIGIN`'s host, e.g. `localhost` in dev). A passkey only works
+  on the domain it was set up on, so keep this stable once users enrol
 - `COGNITO_USER_POOL_ID` — Cognito User Pool that issues Google/Apple ID tokens
 - `COGNITO_CLIENT_ID` — the portal's Cognito app client (the ID token audience)
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` — only when not running under

@@ -96,8 +96,8 @@ export const UploadDocumentsModal = ({ files, onUpload, onClose }: UploadDocumen
         ))}
         <span className="text-xs text-mutedGray">
           {can(PERMISSIONS.managePlatform)
-            ? "Available to organisations granted access to this brand once approved."
-            : "Available to your organisation after review, subject to brand access."}{" "}
+            ? "Available to every organisation once approved."
+            : "Available to your organisation after review."}{" "}
           Files go straight to secure storage.
         </span>
         <div className="flex">

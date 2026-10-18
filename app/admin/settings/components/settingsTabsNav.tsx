@@ -8,6 +8,7 @@ const tabs = [
   { href: "/admin/settings/notifications", label: "Notifications & alerts" },
   { href: "/admin/settings/reports", label: "Reports & exports" },
   { href: "/admin/settings/data-retention", label: "Data & retention" },
+  { href: "/admin/settings/security", label: "Sign-in & security" },
 ];
 
 export const SettingsTabsNav = () => {

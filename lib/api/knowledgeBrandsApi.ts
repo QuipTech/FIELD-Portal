@@ -45,14 +45,6 @@ export const updateKnowledgeMetadataRequest = (
     headers: headers(token),
     body: JSON.stringify(input),
   });
-export const getOrganisationBrandAccessRequest = (token: string, id: string) =>
-  apiRequest<{ brandIds: string[] }>(`/admin/organisations/${id}/brand-access`, { headers: headers(token) });
-export const setOrganisationBrandAccessRequest = (token: string, id: string, brandIds: string[]) =>
-  apiRequest(`/admin/organisations/${id}/brand-access`, {
-    method: "PUT",
-    headers: headers(token),
-    body: JSON.stringify({ brandIds }),
-  });
 export const uploadKnowledgeBrandLogoRequest = (token: string, id: string, file: File) => {
   const body = new FormData();
   body.append("file", file);

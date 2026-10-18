@@ -68,6 +68,8 @@ session (set per-request by `DatabaseService.withTenant`).
 | `0084`–`0085` | Knowledge brands, nested categories, organisation grants, document/model links, chunk metadata and Uncategorised backfill; existing S3 keys and embeddings are retained |
 | `0086`–`0087` | Brand-aware RLS/shared access predicates, category-cycle validation, chunk metadata synchronisation, explicit model-link preservation and review for all new documents |
 | `0088`–`0091` | Scoped document lists/filters, audited metadata moves, numeric-version key reservation and retained AI answer provenance |
+| `0092` | Passkey sign-in (Face ID / Touch ID / Windows Hello) — `user_passkeys` (public keys only; owner-only RLS, hard delete, cascades with the user), single-use 5-minute `webauthn_challenges` reachable only through SECURITY DEFINER `webauthn_issue_challenge()` / `webauthn_take_challenge()`, and `auth_lookup_passkey()` for sign-in before the tenant is known |
+| `0093` | Every organisation sees every active Knowledge brand: `knowledge_has_brand_access()` no longer checks per-organisation grants (inactive brands stay admin-only; organisation-private documents unaffected). `organisation_brand_access` is kept, unused |
 
 See [Knowledge rollout](../../src/knowledgeBrands/README.md) for deployment order and compatibility.
 

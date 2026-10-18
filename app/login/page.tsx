@@ -12,8 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { resolvePostLoginRoute } from "@/lib/auth/postLoginRouting";
 import { usePlatformAuthenticator } from "@/lib/auth/usePlatformAuthenticator";
-import { signInWithPlatformAuthenticator } from "@/lib/auth/webauthnPlatformCredential";
-import { getStoredUser } from "@/lib/auth/authSession";
+import { signInWithPasskey, toPasskeyErrorMessage } from "@/lib/auth/passkeys";
 import { resendEmailCode, signInWithEmail, toCognitoErrorMessage } from "@/lib/auth/cognitoPasswordAuth";
 import { OauthButtons } from "./components/oauthButtons";
 import { AppDownloadLinks } from "./components/appDownloadLinks";
@@ -76,11 +75,11 @@ const LoginPage = () => {
     setBiometricError(null);
     setIsBiometricPending(true);
     try {
-      await signInWithPlatformAuthenticator(email);
-      router.push(resolvePostLoginRoute(getStoredUser()?.roles));
-    } catch {
+      const session = await signInWithPasskey();
+      router.push(resolvePostLoginRoute(session.user.roles));
+    } catch (error) {
       setBiometricError(
-        "Face ID / Touch ID sign-in was cancelled or didn't complete.",
+        toPasskeyErrorMessage(error, "Face ID / Touch ID sign-in didn't complete. Please try again."),
       );
     } finally {
       setIsBiometricPending(false);

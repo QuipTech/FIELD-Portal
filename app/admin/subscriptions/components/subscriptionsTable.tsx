@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { Icon } from "@/components/icons/icon";
 import { Avatar } from "@/components/ui/avatar";
 import { Tag } from "@/components/ui/tag";
@@ -78,11 +77,6 @@ export const SubscriptionsTable = ({ items, onEdit }: SubscriptionsTableProps) =
             {/* Clicks here mustn't also open the editor. */}
             <TableCell flex={0.8} className="overflow-visible">
               <span onClick={(event) => event.stopPropagation()}>
-                {onEdit && (
-                  <Link href={`/admin/organisations/${item.tenantId}`} className="text-xs text-primary">
-                    Knowledge access
-                  </Link>
-                )}
                 {canNotify && onEdit && (
                   <ComingSoonButton label="Notify" className={notifyButtonClasses}>
                     <Icon name="msg" className="h-3.5 w-3.5" />

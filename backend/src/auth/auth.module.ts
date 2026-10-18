@@ -11,10 +11,13 @@ import { CognitoAuthService } from './cognitoAuth.service';
 import { CognitoTokenVerifierService } from './cognito/cognitoTokenVerifier.service';
 import { CognitoAuthGuard } from './guards/cognitoAuth.guard';
 import { PasswordResetService } from './passwordReset/passwordReset.service';
+import { PasskeysController } from './passkeys/passkeys.controller';
+import { PasskeyRegistrationService } from './passkeys/passkeyRegistration.service';
+import { PasskeySignInService } from './passkeys/passkeySignIn.service';
 
 @Module({
   imports: [PassportModule, JwtModule.register({}), UsersModule],
-  controllers: [AuthController, CognitoAuthController],
+  controllers: [AuthController, CognitoAuthController, PasskeysController],
   providers: [
     AuthService,
     AuthTokenService,
@@ -23,6 +26,8 @@ import { PasswordResetService } from './passwordReset/passwordReset.service';
     CognitoAuthService,
     CognitoTokenVerifierService,
     CognitoAuthGuard,
+    PasskeyRegistrationService,
+    PasskeySignInService,
   ],
 })
 export class AuthModule {}

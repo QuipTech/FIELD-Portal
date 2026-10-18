@@ -4,7 +4,7 @@ import { DatabaseService } from '../database/database.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 
 // SQL predicates knowledge_has_brand_access / knowledge_can_read_document are
-// shared by queries and RLS. Always read grants from the DB, never a JWT/cache.
+// shared by queries and RLS. Always read brand state from the DB, never a JWT/cache.
 export const getAccessibleBrandIds = async (
   database: DatabaseService,
   actor: AuthenticatedUser,
