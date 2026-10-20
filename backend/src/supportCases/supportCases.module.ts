@@ -8,6 +8,7 @@ import { SupportCasesService } from './supportCases.service';
 import { CaseMessagesService } from './caseMessages.service';
 import { AdminSupportCasesService } from './adminSupportCases.service';
 import { AdminCaseUpdatesService } from './adminCaseUpdates.service';
+import { AdminCaseNotesService } from './adminCaseNotes.service';
 import { CaseAccessService } from './caseAccess.service';
 import { CaseAttachmentsService } from './caseAttachments.service';
 import { CaseAnnouncer } from './caseAnnouncer.service';
@@ -28,6 +29,7 @@ import { SupportStaffGuard } from './supportStaff.guard';
     CaseMessagesService,
     AdminSupportCasesService,
     AdminCaseUpdatesService,
+    AdminCaseNotesService,
     CaseAccessService,
     CaseAttachmentsService,
     CaseAnnouncer,

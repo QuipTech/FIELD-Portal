@@ -11,7 +11,8 @@ import { UsageByOrganisationCard } from "./usageByOrganisationCard";
 import { OtherAiUsageCard } from "./otherAiUsageCard";
 import { PlatformAiCard } from "./platformAiCard";
 import { PromptCard } from "./promptCard";
-import { ReviewQueueSection } from "./reviewQueueSection";
+// Review queue hidden until the client asks for it back.
+// import { ReviewQueueSection } from "./reviewQueueSection";
 
 const USAGE_PERIOD_DAYS = 30;
 
@@ -58,7 +59,7 @@ export const AiConfigurationDashboard = () => {
         )}
         {can(PERMISSIONS.managePlatform) && <PromptCard />}
       </div>
-      <ReviewQueueSection />
+      {/* <ReviewQueueSection /> */}
     </>
   );
 };

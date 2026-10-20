@@ -5,6 +5,7 @@ import { Icon } from "@/components/icons/icon";
 import { IconTile } from "@/components/ui/iconTile";
 import { Tag } from "@/components/ui/tag";
 import { ClickableRow } from "@/components/ui/clickableRow";
+import { SerialNumber } from "@/components/ui/serialNumber";
 import { buildArticleHref, type KnowledgeListContext } from "@/lib/knowledge/knowledgeLinks";
 import type { OrganisationDocument } from "@/lib/api/documentsApi";
 import { documentStateLabel, documentStateTone, documentTypeIcon, knowledgeDocumentTypes } from "@/lib/types/adminDocument";
@@ -13,12 +14,13 @@ const typeLabel = (type: string) => knowledgeDocumentTypes.find((option) => opti
 
 interface OrganisationDocumentRowProps {
   document: OrganisationDocument;
+  serialNumber: number;
   listContext: KnowledgeListContext;
 }
 
 // One document in the Documents card: opens its article. Download and the
 // Shared/state tags keep their own behaviour.
-export const OrganisationDocumentRow = ({ document, listContext }: OrganisationDocumentRowProps) => {
+export const OrganisationDocumentRow = ({ document, serialNumber, listContext }: OrganisationDocumentRowProps) => {
   const router = useRouter();
   const { icon, tone } = documentTypeIcon[document.type] ?? documentTypeIcon.manual;
 
@@ -28,6 +30,7 @@ export const OrganisationDocumentRow = ({ document, listContext }: OrganisationD
       onOpen={() => router.push(buildArticleHref(document.id, listContext))}
       className="flex items-center gap-2.5 rounded-lg border-t border-slate-100 px-1 pt-2.5 hover:bg-surfaceGray"
     >
+      <SerialNumber value={serialNumber} />
       <IconTile icon={icon} tone={tone} size="sm" />
       <div className="flex min-w-0 flex-col">
         <span className="truncate text-sm font-medium text-ink">{document.title}</span>

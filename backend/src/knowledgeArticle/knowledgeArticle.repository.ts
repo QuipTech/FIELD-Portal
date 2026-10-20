@@ -14,9 +14,10 @@ export const findArticleDocument = async (
   client: PoolClient,
   itemId: string,
   tenantId: string,
+  userId?: string,
 ): Promise<ArticleDocumentRow | null> => {
   const result = await client.query<ArticleDocumentRow>(
-    `SELECT ki.id, ki.title, ki.type, ki.status, ki.tenant_id, d.live_version_id,
+    `SELECT d.brand_id,d.category_id,d.document_type,ki.id, ki.title, ki.type, ki.status, ki.tenant_id, d.live_version_id,
             lv.version_number, lv.page_count, lv.summary, lv.file_name, lv.storage_key,
             latest.ingestion_status AS latest_ingestion_status,
             latest.indexing_progress AS latest_progress,
@@ -37,8 +38,8 @@ export const findArticleDocument = async (
        ORDER BY km.mention_count DESC, mm.name LIMIT 1
      ) m ON true
      WHERE ki.id = $1 AND ki.deleted_at IS NULL
-       AND (ki.tenant_id IS NULL OR ki.tenant_id = $2)`,
-    [itemId, tenantId],
+       AND knowledge_can_read_document(d.id,$2,$3)`,
+    [itemId, tenantId, userId ?? null],
   );
   return result.rows[0] ?? null;
 };

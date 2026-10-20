@@ -57,6 +57,8 @@ export interface SupportStaffMember {
   email: string;
   avatarUrl: string | null;
   organisationName: string;
+  // e.g. "Technical Manager"; null for someone with no role.
+  roleName: string | null;
   isAdmin: boolean;
   // Only support staff can be assigned; everyone else is listed greyed out.
   isSupportStaff: boolean;

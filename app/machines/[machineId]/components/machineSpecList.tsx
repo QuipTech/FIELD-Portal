@@ -19,30 +19,41 @@ const SpecRow = ({ label, value, aside }: { label: string; value: ReactNode; asi
   </div>
 );
 
-export const MachineSpecList = () => {
-  const { machine, notify, notifyError } = useMachineDetail();
-  if (!machine) return <SkeletonBar className="h-[218px] min-w-[280px] flex-1 rounded-xl" />;
-
-  const copySerial = () =>
+// Copies `value`, confirming with a toast named after `what`.
+const CopyButton = ({ value, what }: { value: string; what: string }) => {
+  const { notify, notifyError } = useMachineDetail();
+  const copy = () =>
     navigator.clipboard
-      .writeText(machine.serialNumber)
-      .then(() => notify("Serial number copied"))
-      .catch(() => notifyError("Couldn't copy the serial number."));
+      .writeText(value)
+      .then(() => notify(`${what} copied`))
+      .catch(() => notifyError(`Couldn't copy the ${what.toLowerCase()}.`));
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      aria-label={`Copy ${what.toLowerCase()}`}
+      className="rounded-md border border-borderGrayStrong bg-fillGray px-2 py-0.5 text-xs text-bodyGray hover:text-ink"
+    >
+      Copy
+    </button>
+  );
+};
+
+export const MachineSpecList = () => {
+  const { machine } = useMachineDetail();
+  if (!machine) return <SkeletonBar className="h-[260px] min-w-[280px] flex-1 rounded-xl" />;
 
   return (
     <div className="flex min-w-0 flex-1 flex-col rounded-xl border border-borderGray bg-surface px-3.5">
       <SpecRow
+        label="Plant ID"
+        value={machine.plantId ? <span className="font-mono">{machine.plantId}</span> : "—"}
+        aside={machine.plantId && <CopyButton value={machine.plantId} what="Plant ID" />}
+      />
+      <SpecRow
         label="Serial"
         value={<span className="font-mono">{machine.serialNumber}</span>}
-        aside={
-          <button
-            type="button"
-            onClick={copySerial}
-            className="rounded-md border border-borderGrayStrong bg-fillGray px-2 py-0.5 text-xs text-bodyGray hover:text-ink"
-          >
-            Copy
-          </button>
-        }
+        aside={<CopyButton value={machine.serialNumber} what="Serial number" />}
       />
       <SpecRow
         label="Hours"

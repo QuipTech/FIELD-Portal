@@ -13,7 +13,16 @@ const authorizationHeader = (accessToken: string) => ({ Authorization: `Bearer $
 
 export const listKnowledgeDocumentsRequest = (
   accessToken: string,
-  query: { search?: string; type?: KnowledgeDocumentType; pageSize?: number } = {},
+  query: {
+    search?: string;
+    type?: KnowledgeDocumentType | string;
+    page?: number;
+    pageSize?: number;
+    brandId?: string;
+    categoryId?: string;
+    machineModelId?: string;
+    status?: string;
+  } = {},
 ): Promise<KnowledgeDocumentList> => {
   const params = new URLSearchParams();
   Object.entries(query).forEach(([key, value]) => value !== undefined && params.set(key, String(value)));
@@ -43,6 +52,12 @@ export const completeKnowledgeUploadRequest = (accessToken: string, documentId: 
 
 export const getKnowledgeDownloadUrlRequest = (accessToken: string, documentId: string): Promise<SignedUrl> =>
   apiRequest<SignedUrl>(`/admin/knowledge/documents/${documentId}/download`, {
+    headers: authorizationHeader(accessToken),
+  });
+
+// Like the download link, but opens in the browser for the preview.
+export const getKnowledgePreviewUrlRequest = (accessToken: string, documentId: string): Promise<SignedUrl> =>
+  apiRequest<SignedUrl>(`/admin/knowledge/documents/${documentId}/preview`, {
     headers: authorizationHeader(accessToken),
   });
 

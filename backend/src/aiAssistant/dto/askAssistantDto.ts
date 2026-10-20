@@ -31,6 +31,8 @@ export class AttachedImageDto {
 }
 
 export class AskAssistantDto {
+  @IsOptional() @IsUUID() brandId?: string;
+  @IsOptional() @IsUUID() categoryId?: string;
   @Transform(trimString)
   @IsString()
   @MinLength(2)

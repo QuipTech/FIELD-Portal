@@ -40,6 +40,7 @@ export const toSupportCase = (row: SupportCaseRow): SupportCase => ({
   subject: row.subject,
   description: row.description,
   category: row.category as CaseCategory,
+  customCategory: row.custom_category,
   status: row.status as CaseStatus,
   priority: row.priority as CasePriority,
   machine:
@@ -77,6 +78,7 @@ export const toCaseMessage = (
   id: row.id,
   body: row.note,
   createdAt: row.created_at.toISOString(),
+  editedAt: toIso(row.edited_at),
   author: toPerson(
     row.author_id,
     row.author_first_name,

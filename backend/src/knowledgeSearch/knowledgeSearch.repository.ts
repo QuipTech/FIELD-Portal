@@ -27,17 +27,22 @@ const LIVE_CHUNK_SEARCH = `
                   AND d.live_version_id = c.document_version_id
   JOIN knowledge_items ki ON ki.id = d.knowledge_item_id
                          AND ki.deleted_at IS NULL
-                         AND ki.status <> 'archived'
-  WHERE (c.tenant_id IS NULL OR c.tenant_id = $2)
+                         AND ki.status NOT IN ('archived','withdrawn')
+  WHERE knowledge_can_read_document(d.id,$2,$5)
     AND ($4::uuid IS NULL OR ki.id = $4)
+    AND ($6::uuid IS NULL OR c.brand_id=$6)
+    AND ($7::uuid IS NULL OR c.category_id=$7)
   ORDER BY c.embedding <=> $1::vector
   LIMIT $3`;
 
 export const searchLiveChunks = async (
-  databaseService: DatabaseService,
+  databaseService: Pick<DatabaseService, 'query'>,
   params: {
     queryVector: string;
     tenantId: string;
+    userId: string;
+    brandId?: string;
+    categoryId?: string;
     limit: number;
     documentId?: string | null;
   },
@@ -47,6 +52,9 @@ export const searchLiveChunks = async (
     params.tenantId,
     params.limit,
     params.documentId ?? null,
+    params.userId,
+    params.brandId ?? null,
+    params.categoryId ?? null,
   ]);
   return result.rows;
 };

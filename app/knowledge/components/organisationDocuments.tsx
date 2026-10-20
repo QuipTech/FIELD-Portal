@@ -26,8 +26,13 @@ export const OrganisationDocuments = ({ listContext }: { listContext: KnowledgeL
       {!isLoading && !loadError && documents.length === 0 && (
         <span className="text-sm text-mutedGray">No documents yet.</span>
       )}
-      {documents.map((document) => (
-        <OrganisationDocumentRow key={document.id} document={document} listContext={listContext} />
+      {documents.map((document, index) => (
+        <OrganisationDocumentRow
+          key={document.id}
+          document={document}
+          serialNumber={index + 1}
+          listContext={listContext}
+        />
       ))}
     </section>
   );

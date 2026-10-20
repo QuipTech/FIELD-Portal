@@ -2,14 +2,15 @@
 
 import { EmptyState } from "@/components/ui/emptyState";
 import { LoadErrorState } from "@/components/ui/loadErrorState";
+import { Pagination } from "@/components/ui/pagination";
 import { CaseListSkeleton } from "@/components/supportCases/caseListSkeleton";
 import { useSupportCases } from "../useSupportCases";
 import { CasesFilterBar } from "./casesFilterBar";
-import { CasesTable } from "./casesTable";
+import { CasesTable } from "@/components/supportCases/casesTable";
 import { NewCaseButton } from "./newCaseButton";
 
 export const CasesManager = () => {
-  const { filters, updateFilter, isFiltered, cases } = useSupportCases();
+  const { filters, updateFilter, isFiltered, cases, page, setPage } = useSupportCases();
   const items = cases.data?.items ?? [];
 
   const renderBody = () => {
@@ -32,6 +33,9 @@ export const CasesManager = () => {
     <>
       <CasesFilterBar filters={filters} statusCounts={cases.data?.statusCounts ?? null} onChange={updateFilter} />
       {renderBody()}
+      {cases.data && (
+        <Pagination page={page} pageSize={cases.data.pageSize} total={cases.data.total} onPageChange={setPage} />
+      )}
     </>
   );
 };

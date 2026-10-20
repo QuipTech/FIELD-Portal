@@ -38,18 +38,20 @@ export class KnowledgeSearchService {
     limit: number,
     // Only this document (a knowledge item id), within what the caller sees.
     documentId?: string,
+    scope?: { brandId?: string; categoryId?: string },
   ): Promise<KnowledgeMatch[]> => {
     const queryVector = toVectorLiteral(
       await this.embedQuery(query, actor.tenantId),
     );
-    const rows = await knowledgeSearchRepository.searchLiveChunks(
-      this.databaseService,
-      {
+    const rows = await this.databaseService.withActor(actor, (client) =>
+      knowledgeSearchRepository.searchLiveChunks(client, {
         queryVector,
         tenantId: actor.tenantId,
+        userId: actor.userId,
+        ...scope,
         limit,
         documentId,
-      },
+      }),
     );
     return rows.map((row) => ({
       chunkId: row.chunk_id,

@@ -2,14 +2,24 @@ import type { KnowledgeLibraryFilters } from "../types/knowledgeLibrary";
 
 // The /knowledge filters an article keeps in its own URL, so its
 // breadcrumb (and Back) return to the same results.
-const KEPT_FILTERS = { q: "search", type: "type", make: "make", model: "model" } as const;
+const KEPT_FILTERS = {
+  q: "search",
+  type: "type",
+  make: "make",
+  model: "model",
+  brandId: "brandId",
+  categoryId: "categoryId",
+  page: "page",
+} as const;
 
 export type KnowledgeListContext = Partial<Record<keyof typeof KEPT_FILTERS, string>>;
 
-export const toListContext = (filters: Pick<KnowledgeLibraryFilters, "search" | "type" | "make" | "model">): KnowledgeListContext => {
+export const toListContext = (
+  filters: Pick<KnowledgeLibraryFilters, "search" | "type" | "make" | "model" | "brandId" | "categoryId" | "page">,
+): KnowledgeListContext => {
   const context: KnowledgeListContext = {};
   (Object.keys(KEPT_FILTERS) as (keyof typeof KEPT_FILTERS)[]).forEach((param) => {
-    const value = filters[KEPT_FILTERS[param]].trim();
+    const value = filters[KEPT_FILTERS[param]]?.trim();
     if (value) context[param] = value;
   });
   return context;
@@ -37,3 +47,25 @@ export const readListContext = (params: URLSearchParams): KnowledgeListContext =
   });
   return context;
 };
+
+// Where an article's links lead: back to its list, and on to other
+// documents. The Knowledge screen, or a machine's Manuals tab.
+export interface ArticleNavigation {
+  listHref: string;
+  listLabel: string;
+  articleHref: (documentId: string, section?: string | null) => string;
+}
+
+export const knowledgeArticleNavigation = (context: KnowledgeListContext): ArticleNavigation => ({
+  listHref: buildKnowledgeListHref(context),
+  listLabel: "Knowledge",
+  articleHref: (documentId, section) => buildArticleHref(documentId, context, section),
+});
+
+// /machines/:id/manuals/:documentId — the document inside the machine page.
+export const machineManualsNavigation = (machineId: string): ArticleNavigation => ({
+  listHref: `/machines/${machineId}/manuals`,
+  listLabel: "Manuals",
+  articleHref: (documentId, section) =>
+    `/machines/${machineId}/manuals/${documentId}${toQuery({ section: section ?? undefined })}`,
+});

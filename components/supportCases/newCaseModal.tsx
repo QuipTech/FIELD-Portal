@@ -18,7 +18,15 @@ import { CaseAttachmentPicker } from "./caseAttachmentPicker";
 const fieldLabelClasses = "text-xs font-medium uppercase tracking-wide text-mutedGray";
 const selectClasses = "h-10 rounded-lg border border-borderGrayStrong bg-surface px-3 text-[15px] text-ink";
 
-const EMPTY_CASE: NewSupportCase = { subject: "", category: "alarm", priority: "P3", machineId: "", description: "" };
+const EMPTY_CASE: NewSupportCase = {
+  subject: "",
+  category: "alarm",
+  customCategory: "",
+  priority: "P3",
+  machineId: "",
+  description: "",
+};
+const MIN_CUSTOM_CATEGORY_LENGTH = 2;
 
 interface NewCaseModalProps {
   onClose: () => void;
@@ -35,7 +43,10 @@ export const NewCaseModal = ({ onClose, initialDraft }: NewCaseModalProps) => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const uploads = useCaseAttachmentUploads("customer", null);
-  const canSubmit = draft.subject.trim().length >= 3 && draft.description.trim().length > 0 && !uploads.isUploading;
+  const isOtherCategory = draft.category === "other";
+  const hasCategory = !isOtherCategory || (draft.customCategory?.trim().length ?? 0) >= MIN_CUSTOM_CATEGORY_LENGTH;
+  const canSubmit =
+    draft.subject.trim().length >= 3 && hasCategory && draft.description.trim().length > 0 && !uploads.isUploading;
 
   const update = <K extends keyof NewSupportCase>(key: K, value: NewSupportCase[K]) =>
     setDraft((current) => ({ ...current, [key]: value }));
@@ -46,6 +57,7 @@ export const NewCaseModal = ({ onClose, initialDraft }: NewCaseModalProps) => {
     try {
       const created = await createSupportCaseRequest(requireAccessToken(), {
         ...draft,
+        customCategory: isOtherCategory ? draft.customCategory?.trim() : undefined,
         machineId: draft.machineId || undefined,
         attachmentIds: uploads.attachmentIds,
       });
@@ -98,6 +110,18 @@ export const NewCaseModal = ({ onClose, initialDraft }: NewCaseModalProps) => {
             </select>
           </label>
         </div>
+        {isOtherCategory && (
+          <label className="flex flex-col gap-1.5">
+            <span className={fieldLabelClasses}>Type of issue</span>
+            <Input
+              value={draft.customCategory ?? ""}
+              onChange={(event) => update("customCategory", event.target.value)}
+              placeholder="e.g. Warranty claim"
+              maxLength={80}
+              autoFocus
+            />
+          </label>
+        )}
         <label className="flex flex-col gap-1.5">
           <span className={fieldLabelClasses}>Machine</span>
           <select

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Icon } from "@/components/icons/icon";
 import { Tag } from "@/components/ui/tag";
 import { getCasePriorityTone } from "@/lib/format/casePriority";
-import { formatCaseNumber } from "@/lib/format/caseLabels";
+import { formatCaseCategory, formatCaseNumber } from "@/lib/format/caseLabels";
 import type { SupportCase } from "@/lib/types/supportCase";
 import { CaseStatusBadge } from "./caseStatusBadge";
 
@@ -32,6 +32,7 @@ export const CaseHeaderBar = ({ backHref, backLabel, caseNumber, item, audience,
     {item && (
       <>
         <Tag tone={getCasePriorityTone(item.priority)}>{item.priority}</Tag>
+        <Tag>{formatCaseCategory(item)}</Tag>
         <CaseStatusBadge status={item.status} audience={audience} />
         <div className="ml-auto flex flex-none items-center gap-2.5">
           {!isLive && (

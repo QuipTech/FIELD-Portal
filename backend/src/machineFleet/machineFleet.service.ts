@@ -61,6 +61,8 @@ export class MachineFleetService {
       return {
         items: rows.map(toFleetMachine),
         total,
+        page: filters.page,
+        pageSize: filters.pageSize,
         facets,
         featuredDown: featured ? toFeaturedDownMachine(featured) : null,
       };

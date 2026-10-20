@@ -1,6 +1,6 @@
 import type { IconName } from "@/components/icons/icon";
 import type { Tone } from "@/components/ui/tone";
-import type { CaseCategory, CasePriority, CaseStatus } from "../types/supportCase";
+import type { CaseCategory, CasePriority, CaseStatus, SupportCase } from "../types/supportCase";
 
 export const CASE_CATEGORIES: { value: CaseCategory; label: string; icon: IconName }[] = [
   { value: "alarm", label: "Alarm or fault code", icon: "alert" },
@@ -14,6 +14,11 @@ export const CASE_CATEGORIES: { value: CaseCategory; label: string; icon: IconNa
 
 export const getCaseCategoryIcon = (category: CaseCategory): IconName =>
   CASE_CATEGORIES.find((option) => option.value === category)?.icon ?? "msg";
+
+// "Warranty claim" for a "Something else" case named by its reporter.
+export const formatCaseCategory = ({ category, customCategory }: Pick<SupportCase, "category" | "customCategory">) =>
+  (category === "other" && customCategory) ||
+  (CASE_CATEGORIES.find((option) => option.value === category)?.label ?? "Something else");
 
 export const CASE_PRIORITIES: { value: CasePriority; label: string }[] = [
   { value: "P1", label: "P1 · Machine down" },

@@ -1,61 +1,68 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getAccessToken } from "@/lib/auth/authSession";
 import { listAdminUsersRequest } from "@/lib/api/adminUsersApi";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import type { AdminUser } from "@/lib/types/adminUser";
 
-const SEARCH_DEBOUNCE_MS = 300;
-// The table has no pager yet, so fetch the backend's maximum page.
-const PAGE_SIZE = 100;
+export const USERS_PAGE_SIZE = 25;
+const FETCH_PAGE_SIZE = 100;
 const SIGNED_OUT_MESSAGE = "Your session has expired. Sign in again to see users.";
 const FALLBACK_ERROR_MESSAGE = "Couldn't load users. Please try again.";
 
-// Role filtering happens on the client (see usersDirectory), so only the
-// search goes to the backend.
-export const useAdminUsers = (search: string) => {
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [total, setTotal] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+// Load the complete authorised directory; tabs, search and pagination stay local.
+export const useAdminUsers = (search: string, role: string, page: number) => {
+  const [result, setResult] = useState<{ token: string; users: AdminUser[]; error?: string } | null>(null);
   const [reloadCount, setReloadCount] = useState(0);
+  const accessToken = getAccessToken();
 
   useEffect(() => {
-    const accessToken = getAccessToken();
-    if (!accessToken) {
-      setErrorMessage(SIGNED_OUT_MESSAGE);
-      setIsLoading(false);
-      return;
-    }
-
-    // Ignores a slower, older response that lands after a newer search.
+    setResult(null);
+    if (!accessToken) return;
     let isCurrent = true;
-    setIsLoading(true);
-    // Only typing needs the debounce; the first load and reloads go straight out.
-    const delay = search ? SEARCH_DEBOUNCE_MS : 0;
-    const timer = setTimeout(() => {
-      listAdminUsersRequest(accessToken, { search, pageSize: PAGE_SIZE })
-        .then((response) => {
+    const load = async () => {
+      try {
+        const users: AdminUser[] = [];
+        let nextPage = 1;
+        // Fetch every API page so local filters never omit users on later pages.
+        while (isCurrent) {
+          const response = await listAdminUsersRequest(accessToken, { page: nextPage, pageSize: FETCH_PAGE_SIZE });
           if (!isCurrent) return;
-          setUsers(response.users);
-          setTotal(response.total);
-          setErrorMessage(null);
-        })
-        .catch((error: unknown) => {
-          if (!isCurrent) return;
-          setErrorMessage(toApiErrorMessage(error, FALLBACK_ERROR_MESSAGE));
-        })
-        .finally(() => isCurrent && setIsLoading(false));
-    }, delay);
-
-    return () => {
-      isCurrent = false;
-      clearTimeout(timer);
+          users.push(...response.users);
+          if (users.length >= response.total || response.users.length === 0) break;
+          nextPage += 1;
+        }
+        if (isCurrent) setResult({ token: accessToken, users });
+      } catch (error: unknown) {
+        if (isCurrent) setResult({ token: accessToken, users: [], error: toApiErrorMessage(error, FALLBACK_ERROR_MESSAGE) });
+      }
     };
-  }, [search, reloadCount]);
+    void load();
+    return () => { isCurrent = false; };
+  }, [accessToken, reloadCount]);
 
-  const reload = () => setReloadCount((count) => count + 1);
+  const currentResult = result?.token === accessToken ? result : null;
+  const filteredUsers = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return (currentResult?.users ?? []).filter((user) => {
+      if (role && !user.roles.includes(role)) return false;
+      const name = `${user.firstName} ${user.lastName}`.toLowerCase();
+      return !query || name.includes(query) || user.email.toLowerCase().includes(query);
+    });
+  }, [currentResult, search, role]);
 
-  return { users, total, isLoading, errorMessage, reload };
+  const reload = () => {
+    setResult(null);
+    setReloadCount((count) => count + 1);
+  };
+  const errorMessage = !accessToken ? SIGNED_OUT_MESSAGE : currentResult?.error ?? null;
+  const start = (page - 1) * USERS_PAGE_SIZE;
+  return {
+    users: filteredUsers.slice(start, start + USERS_PAGE_SIZE),
+    total: filteredUsers.length,
+    isLoading: !currentResult && !errorMessage,
+    errorMessage,
+    reload,
+  };
 };

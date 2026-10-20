@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { Pagination } from "@/components/ui/pagination";
 import { EmptyState } from "@/components/ui/emptyState";
 import { Input } from "@/components/ui/input";
 import { LoadErrorState } from "@/components/ui/loadErrorState";
@@ -9,7 +9,7 @@ import { QUEUE_PAGE_SIZE, useAdminCaseQueue } from "../useAdminCaseQueue";
 import { CaseQueueStats } from "./caseQueueStats";
 import { CaseQueueTabs } from "./caseQueueTabs";
 import { CaseQueueFilters } from "./caseQueueFilters";
-import { CaseQueueTable } from "./caseQueueTable";
+import { CaseQueueTable } from "@/components/supportCases/caseQueueTable";
 
 const EMPTY_TITLES = {
   unassigned: "Nothing waiting to be assigned",
@@ -22,7 +22,6 @@ const EMPTY_TITLES = {
 export const AdminCasesQueue = () => {
   const { isAdmin, filters, updateFilter, page, setPage, cases, stats, organisations } = useAdminCaseQueue();
   const list = cases.data;
-  const pageCount = list ? Math.max(1, Math.ceil(list.total / QUEUE_PAGE_SIZE)) : 1;
 
   const renderBody = () => {
     if (!list && cases.isLoading) return <CaseListSkeleton />;
@@ -56,19 +55,7 @@ export const AdminCasesQueue = () => {
         <CaseQueueFilters filters={filters} organisations={organisations} onChange={updateFilter} />
       </div>
       {renderBody()}
-      {list && pageCount > 1 && (
-        <div className="flex items-center justify-end gap-2 text-xs text-mutedGray">
-          <Button size="sm" onClick={() => setPage(page - 1)} disabled={page <= 1}>
-            Previous
-          </Button>
-          <span>
-            Page {page} of {pageCount}
-          </span>
-          <Button size="sm" onClick={() => setPage(page + 1)} disabled={page >= pageCount}>
-            Next
-          </Button>
-        </div>
-      )}
+      {list && <Pagination page={page} pageSize={QUEUE_PAGE_SIZE} total={list.total} onPageChange={setPage} />}
       <p className="max-w-xl text-sm text-mutedGray">
         New cases land unassigned. Assigning a case notifies the assignee; setting &quot;Waiting on customer&quot;
         pauses the SLA clock until the customer replies.

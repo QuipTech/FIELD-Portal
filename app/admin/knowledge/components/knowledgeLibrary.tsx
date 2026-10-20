@@ -1,5 +1,10 @@
 "use client";
 
+import { BrandNavigation } from "@/components/knowledge/brandNavigation";
+import Link from "next/link";
+import { Pagination } from "@/components/ui/pagination";
+import { DocumentMetadataModal } from "./documentMetadataModal";
+import { KnowledgeDirectoryFilterBar, EMPTY_KNOWLEDGE_FILTERS } from "./knowledgeDirectoryFilters";
 import { useRef, useState, type DragEvent } from "react";
 import { Icon } from "@/components/icons/icon";
 import { Button } from "@/components/ui/button";
@@ -9,18 +14,32 @@ import { UploadDocumentsModal } from "./uploadDocumentsModal";
 import { UploadProgressList } from "./uploadProgressList";
 import { DeleteDocumentDialog } from "./deleteDocumentDialog";
 import { RejectDocumentDialog } from "./rejectDocumentDialog";
+import { DocumentPreviewModal } from "./documentPreviewModal";
 import { useKnowledgeDocuments } from "../useKnowledgeDocuments";
 import { useKnowledgeUploads } from "../useKnowledgeUploads";
 import { useDocumentRowActions } from "../useDocumentRowActions";
-
+import type { KnowledgeDocument } from "@/lib/types/adminDocument";
 
 export const KnowledgeLibrary = () => {
-  const { documents, total, isLoading, loadError, reloadDocuments, downloadDocument, runAction, rejectDocument, deleteDocument } =
-    useKnowledgeDocuments();
+  const [filters, setFilters] = useState(EMPTY_KNOWLEDGE_FILTERS);
+  const [page, setPage] = useState(1);
+  const [editing, setEditing] = useState<KnowledgeDocument | null>(null);
+  const {
+    documents,
+    total,
+    isLoading,
+    loadError,
+    reloadDocuments,
+    downloadDocument,
+    runAction,
+    rejectDocument,
+    deleteDocument,
+  } = useKnowledgeDocuments(filters, page);
   const { uploads, startUploads, startVersionUpload, clearFinishedUploads } = useKnowledgeUploads(reloadDocuments);
   const rowActions = useDocumentRowActions({ downloadDocument, runAction, startVersionUpload });
   const [selectedFiles, setSelectedFiles] = useState<File[] | null>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [documentToPreview, setDocumentToPreview] = useState<KnowledgeDocument | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const chooseFiles = (fileList: FileList | null) => {
@@ -33,11 +52,13 @@ export const KnowledgeLibrary = () => {
     chooseFiles(event.dataTransfer.files);
   };
 
-
   return (
     <>
       <div className="flex items-center">
         <h1 className="text-[22px] font-medium text-ink">Knowledge</h1>
+        <Link href="/admin/knowledge/brands" className="ml-4 text-sm text-primary">
+          Manage brands
+        </Link>
         <Button variant="primary" className="ml-auto" onClick={() => fileInputRef.current?.click()}>
           <Icon name="upload" />
           Upload documents
@@ -76,21 +97,61 @@ export const KnowledgeLibrary = () => {
         <Icon name="cloud" className="h-6 w-6" />
         Drop PDFs or manuals here — parse &amp; index progress is shown per file
       </div>
+      <BrandNavigation
+        brandId={filters.brandId}
+        categoryId={filters.categoryId}
+        onChange={(brandId, categoryId) => {
+          setFilters({ ...filters, brandId, categoryId });
+          setPage(1);
+        }}
+      />
+      <KnowledgeDirectoryFilterBar
+        value={filters}
+        onChange={(next) => {
+          setPage(1);
+          setFilters(next);
+        }}
+      />
       <UploadProgressList uploads={uploads} onClearFinished={clearFinishedUploads} />
       <DocumentsTable
         documents={documents}
         isLoading={isLoading}
         loadError={loadError}
         onAction={rowActions.handleAction}
+        onPreview={setDocumentToPreview}
+        onEditMetadata={setEditing}
       />
+      <Pagination page={page} pageSize={100} total={total} onPageChange={setPage} />
+      {editing && (
+        <DocumentMetadataModal
+          document={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => void reloadDocuments()}
+        />
+      )}
       {selectedFiles && (
         <UploadDocumentsModal files={selectedFiles} onUpload={startUploads} onClose={() => setSelectedFiles(null)} />
       )}
       {rowActions.documentToDelete && (
-        <DeleteDocumentDialog document={rowActions.documentToDelete} onDelete={deleteDocument} onClose={rowActions.closeDelete} />
+        <DeleteDocumentDialog
+          document={rowActions.documentToDelete}
+          onDelete={deleteDocument}
+          onClose={rowActions.closeDelete}
+        />
       )}
       {rowActions.documentToReject && (
-        <RejectDocumentDialog document={rowActions.documentToReject} onReject={rejectDocument} onClose={rowActions.closeReject} />
+        <RejectDocumentDialog
+          document={rowActions.documentToReject}
+          onReject={rejectDocument}
+          onClose={rowActions.closeReject}
+        />
+      )}
+      {documentToPreview && (
+        <DocumentPreviewModal
+          document={documentToPreview}
+          onDownload={() => rowActions.handleAction(documentToPreview, "download")}
+          onClose={() => setDocumentToPreview(null)}
+        />
       )}
       {rowActions.versionPickerInput}
     </>

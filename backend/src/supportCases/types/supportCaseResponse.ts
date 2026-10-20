@@ -55,6 +55,8 @@ export interface SupportCase {
   subject: string;
   description: string | null;
   category: CaseCategory;
+  // The reporter's own type name, for category 'other'.
+  customCategory: string | null;
   status: CaseStatus;
   priority: CasePriority;
   machine: CaseMachine | null;
@@ -72,6 +74,10 @@ export interface SupportCase {
 
 export interface SupportCaseList {
   items: SupportCase[];
+  // Matching the filters, across every page.
+  total: number;
+  page: number;
+  pageSize: number;
   // Across the whole organisation, ignoring the list's filters.
   statusCounts: Record<CaseStatus, number>;
 }
@@ -89,6 +95,8 @@ export interface CaseMessage {
   id: string;
   body: string;
   createdAt: string;
+  // Internal notes only: when a staff member last changed it.
+  editedAt: string | null;
   // null once the author's account is deleted.
   author: CasePerson | null;
   authorRole: CaseAuthorRole;

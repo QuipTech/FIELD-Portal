@@ -21,6 +21,9 @@ export const toKnowledgeResult = (
   matchedSection?: MatchingSectionRow | null,
 ): KnowledgeResult => ({
   id: row.id,
+  brandId: row.brand_id,
+  categoryId: row.category_id,
+  documentType: row.document_type,
   title: toDocumentDisplayTitle(row.title),
   type: row.type,
   snippet: toSnippet(row.chunk_text),

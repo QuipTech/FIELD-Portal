@@ -17,15 +17,19 @@ import { prefetchMachineDetail } from "../prefetchMachineDetail";
 import { MachineHeaderBar } from "./machineHeaderBar";
 import { MachinePhotoGallery } from "./machinePhotoGallery";
 import { MachineSpecList } from "./machineSpecList";
-import { SystemsSideNav } from "./systemsSideNav";
+import { SystemsTabs } from "./systemsTabs";
+import { AppShell } from "@/components/shell/appShell";
+
+const ROUTED_TABS: MachineTab[] = ["history", "config-history", "manuals", "cases"];
 
 const toActiveTab = (pathname: string, machineId: string): MachineTab => {
   const section = pathname.slice(`/machines/${machineId}`.length).split("/")[1];
-  return section === "history" || section === "config-history" ? section : "components";
+  return ROUTED_TABS.find((tab) => tab === section) ?? "components";
 };
 
 // Everything above the tab content, shared by every machine detail tab:
-// breadcrumb and actions, photo gallery, info card and tabs. The tab
+// breadcrumb and actions (as the app shell's top bar, beside the main side
+// nav), photo gallery, info card, tabs and, on Components, the systems. The tab
 // renders at once and loads in parallel with the machine itself.
 export const MachineDetailShell = ({ machineId, children }: { machineId: string; children: ReactNode }) => {
   const machine = useCachedResource(machineCacheKeys.machine(machineId), () => service.getMachine(machineId), "Couldn't load this machine.");
@@ -60,20 +64,17 @@ export const MachineDetailShell = ({ machineId, children }: { machineId: string;
 
   return (
     <MachineDetailProvider value={contextValue}>
-      <div className="flex h-screen flex-col bg-surfaceGray">
-        <MachineHeaderBar machine={machine.data} onStatusChange={changeStatus} />
-        <div className="flex min-h-0 flex-1">
-          {activeTab === "components" && <SystemsSideNav />}
-          <main className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
-            <div className="flex flex-wrap gap-4">
-              <MachinePhotoGallery />
-              <MachineSpecList />
-            </div>
-            <MachineTabs machineId={machineId} active={activeTab} openCaseCount={machine.data?.openCaseCount ?? null} />
-            {children}
-          </main>
-        </div>
-      </div>
+      <AppShell topBar={<MachineHeaderBar machine={machine.data} onStatusChange={changeStatus} />}>
+        <main className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
+          <div className="flex flex-wrap gap-4">
+            <MachinePhotoGallery />
+            <MachineSpecList />
+          </div>
+          <MachineTabs machineId={machineId} active={activeTab} openCaseCount={machine.data?.openCaseCount ?? null} />
+          {activeTab === "components" && <SystemsTabs />}
+          {children}
+        </main>
+      </AppShell>
       {successMessage && <SavedToast key={successMessage} message={successMessage} onDismiss={dismissSuccess} />}
       {errorMessage && <ErrorToast key={errorMessage} message={errorMessage} onDismiss={dismissError} />}
     </MachineDetailProvider>

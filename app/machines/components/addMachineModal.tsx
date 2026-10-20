@@ -113,7 +113,7 @@ export const AddMachineModal = ({ onClose, onRegistered }: AddMachineModalProps)
           <Field label="Serial number">
             <Input value={serialNumber} onChange={(event) => setSerialNumber(event.target.value)} maxLength={100} />
           </Field>
-          <Field label="Asset number">
+          <Field label="Plant ID / Asset number">
             <Input
               value={assetNumber}
               onChange={(event) => setAssetNumber(event.target.value)}

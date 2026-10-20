@@ -34,15 +34,19 @@ const actionRequests = {
   archive: archiveDocumentRequest,
 };
 
-export const useKnowledgeDocuments = () => {
+export const useKnowledgeDocuments = (
+  filters: import("./components/knowledgeDirectoryFilters").KnowledgeDirectoryFilters,
+  page: number,
+) => {
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const reloadDocuments = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const list = await listKnowledgeDocumentsRequest(requireAccessToken(), { pageSize: PAGE_SIZE });
+      const list = await listKnowledgeDocumentsRequest(requireAccessToken(), { ...filters, page, pageSize: PAGE_SIZE });
       setDocuments(list.documents);
       setTotal(list.total);
       setLoadError(null);
@@ -51,7 +55,7 @@ export const useKnowledgeDocuments = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [filters, page]);
 
   useEffect(() => {
     reloadDocuments();
@@ -62,7 +66,10 @@ export const useKnowledgeDocuments = () => {
 
   // Queued/indexing rows: GET /documents/:id/status every 3 s. Once any of
   // them reaches a final state, reload the list (page count, dates…).
-  const inProgressIds = documents.filter(isInProgress).map((document) => document.id).join(",");
+  const inProgressIds = documents
+    .filter(isInProgress)
+    .map((document) => document.id)
+    .join(",");
   useEffect(() => {
     if (!inProgressIds) return;
     const timer = setInterval(async () => {

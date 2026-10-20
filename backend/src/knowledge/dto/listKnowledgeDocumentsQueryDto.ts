@@ -1,5 +1,6 @@
 import { Transform, Type } from 'class-transformer';
 import {
+  IsUUID,
   IsIn,
   IsInt,
   IsOptional,
@@ -17,6 +18,14 @@ const trimToUndefined = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() || undefined : value;
 
 export class ListKnowledgeDocumentsQueryDto {
+  @IsOptional() @Transform(trimToUndefined) @IsUUID() brandId?: string;
+  @IsOptional() @Transform(trimToUndefined) @IsUUID() categoryId?: string;
+  @IsOptional() @Transform(trimToUndefined) @IsUUID() machineModelId?: string;
+  @IsOptional()
+  @Transform(trimToUndefined)
+  @IsIn(['draft', 'needs_review', 'published', 'archived'])
+  status?: string;
+
   @IsOptional()
   @Transform(trimToUndefined)
   @IsString()

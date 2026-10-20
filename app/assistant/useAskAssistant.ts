@@ -10,6 +10,8 @@ const UNREACHABLE_MESSAGE = "Couldn't reach the assistant. Check your connection
 const CUT_OFF_MESSAGE = "The answer was cut off. Try again.";
 
 interface AskAssistantOptions {
+  brandId?: string;
+  categoryId?: string;
   activeThread: AssistantThreadSummary | null;
   // Context for a new thread; an existing thread keeps its own.
   machineId: string;
@@ -33,6 +35,8 @@ const newEntry = (id: string, role: ChatEntry["role"], content: string): ChatEnt
 // failed question is taken back off the list (nothing was saved) and
 // `ask` resolves false so the composer can restore it.
 export const useAskAssistant = ({
+  brandId,
+  categoryId,
   activeThread,
   machineId,
   documentId,
@@ -76,7 +80,12 @@ export const useAskAssistant = ({
           current.map((entry) => {
             if (entry.id === questionId) return { ...entry, id: event.data.userMessageId };
             if (entry.id !== answerId) return entry;
-            return { ...entry, id: event.data.assistantMessageId, citedIndexes: event.data.citedIndexes, isStreaming: false };
+            return {
+              ...entry,
+              id: event.data.assistantMessageId,
+              citedIndexes: event.data.citedIndexes,
+              isStreaming: false,
+            };
           }),
         );
       } else {
@@ -89,6 +98,8 @@ export const useAskAssistant = ({
         requireAccessToken(),
         {
           question,
+          brandId: brandId || undefined,
+          categoryId: categoryId || undefined,
           conversationId: activeThread?.id,
           machineId: activeThread ? undefined : machineId || undefined,
           documentId: documentId ?? undefined,

@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { OrganisationDocument } from "@/lib/api/documentsApi";
+import { knowledgeArticleNavigation } from "@/lib/knowledge/knowledgeLinks";
 import type { KnowledgeResult } from "@/lib/types/knowledgeLibrary";
 import { OrganisationDocumentRow } from "./organisationDocumentRow";
-import { KnowledgeResultCard } from "./knowledgeResultCard";
+import { KnowledgeResultCard } from "@/components/knowledge/knowledgeResultCard";
 
 const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
@@ -53,19 +54,24 @@ const RESULT: KnowledgeResult = {
 
 describe("Documents card row", () => {
   it("opens the article, keeping the search in the URL", () => {
-    render(<OrganisationDocumentRow document={DOCUMENT} listContext={{ q: "strainer" }} />);
+    render(<OrganisationDocumentRow document={DOCUMENT} serialNumber={1} listContext={{ q: "strainer" }} />);
     fireEvent.click(screen.getByText(DOCUMENT.title));
     expect(push).toHaveBeenCalledWith("/knowledge/doc-1?q=strainer");
   });
 
   it("shows the clean title, with the file name in the meta line", () => {
-    render(<OrganisationDocumentRow document={DOCUMENT} listContext={{}} />);
+    render(<OrganisationDocumentRow document={DOCUMENT} serialNumber={1} listContext={{}} />);
     expect(screen.getByText(DOCUMENT.title)).toBeTruthy();
     expect(screen.getByText(/CAT_793F_Hydraulic_System_Maintenance_Bulletin \(2\)\.pdf/)).toBeTruthy();
   });
 
+  it("numbers the row", () => {
+    render(<OrganisationDocumentRow document={DOCUMENT} serialNumber={3} listContext={{}} />);
+    expect(screen.getByText("3.")).toBeTruthy();
+  });
+
   it("doesn't open the article from Download or the tags", () => {
-    render(<OrganisationDocumentRow document={DOCUMENT} listContext={{}} />);
+    render(<OrganisationDocumentRow document={DOCUMENT} serialNumber={1} listContext={{}} />);
     const download = screen.getByLabelText(`Download ${DOCUMENT.title}`);
     // jsdom can't follow the real link; the row must still ignore the click.
     download.addEventListener("click", (event) => event.preventDefault());
@@ -76,7 +82,7 @@ describe("Documents card row", () => {
   });
 
   it("opens with Enter from the keyboard", () => {
-    render(<OrganisationDocumentRow document={DOCUMENT} listContext={{}} />);
+    render(<OrganisationDocumentRow document={DOCUMENT} serialNumber={1} listContext={{}} />);
     fireEvent.keyDown(screen.getByRole("link", { name: `Open ${DOCUMENT.title}` }), { key: "Enter" });
     expect(push).toHaveBeenCalledWith("/knowledge/doc-1");
   });
@@ -84,18 +90,18 @@ describe("Documents card row", () => {
 
 describe("Search result card", () => {
   it("opens the article at the matching section, with the search kept", () => {
-    render(<KnowledgeResultCard result={RESULT} listContext={{ q: "strainer", type: "bulletin" }} />);
+    render(<KnowledgeResultCard result={RESULT} navigation={knowledgeArticleNavigation({ q: "strainer", type: "bulletin" })} />);
     fireEvent.click(screen.getByText(RESULT.title));
     expect(push).toHaveBeenCalledWith("/knowledge/doc-1?q=strainer&type=bulletin&section=s4");
   });
 
   it("shows the matched page, not page 1", () => {
-    render(<KnowledgeResultCard result={RESULT} listContext={{}} />);
+    render(<KnowledgeResultCard result={RESULT} navigation={knowledgeArticleNavigation({})} />);
     expect(screen.getByText("CAT 793F · p. 2 · Rev 1")).toBeTruthy();
   });
 
   it("doesn't open the article from its tags", () => {
-    render(<KnowledgeResultCard result={RESULT} listContext={{}} />);
+    render(<KnowledgeResultCard result={RESULT} navigation={knowledgeArticleNavigation({})} />);
     fireEvent.click(screen.getByText("QuipTech library"));
     expect(push).not.toHaveBeenCalled();
   });

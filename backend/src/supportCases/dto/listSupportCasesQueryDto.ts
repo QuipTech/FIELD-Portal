@@ -1,6 +1,7 @@
 import { Transform } from 'class-transformer';
 import { trimToUndefined } from '../../common/utils/trimTransforms';
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { PaginationQueryDto } from '../../common/dto/paginationQueryDto';
+import { IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import {
   CASE_PRIORITIES,
   CASE_STATUSES,
@@ -11,7 +12,7 @@ import {
 export const CASE_STATUS_FILTERS = ['active', ...CASE_STATUSES, 'all'] as const;
 export type CaseStatusFilter = (typeof CASE_STATUS_FILTERS)[number];
 
-export class ListSupportCasesQueryDto {
+export class ListSupportCasesQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsIn(CASE_STATUS_FILTERS)
   status?: CaseStatusFilter;
@@ -26,4 +27,9 @@ export class ListSupportCasesQueryDto {
   @IsString()
   @MaxLength(200)
   search?: string;
+
+  // Only cases about this machine (a machine's Open cases tab).
+  @IsOptional()
+  @IsUUID()
+  machineId?: string;
 }

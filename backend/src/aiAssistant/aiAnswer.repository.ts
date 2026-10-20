@@ -71,6 +71,11 @@ export const insertSourceReferences = async (
 ): Promise<void> => {
   if (!params.chunks.length) return;
   await client.query(
+    `INSERT INTO ai_message_documents(message_id,document_id)
+    SELECT DISTINCT $1,d.id FROM documents d WHERE d.knowledge_item_id=ANY($2::uuid[]) ON CONFLICT DO NOTHING`,
+    [params.messageId, params.chunks.map((chunk) => chunk.documentId)],
+  );
+  await client.query(
     `INSERT INTO ai_source_references
        (tenant_id, message_id, chunk_id, page_number, section_heading, created_at)
      SELECT $1, $2, source.chunk_id, source.page_number, source.section_heading,

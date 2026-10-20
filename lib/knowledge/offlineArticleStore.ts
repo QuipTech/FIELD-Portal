@@ -41,3 +41,8 @@ export const findOfflineArticle = async (id: string): Promise<OfflineArticle | n
 export const removeOfflineArticle = async (id: string): Promise<void> => {
   await runInStore("readwrite", (store) => store.delete(id));
 };
+
+// Brand-controlled Knowledge must be checked online; remove legacy local copies.
+export const clearOfflineArticles = async (): Promise<void> => {
+  await runInStore("readwrite", (store) => store.clear());
+};

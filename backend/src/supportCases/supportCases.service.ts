@@ -22,6 +22,7 @@ import {
   SupportCaseList,
   SupportCaseOptions,
 } from './types/supportCaseResponse';
+import { toCaseCategoryFields } from './toCaseCategoryFields';
 
 const UNKNOWN_MACHINE_MESSAGE = 'That machine is not in your organisation.';
 const REOPEN_REFUSED_MESSAGE =
@@ -43,16 +44,26 @@ export class SupportCasesService {
     query: ListSupportCasesQueryDto,
   ): Promise<SupportCaseList> =>
     this.databaseService.withTenant(actor.tenantId, async (client) => {
-      const rows = await casesRepository.listCases(client, actor.tenantId, {
-        ...query,
-        status: query.status ?? 'active',
-      });
+      const filters = { ...query, status: query.status ?? 'active' };
+      const rows = await casesRepository.listCases(
+        client,
+        actor.tenantId,
+        filters,
+      );
+      const total = await casesRepository.countCases(
+        client,
+        actor.tenantId,
+        filters,
+      );
       const counts = await casesRepository.countCasesByStatus(
         client,
         actor.tenantId,
       );
       return {
         items: rows.map(toSupportCase),
+        total,
+        page: query.page,
+        pageSize: query.pageSize,
         statusCounts: toStatusCounts(counts),
       };
     });
@@ -107,7 +118,7 @@ export class SupportCasesService {
           reporterId: actor.userId,
           subject: dto.subject,
           description: dto.description,
-          category: dto.category,
+          ...toCaseCategoryFields(dto),
           priority: dto.priority,
           machineId: dto.machineId ?? null,
           slaHours: Math.round(this.dashboardConfig.slaHours[dto.priority]),

@@ -1,3 +1,5 @@
+import { KnowledgeMetadataService } from '../knowledge/knowledgeMetadata.service';
+import { setUploadClassification } from '../knowledge/knowledgeAccess';
 import {
   BadRequestException,
   ConflictException,
@@ -12,10 +14,7 @@ import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import * as adminKnowledgeRepository from './adminKnowledge.repository';
 import { StorageService } from '../storage/storage.service';
 import { SharedLibraryStorageService } from '../storage/sharedLibraryStorage.service';
-import {
-  buildDocumentKey,
-  buildSharedDocumentKey,
-} from '../storage/storageKeys';
+import { buildKnowledgeDocumentKey } from '../storage/storageKeys';
 import { DocumentPageCountService } from '../knowledge/documentPageCount.service';
 import { IndexingWorkerService } from '../knowledgeIndexing/indexingWorker.service';
 import { CreateKnowledgeUploadDto } from './dto/createKnowledgeUploadDto';
@@ -34,6 +33,7 @@ const FIRST_VERSION = 1;
 @Injectable()
 export class AdminKnowledgeUploadsService {
   constructor(
+    private readonly metadata: KnowledgeMetadataService,
     private readonly databaseService: DatabaseService,
     private readonly storageService: StorageService,
     private readonly sharedLibraryStorage: SharedLibraryStorageService,
@@ -51,15 +51,21 @@ export class AdminKnowledgeUploadsService {
     scope: AdminScope,
     dto: CreateKnowledgeUploadDto,
   ): Promise<KnowledgeUploadTicket> => {
+    await this.metadata.validate(actor, dto);
     const bucket = this.storageService.requireBucket();
     const itemId = randomUUID();
     const documentId = randomUUID();
-    const key = scope.tenantId
-      ? buildDocumentKey(scope.tenantId, dto.fileName)
-      : buildSharedDocumentKey(documentId, FIRST_VERSION, dto.fileName);
+    const key = buildKnowledgeDocumentKey(
+      dto.brandId,
+      dto.categoryId,
+      documentId,
+      FIRST_VERSION,
+      dto.fileName,
+    );
 
-    await this.databaseService.withTenant(actor.tenantId, (client) =>
-      adminKnowledgeRepository.createKnowledgeUpload(client, {
+    await this.databaseService.withActor(actor, async (client) => {
+      await setUploadClassification(client, dto.brandId, dto.categoryId);
+      await adminKnowledgeRepository.createKnowledgeUpload(client, {
         ...dto,
         tenantId: scope.tenantId,
         itemId,
@@ -68,8 +74,12 @@ export class AdminKnowledgeUploadsService {
         userId: actor.userId,
         bucket,
         key,
-      }),
-    );
+      });
+      await this.metadata.apply(client, actor, itemId, {
+        ...dto,
+        documentType: dto.type,
+      });
+    });
     const signedUpload = await this.sharedLibraryStorage.createSignedUploadUrl(
       key,
       dto.contentType,

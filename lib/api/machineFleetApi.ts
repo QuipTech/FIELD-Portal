@@ -12,15 +12,17 @@ const authorizationHeader = (accessToken: string) => ({ Authorization: `Bearer $
 
 export const EMPTY_MACHINE_FILTERS: MachineFleetFilters = { site: "", make: "", status: "", machineClass: "" };
 
-const toQueryString = (filters: MachineFleetFilters, search: string): string => {
-  const params = new URLSearchParams();
+export const MACHINES_PAGE_SIZE = 25;
+
+const toQueryString = (filters: MachineFleetFilters, search: string, page: number): string => {
+  const params = new URLSearchParams({ page: String(page), pageSize: String(MACHINES_PAGE_SIZE) });
   Object.entries(filters).forEach(([key, value]) => value && params.set(key, value));
   if (search.trim()) params.set("search", search.trim());
   return params.toString();
 };
 
-export const listMachinesRequest = (accessToken: string, filters: MachineFleetFilters, search: string) =>
-  apiRequest<MachineFleetList>(`/machines?${toQueryString(filters, search)}`, {
+export const listMachinesRequest = (accessToken: string, filters: MachineFleetFilters, search: string, page = 1) =>
+  apiRequest<MachineFleetList>(`/machines?${toQueryString(filters, search, page)}`, {
     headers: authorizationHeader(accessToken),
   });
 

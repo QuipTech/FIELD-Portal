@@ -7,7 +7,6 @@ interface UploadProgressListProps {
 }
 
 const describeUpload = (upload: UploadProgress) => {
-  if (upload.status === "done") return "Uploaded — queued for indexing";
   if (upload.status === "failed") return upload.errorMessage;
   return `Uploading ${Math.round(upload.fraction * 100)}%`;
 };

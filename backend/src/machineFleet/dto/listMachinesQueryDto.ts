@@ -1,13 +1,14 @@
 import { Transform } from 'class-transformer';
 import { IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { trimToUndefined } from '../../common/utils/trimTransforms';
+import { PaginationQueryDto } from '../../common/dto/paginationQueryDto';
 import {
   OPERATING_STATUSES,
   OperatingStatus,
 } from '../types/machineFleetResponse';
 
 // Every filter is optional; blank values count as "any".
-export class ListMachinesQueryDto {
+export class ListMachinesQueryDto extends PaginationQueryDto {
   // Matches asset/fleet/serial number, make, model or site.
   @IsOptional()
   @Transform(trimToUndefined)
