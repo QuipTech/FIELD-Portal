@@ -21,7 +21,10 @@ export type SnapshotTrigger =
   | 'scheduled'
   | 'service'
   | 'component_replaced'
-  | 'baseline';
+  | 'baseline'
+  // Restoring a snapshot (0104): the configuration it replaced, and after.
+  | 'before_restore'
+  | 'restored';
 
 export interface Snapshot {
   id: string;
@@ -34,16 +37,48 @@ export interface Snapshot {
 
 export type DiffChangeKind = 'changed' | 'added' | 'removed';
 
-export interface DiffRow {
-  kind: DiffChangeKind;
-  componentName: string;
+export type DiffField = 'serialNumber' | 'firmwareVersion' | 'softwareVersion';
+
+// One field of one component, before → after (null = not recorded).
+export interface FieldChange {
+  field: DiffField;
   before: string | null;
   after: string | null;
+}
+
+export interface DiffRow {
+  kind: DiffChangeKind;
+  systemName: string;
+  componentName: string;
+  // The whole item as text, e.g. "S/N 4T-9455 · FW v4.14.0".
+  before: string | null;
+  after: string | null;
+  // Field by field: what changed, or every recorded field when added/removed.
+  fields: FieldChange[];
 }
 
 export interface UnchangedItem {
   componentName: string;
   value: string;
+}
+
+export interface ComponentRef {
+  systemName: string;
+  componentName: string;
+}
+
+// POST /machines/:machineId/snapshots/:snapshotId/restore
+export interface SnapshotRestore {
+  restoredFrom: Snapshot;
+  // The configuration before and after the restore, as new snapshots.
+  before: Snapshot;
+  after: Snapshot;
+  // Components whose serial / firmware / software changed.
+  updatedComponents: number;
+  // In the snapshot but no longer installed (not re-added).
+  missingComponents: ComponentRef[];
+  // Installed now but not in the snapshot (left as they are).
+  extraComponents: ComponentRef[];
 }
 
 export interface SnapshotDiff {

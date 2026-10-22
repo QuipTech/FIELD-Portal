@@ -64,4 +64,25 @@ export class AiConversationsService {
       messages: toAssistantMessages(messages, sources),
     };
   };
+
+  clearConversation = async (
+    actor: AuthenticatedUser,
+    conversationId: string,
+  ): Promise<void> => {
+    const cleared = await this.clear(actor, conversationId);
+    if (!cleared) throw new NotFoundException(CONVERSATION_NOT_FOUND_MESSAGE);
+  };
+
+  clearAllConversations = async (
+    actor: AuthenticatedUser,
+  ): Promise<{ cleared: number }> => ({ cleared: await this.clear(actor) });
+
+  private clear = (actor: AuthenticatedUser, conversationId?: string) =>
+    this.databaseService.withTenant(actor.tenantId, (client) =>
+      aiConversationsRepository.softDeleteConversations(client, {
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        conversationId,
+      }),
+    );
 }

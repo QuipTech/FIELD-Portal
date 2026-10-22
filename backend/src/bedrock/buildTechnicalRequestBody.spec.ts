@@ -12,6 +12,7 @@ const question: TechnicalQuestion = {
       title: 'Service manual',
       page: 214,
       heading: 'Brake accumulator',
+      sectionId: null,
       text: 'Pre-charge 9.5–10.5 MPa cold.',
     },
   ],

@@ -53,6 +53,12 @@ export class AskAssistantDto {
   @IsUUID()
   documentId?: string;
 
+  // Answer from this brand's documents only (a manufacturer id); 403 when
+  // the plan doesn't include it. Applies to this question.
+  @IsOptional()
+  @IsUUID()
+  brandId?: string;
+
   @IsOptional()
   @ValidateNested()
   @Type(() => AttachedImageDto)

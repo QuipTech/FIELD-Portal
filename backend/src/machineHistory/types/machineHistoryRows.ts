@@ -15,10 +15,12 @@ export interface MachineDetailRow extends MachineRow {
   model_id: string;
   asset_number: string | null;
   operating_hours_read_at: Date | null;
+  lifecycle_state: string;
   owner_id: string | null;
   owner_first_name: string | null;
   owner_last_name: string | null;
   owner_avatar_url: string | null;
+  photo_storage_key: string | null;
   open_case_count: number;
 }
 

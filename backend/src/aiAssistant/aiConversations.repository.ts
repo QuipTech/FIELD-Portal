@@ -1,6 +1,7 @@
 import { PoolClient } from 'pg';
 import { DatabaseService } from '../database/database.service';
 import { MACHINE_LABEL_SQL } from '../machineFleet/machineFleet.repository';
+import { chunkSectionLateral } from '../knowledge/knowledgeSql';
 import {
   ConversationRow,
   LivePromptRow,
@@ -70,10 +71,12 @@ export const listMessageSources = async (
 ): Promise<MessageSourceRow[]> => {
   const result = await databaseService.query<MessageSourceRow>(
     `SELECT r.message_id, r.chunk_id, ki.id AS document_id, ki.title,
-            r.page_number, r.section_heading
+            r.page_number, r.section_heading,
+            sec.ordinal AS section_ordinal, sec.heading AS section_title
      FROM ai_source_references r
      JOIN ai_messages msg ON msg.id = r.message_id
      LEFT JOIN document_chunks c ON c.id = r.chunk_id
+     ${chunkSectionLateral('c')}
      LEFT JOIN documents d ON d.id = c.document_id AND d.deleted_at IS NULL
      LEFT JOIN knowledge_items ki ON ki.id = d.knowledge_item_id
                                  AND ki.deleted_at IS NULL
@@ -82,6 +85,21 @@ export const listMessageSources = async (
     [params.conversationId, params.tenantId],
   );
   return result.rows;
+};
+
+// Clears one of the caller's threads, or all of them without an id. The
+// messages stay (usage, review queue); the threads just stop showing.
+export const softDeleteConversations = async (
+  client: PoolClient,
+  params: { tenantId: string; userId: string; conversationId?: string },
+): Promise<number> => {
+  const result = await client.query(
+    `UPDATE ai_conversations SET deleted_at = now(), updated_at = now()
+     WHERE tenant_id = $1 AND user_id = $2 AND deleted_at IS NULL
+       AND ($3::uuid IS NULL OR id = $3)`,
+    [params.tenantId, params.userId, params.conversationId ?? null],
+  );
+  return result.rowCount ?? 0;
 };
 
 // The platform-wide prompt published in Admin → AI configuration.

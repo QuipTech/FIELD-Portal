@@ -4,15 +4,18 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
+import { StorageService } from '../storage/storage.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { runAuditedChange } from '../common/audit/runAuditedChange';
+import { findUserPermissionCodes } from '../auth/userAccess.repository';
+import { MACHINE_LIFECYCLE_PERMISSION } from '../machineLifecycle/lifecycleTransitions';
 import * as fleetRepository from './machineFleet.repository';
 import * as catalogRepository from './machineCatalog.repository';
 import {
   groupCatalogByMake,
   toFeaturedDownMachine,
-  toFleetMachine,
 } from './machineFleetMapper';
+import { toFleetMachineWithPhoto } from './machinePhotoUrl';
 import { ListMachinesQueryDto } from './dto/listMachinesQueryDto';
 import { RegisterMachineDto } from './dto/registerMachineDto';
 import { UpdateMachineStatusDto } from './dto/updateMachineStatusDto';
@@ -33,23 +36,19 @@ const UNKNOWN_MODEL_MESSAGE =
 // its operating status (a trigger records each change, migration 0053).
 @Injectable()
 export class MachineFleetService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly storageService: StorageService,
+  ) {}
 
   listMachines = async (
     actor: AuthenticatedUser,
     filters: ListMachinesQueryDto,
   ): Promise<MachineFleetList> =>
     this.databaseService.withTenant(actor.tenantId, async (client) => {
-      const rows = await fleetRepository.listMachines(
-        client,
-        actor.tenantId,
-        filters,
-      );
-      const total = await fleetRepository.countMachines(
-        client,
-        actor.tenantId,
-        filters,
-      );
+      const scope = { tenantId: actor.tenantId, viewerId: actor.userId };
+      const rows = await fleetRepository.listMachines(client, scope, filters);
+      const total = await fleetRepository.countMachines(client, scope, filters);
       const facets = await catalogRepository.listFleetFacets(
         client,
         actor.tenantId,
@@ -58,13 +57,32 @@ export class MachineFleetService {
         client,
         actor.tenantId,
       );
+      const canManageLifecycle = (
+        await findUserPermissionCodes(client, actor.userId)
+      ).includes(MACHINE_LIFECYCLE_PERMISSION);
       return {
-        items: rows.map(toFleetMachine),
+        items: await Promise.all(
+          rows.map((row) =>
+            toFleetMachineWithPhoto(
+              this.storageService,
+              row,
+              canManageLifecycle,
+            ),
+          ),
+        ),
         total,
         page: filters.page,
         pageSize: filters.pageSize,
         facets,
-        featuredDown: featured ? toFeaturedDownMachine(featured) : null,
+        featuredDown: featured
+          ? {
+              ...toFeaturedDownMachine(featured),
+              machine: await toFleetMachineWithPhoto(
+                this.storageService,
+                featured,
+              ),
+            }
+          : null,
       };
     });
 
@@ -110,7 +128,10 @@ export class MachineFleetService {
           actor.tenantId,
           machineId,
         );
-        const machine = toFleetMachine(row!);
+        const machine = await toFleetMachineWithPhoto(
+          this.storageService,
+          row!,
+        );
         return {
           result: machine,
           audit: {
@@ -147,7 +168,10 @@ export class MachineFleetService {
           actor.tenantId,
           machineId,
         );
-        const machine = toFleetMachine(row!);
+        const machine = await toFleetMachineWithPhoto(
+          this.storageService,
+          row!,
+        );
         return {
           result: machine,
           audit: {

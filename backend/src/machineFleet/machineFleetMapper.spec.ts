@@ -17,6 +17,8 @@ const machineRow = (
   site: 'Pit 4',
   operating_hours: 14208,
   status: 'down',
+  lifecycle_state: 'active',
+  photo_storage_key: null,
   ...overrides,
 });
 
@@ -31,8 +33,23 @@ describe('toFleetMachine', () => {
       machineClass: 'Haul truck',
       site: 'Pit 4',
       operatingHours: 14208,
+      photoUrl: null,
       status: 'down',
+      lifecycleState: 'active',
+      availableActions: [],
+      canRequestTransfer: false,
     });
+  });
+
+  it('offers lifecycle actions only to a caller who may manage them', () => {
+    expect(toFleetMachine(machineRow(), true)).toMatchObject({
+      availableActions: ['deactivate', 'archive'],
+      canRequestTransfer: true,
+    });
+    expect(
+      toFleetMachine(machineRow({ lifecycle_state: 'registered' }), true)
+        .availableActions,
+    ).toEqual(['activate']);
   });
 
   it('reads an unknown status as running and a blank class as none', () => {

@@ -17,6 +17,13 @@ export interface UserRow {
   avatar_storage_key: string | null;
 }
 
+// findUserById: a UserRow plus the profile fields GET /auth/me returns.
+export interface MeUserRow extends UserRow {
+  phone_number: string | null;
+  site: string | null;
+  language: string;
+}
+
 export interface UserLoginRow {
   id: string;
   tenant_id: string;

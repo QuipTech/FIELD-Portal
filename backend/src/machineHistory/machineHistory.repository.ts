@@ -1,5 +1,8 @@
 import { PoolClient } from 'pg';
-import { MACHINE_LABEL_SQL } from '../machineFleet/machineFleet.repository';
+import {
+  MACHINE_LABEL_SQL,
+  MACHINE_PHOTO_KEY_SQL,
+} from '../machineFleet/machineFleet.repository';
 import { StoredFile } from '../storage/types/storedFile';
 import {
   MachineDetailRow,
@@ -38,9 +41,11 @@ export const findMachineDetail = async (
   const result = await client.query<MachineDetailRow>(
     `SELECT m.id, m.serial_number, m.fleet_number, m.status,
             ${MACHINE_LABEL_SQL} AS label, m.asset_number, m.site, m.operating_hours, m.operating_hours_read_at,
+            m.lifecycle_state,
             mf.name AS manufacturer_name, mm.name AS model_name, mm.id AS model_id,
             u.id AS owner_id, u.first_name AS owner_first_name, u.last_name AS owner_last_name,
             u.avatar_url AS owner_avatar_url,
+            ${MACHINE_PHOTO_KEY_SQL} AS photo_storage_key,
             (SELECT count(*)::int FROM support_cases sc
              WHERE sc.machine_id = m.id AND sc.tenant_id = $2 AND sc.deleted_at IS NULL
                AND sc.status IN ('new', 'open', 'waiting_on_customer')) AS open_case_count

@@ -31,3 +31,7 @@ Runs inside the API (`npm run start:dev` in `backend/`). Needs migrations `0053`
 ## Environment variables required
 
 `DATABASE_URL` (the listener's connection), `JWT_SECRET` (socket auth).
+
+## Push devices and preferences
+
+`GET/POST /me/devices` and `DELETE /me/devices/:id` register the app's FCM/APNs token. Call POST on every app start; re-registering the same token refreshes it, and DELETE belongs on sign-out. `GET/PUT /me/notification-preferences` saves push and email on/off plus muted kinds; before anything is saved, everything is on. Nothing sends pushes yet: these are what a push sender will read, and the in-app feed ignores them (migration `0106`).

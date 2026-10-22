@@ -21,6 +21,7 @@ const primaryLinks: NavLink[] = [
   { href: "/knowledge", label: "Knowledge", icon: "book" },
   { href: "/assistant", label: "AI assistant", icon: "spark" },
   { href: "/cases", label: "Support cases", icon: "life" },
+  { href: "/settings/billing", label: "Billing", icon: "card" },
 ];
 
 const NavItem = ({ href, label, icon, active, badgeCount = 0 }: NavLink & { active: boolean; badgeCount?: number }) => (
@@ -73,7 +74,7 @@ export const SideNav = () => {
           href="/settings"
           label={collapsed ? "" : "Settings"}
           icon="settings"
-          active={pathname.startsWith("/settings")}
+          active={pathname.startsWith("/settings") && !pathname.startsWith("/settings/billing")}
         />
         <LogoutButton
           className="flex items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-[15px] text-white/75 transition-colors hover:bg-white/10"

@@ -16,5 +16,12 @@ import { AdminUserRemovalService } from './adminUserRemoval.service';
     AdminUserRolesService,
     AdminUserRemovalService,
   ],
+  // Reused by the organisation's own Team screen (src/team).
+  exports: [
+    AdminUsersService,
+    AdminUserInvitationsService,
+    AdminUserRolesService,
+    AdminUserRemovalService,
+  ],
 })
 export class AdminUsersModule {}

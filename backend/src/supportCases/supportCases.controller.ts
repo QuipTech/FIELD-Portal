@@ -19,12 +19,14 @@ import { CurrentUser } from '../auth/decorators/currentUser.decorator';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { CASE_ATTACHMENT_RULE } from '../storage/storageFileRules';
 import { IncomingFile } from '../storage/types/storedFile';
+import { IdempotencyInterceptor } from '../idempotency/idempotency.interceptor';
 import { SupportCasesService } from './supportCases.service';
 import { CaseMessagesService } from './caseMessages.service';
 import { SUPPORT_CREATE_PERMISSION } from './caseAccessPolicy';
 import { ListSupportCasesQueryDto } from './dto/listSupportCasesQueryDto';
 import { CreateSupportCaseDto } from './dto/createSupportCaseDto';
 import { PostCaseMessageDto } from './dto/postCaseMessageDto';
+import { ThreadSinceQueryDto } from './dto/threadSinceQueryDto';
 
 // The customer side: support cases in the caller's own organisation,
 // addressed by case number (#1042). Everything needs support.create.
@@ -96,8 +98,13 @@ export class SupportCasesController {
   listMessages(
     @CurrentUser() actor: AuthenticatedUser,
     @Param('caseNumber', ParseIntPipe) caseNumber: number,
+    @Query() query: ThreadSinceQueryDto,
   ) {
-    return this.caseMessagesService.listMessages(actor, caseNumber);
+    return this.caseMessagesService.listMessages(
+      actor,
+      caseNumber,
+      query.since,
+    );
   }
 
   // The thread's system lines (assigned, status changed, …).
@@ -105,11 +112,14 @@ export class SupportCasesController {
   listEvents(
     @CurrentUser() actor: AuthenticatedUser,
     @Param('caseNumber', ParseIntPipe) caseNumber: number,
+    @Query() query: ThreadSinceQueryDto,
   ) {
-    return this.caseMessagesService.listEvents(actor, caseNumber);
+    return this.caseMessagesService.listEvents(actor, caseNumber, query.since);
   }
 
+  // Idempotency-Key makes an offline reply safe to resend.
   @Post(':caseNumber/messages')
+  @UseInterceptors(IdempotencyInterceptor)
   postMessage(
     @CurrentUser() actor: AuthenticatedUser,
     @Param('caseNumber', ParseIntPipe) caseNumber: number,

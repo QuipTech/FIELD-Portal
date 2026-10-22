@@ -3,6 +3,7 @@ import { IBM_Plex_Sans } from "next/font/google";
 import { IconSprite } from "@/components/icons/iconSprite";
 import { themeInitScript } from "@/lib/theme/themePreference";
 import "./globals.css";
+import { PersonalPaymentPrompt } from "@/components/billing/personalPaymentPrompt";
 
 const ibmPlexSans = IBM_Plex_Sans({
   subsets: ["latin"],
@@ -27,6 +28,7 @@ const RootLayout = ({ children }: { children: React.ReactNode }) => {
       <body className="bg-surface font-sans text-[16px] leading-[1.55] text-ink">
         <IconSprite />
         {children}
+        <PersonalPaymentPrompt />
       </body>
     </html>
   );

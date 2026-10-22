@@ -10,6 +10,11 @@ import {
   FeaturedDownRow,
   FleetMachineRow,
 } from './types/machineFleetRows';
+import {
+  canRequestTransfer,
+  listAvailableActions,
+  toLifecycleState,
+} from '../machineLifecycle/lifecycleTransitions';
 
 // The column's CHECK allows only these; anything else reads as running.
 const toOperatingStatus = (status: string): OperatingStatus =>
@@ -17,17 +22,29 @@ const toOperatingStatus = (status: string): OperatingStatus =>
     ? (status as OperatingStatus)
     : 'running';
 
-export const toFleetMachine = (row: FleetMachineRow): FleetMachine => ({
-  id: row.id,
-  label: row.label,
-  serialNumber: row.serial_number,
-  manufacturer: row.manufacturer_name,
-  model: row.model_name,
-  machineClass: row.product_family || null,
-  site: row.site,
-  operatingHours: row.operating_hours,
-  status: toOperatingStatus(row.status),
-});
+// canManageLifecycle: whether the caller holds machine.lifecycle.
+export const toFleetMachine = (
+  row: FleetMachineRow,
+  canManageLifecycle = false,
+): FleetMachine => {
+  const lifecycleState = toLifecycleState(row.lifecycle_state);
+  return {
+    id: row.id,
+    label: row.label,
+    serialNumber: row.serial_number,
+    manufacturer: row.manufacturer_name,
+    model: row.model_name,
+    machineClass: row.product_family || null,
+    site: row.site,
+    operatingHours: row.operating_hours,
+    // Signed by the services (machinePhotoUrl.ts); mappers stay pure.
+    photoUrl: null,
+    status: toOperatingStatus(row.status),
+    lifecycleState,
+    availableActions: listAvailableActions(lifecycleState, canManageLifecycle),
+    canRequestTransfer: canRequestTransfer(lifecycleState, canManageLifecycle),
+  };
+};
 
 export const toFeaturedDownMachine = (
   row: FeaturedDownRow,

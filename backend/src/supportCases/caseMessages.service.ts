@@ -34,6 +34,7 @@ export class CaseMessagesService {
   listMessages = async (
     actor: AuthenticatedUser,
     caseNumber: number,
+    since?: Date,
   ): Promise<CaseMessage[]> =>
     this.databaseService.withTenant(actor.tenantId, async (client) => {
       const supportCase = await requireSupportCase(
@@ -45,6 +46,7 @@ export class CaseMessagesService {
         tenantId: actor.tenantId,
         caseId: supportCase.id,
         includeInternal: false,
+        since,
       });
       return this.caseAttachmentsService.toMessages(
         client,
@@ -56,6 +58,7 @@ export class CaseMessagesService {
   listEvents = async (
     actor: AuthenticatedUser,
     caseNumber: number,
+    since?: Date,
   ): Promise<CaseEvent[]> =>
     this.databaseService.withTenant(actor.tenantId, async (client) => {
       const supportCase = await requireSupportCase(
@@ -63,7 +66,12 @@ export class CaseMessagesService {
         actor.tenantId,
         caseNumber,
       );
-      const rows = await listCaseEvents(client, actor.tenantId, supportCase.id);
+      const rows = await listCaseEvents(
+        client,
+        actor.tenantId,
+        supportCase.id,
+        since,
+      );
       return rows.map(toCaseEvent);
     });
 

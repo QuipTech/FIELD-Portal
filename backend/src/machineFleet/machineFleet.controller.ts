@@ -18,6 +18,10 @@ import { MachineFleetService } from './machineFleet.service';
 import { ListMachinesQueryDto } from './dto/listMachinesQueryDto';
 import { RegisterMachineDto } from './dto/registerMachineDto';
 import { UpdateMachineStatusDto } from './dto/updateMachineStatusDto';
+import { CorrectIdentifiersDto } from './dto/correctIdentifiersDto';
+import { UpdateMachineDto } from './dto/updateMachineDto';
+import { MachineIdentifiersService } from './machineIdentifiers.service';
+import { MachineDetailsService } from './machineDetails.service';
 
 // The Machines list, registration and status changes. One machine's
 // details and history (/machines/:machineId…) live in
@@ -25,7 +29,11 @@ import { UpdateMachineStatusDto } from './dto/updateMachineStatusDto';
 @Controller()
 @UseGuards(JwtAuthGuard, RequirePermissionsGuard)
 export class MachineFleetController {
-  constructor(private readonly machineFleetService: MachineFleetService) {}
+  constructor(
+    private readonly machineFleetService: MachineFleetService,
+    private readonly machineIdentifiersService: MachineIdentifiersService,
+    private readonly machineDetailsService: MachineDetailsService,
+  ) {}
 
   @Get('machines')
   @RequirePermissions('machine.view')
@@ -45,6 +53,17 @@ export class MachineFleetController {
     return this.machineFleetService.registerMachine(actor, dto);
   }
 
+  // Site, hour-meter reading, cover photo.
+  @Patch('machines/:machineId')
+  @RequirePermissions('machine.manage')
+  update(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('machineId', ParseUUIDPipe) machineId: string,
+    @Body() dto: UpdateMachineDto,
+  ) {
+    return this.machineDetailsService.updateMachine(actor, machineId, dto);
+  }
+
   // Running / down / service due. Feeds the dashboard's fleet uptime.
   @Patch('machines/:machineId/status')
   @RequirePermissions('machine.manage')
@@ -54,6 +73,22 @@ export class MachineFleetController {
     @Body() dto: UpdateMachineStatusDto,
   ) {
     return this.machineFleetService.updateStatus(actor, machineId, dto);
+  }
+
+  // Serial, fleet, Plant ID and registration corrections, audited with a
+  // reason. The machine's id never changes.
+  @Patch('machines/:machineId/identifiers')
+  @RequirePermissions('machine.manage')
+  correctIdentifiers(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('machineId', ParseUUIDPipe) machineId: string,
+    @Body() dto: CorrectIdentifiersDto,
+  ) {
+    return this.machineIdentifiersService.correctIdentifiers(
+      actor,
+      machineId,
+      dto,
+    );
   }
 
   // Makes and models from the Machine library, for "Add machine".

@@ -76,3 +76,59 @@ export const setSnapshotKnownGood = async (
   );
   return (result.rowCount ?? 0) > 0;
 };
+
+// Sets each installed component's serial, firmware and software to the
+// snapshot's values, matching by system and component name. Components
+// aren't added or removed. Returns how many changed.
+export const restoreSnapshotValues = async (
+  client: PoolClient,
+  params: { tenantId: string; machineId: string; snapshotId: string },
+): Promise<number> => {
+  const result = await client.query(
+    `UPDATE installed_components c
+     SET serial_number = i.serial_number, firmware_version = i.firmware_version,
+         software_version = i.software_version, updated_at = now()
+     FROM installed_systems s, configuration_snapshot_items i
+     WHERE c.installed_system_id = s.id AND s.machine_id = $1 AND s.tenant_id = $2
+       AND s.deleted_at IS NULL AND c.deleted_at IS NULL
+       AND i.snapshot_id = $3 AND i.tenant_id = $2
+       AND i.system_name = s.name AND i.component_name = c.name
+       AND (c.serial_number, c.firmware_version, c.software_version)
+           IS DISTINCT FROM (i.serial_number, i.firmware_version, i.software_version)`,
+    [params.machineId, params.tenantId, params.snapshotId],
+  );
+  return result.rowCount ?? 0;
+};
+
+export interface UnmatchedComponentRow {
+  system_name: string;
+  component_name: string;
+  // 'missing': in the snapshot, not installed now. 'extra': installed now,
+  // not in the snapshot. Restoring leaves both as they are.
+  side: 'missing' | 'extra';
+}
+
+export const listUnmatchedComponents = async (
+  client: PoolClient,
+  params: { tenantId: string; machineId: string; snapshotId: string },
+): Promise<UnmatchedComponentRow[]> => {
+  const result = await client.query<UnmatchedComponentRow>(
+    `WITH installed AS (
+       SELECT s.name AS system_name, c.name AS component_name
+       FROM installed_systems s JOIN installed_components c ON c.installed_system_id = s.id
+       WHERE s.machine_id = $1 AND s.tenant_id = $2 AND s.deleted_at IS NULL AND c.deleted_at IS NULL
+     ),
+     recorded AS (
+       SELECT system_name, component_name FROM configuration_snapshot_items
+       WHERE snapshot_id = $3 AND tenant_id = $2
+     )
+     SELECT system_name, component_name, 'missing' AS side FROM recorded
+     EXCEPT SELECT system_name, component_name, 'missing' FROM installed
+     UNION ALL
+     (SELECT system_name, component_name, 'extra' FROM installed
+      EXCEPT SELECT system_name, component_name, 'extra' FROM recorded)
+     ORDER BY side, system_name, component_name`,
+    [params.machineId, params.tenantId, params.snapshotId],
+  );
+  return result.rows;
+};

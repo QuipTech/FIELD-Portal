@@ -1,13 +1,15 @@
-export type NotificationKind =
-  | 'case_message'
-  | 'case_assigned'
-  | 'case_status'
-  | 'case_priority'
-  | 'machine_status'
-  | 'ai_review'
-  | 'knowledge_document'
+export const NOTIFICATION_KINDS = [
+  'case_message',
+  'case_assigned',
+  'case_status',
+  'case_priority',
+  'machine_status',
+  'ai_review',
+  'knowledge_document',
   // From an organisation's alert rules (src/alertEngine).
-  | 'alert';
+  'alert',
+] as const;
+export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 export interface UserNotification {
   id: string;

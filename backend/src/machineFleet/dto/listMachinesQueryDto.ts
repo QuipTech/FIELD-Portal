@@ -1,11 +1,22 @@
 import { Transform } from 'class-transformer';
-import { IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 import { trimToUndefined } from '../../common/utils/trimTransforms';
 import { PaginationQueryDto } from '../../common/dto/paginationQueryDto';
 import {
   OPERATING_STATUSES,
   OperatingStatus,
 } from '../types/machineFleetResponse';
+import {
+  LIFECYCLE_STATES,
+  LifecycleState,
+} from '../../machineLifecycle/lifecycleTransitions';
 
 // Every filter is optional; blank values count as "any".
 export class ListMachinesQueryDto extends PaginationQueryDto {
@@ -32,6 +43,17 @@ export class ListMachinesQueryDto extends PaginationQueryDto {
   @Transform(trimToUndefined)
   @IsIn(OPERATING_STATUSES)
   status?: OperatingStatus;
+
+  @IsOptional()
+  @Transform(trimToUndefined)
+  @IsIn(LIFECYCLE_STATES)
+  lifecycleState?: LifecycleState;
+
+  // Only machines the caller is assigned to.
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  assignedToMe?: boolean;
 
   // A model product family, e.g. "Haul truck".
   @IsOptional()

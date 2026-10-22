@@ -9,10 +9,19 @@ import { OperatingStatus } from './types/machineFleetResponse';
 // bypass RLS.
 export const MACHINE_LABEL_SQL = `COALESCE(NULLIF(m.asset_number, ''), NULLIF(m.fleet_number, ''), m.serial_number)`;
 
+// The storage key of the machine's photo (alias m): its chosen cover, else
+// its newest gallery photo; NULL with none.
+export const MACHINE_PHOTO_KEY_SQL = `(
+  SELECT p.storage_key FROM machine_photos p
+  WHERE p.machine_id = m.id AND p.tenant_id = m.tenant_id AND p.deleted_at IS NULL
+  ORDER BY (p.id = m.cover_photo_id) IS TRUE DESC, p.created_at DESC
+  LIMIT 1)`;
+
 export const FLEET_COLUMNS = `
   m.id, ${MACHINE_LABEL_SQL} AS label, m.serial_number,
   mf.name AS manufacturer_name, mm.name AS model_name, mm.product_family,
-  m.site, m.operating_hours, m.status`;
+  m.site, m.operating_hours, m.status, m.lifecycle_state,
+  ${MACHINE_PHOTO_KEY_SQL} AS photo_storage_key`;
 
 export const FLEET_FROM = `
   FROM machines m
@@ -20,7 +29,12 @@ export const FLEET_FROM = `
   JOIN machine_models mm ON mm.id = m.model_id`;
 
 // WHERE clause and its parameters for the list's filters ($1 = tenant).
-const buildFilter = (tenantId: string, filters: ListMachinesQueryDto) => {
+// viewerId is who "assigned to me" means.
+const buildFilter = (
+  tenantId: string,
+  viewerId: string,
+  filters: ListMachinesQueryDto,
+) => {
   const params: unknown[] = [tenantId];
   const conditions = ['m.tenant_id = $1', 'm.deleted_at IS NULL'];
   const addCondition = (value: unknown, toSql: (param: string) => string) => {
@@ -31,17 +45,27 @@ const buildFilter = (tenantId: string, filters: ListMachinesQueryDto) => {
   if (filters.make)
     addCondition(filters.make, (p) => `m.manufacturer_id = ${p}`);
   if (filters.status) addCondition(filters.status, (p) => `m.status = ${p}`);
+  if (filters.lifecycleState)
+    addCondition(filters.lifecycleState, (p) => `m.lifecycle_state = ${p}`);
   if (filters.machineClass) {
     addCondition(
       filters.machineClass,
       (p) => `lower(mm.product_family) = lower(${p})`,
     );
   }
+  if (filters.assignedToMe) {
+    addCondition(
+      viewerId,
+      (p) => `EXISTS (SELECT 1 FROM machine_assignments a
+                      WHERE a.machine_id = m.id AND a.tenant_id = m.tenant_id AND a.user_id = ${p})`,
+    );
+  }
   if (filters.search) {
     addCondition(
       `%${escapeLikePattern(filters.search)}%`,
       (p) =>
-        `(${MACHINE_LABEL_SQL} ILIKE ${p} OR m.serial_number ILIKE ${p} OR mf.name ILIKE ${p}
+        `(${MACHINE_LABEL_SQL} ILIKE ${p} OR m.serial_number ILIKE ${p}
+          OR m.registration_number ILIKE ${p} OR mf.name ILIKE ${p}
           OR mm.name ILIKE ${p} OR m.site ILIKE ${p})`,
     );
   }
@@ -50,10 +74,14 @@ const buildFilter = (tenantId: string, filters: ListMachinesQueryDto) => {
 
 export const listMachines = async (
   client: PoolClient,
-  tenantId: string,
+  scope: { tenantId: string; viewerId: string },
   filters: ListMachinesQueryDto,
 ): Promise<FleetMachineRow[]> => {
-  const { where, params } = buildFilter(tenantId, filters);
+  const { where, params } = buildFilter(
+    scope.tenantId,
+    scope.viewerId,
+    filters,
+  );
   const { limit, offset } = toLimitOffset(filters);
   const result = await client.query<FleetMachineRow>(
     `SELECT ${FLEET_COLUMNS} ${FLEET_FROM} WHERE ${where}
@@ -65,10 +93,14 @@ export const listMachines = async (
 
 export const countMachines = async (
   client: PoolClient,
-  tenantId: string,
+  scope: { tenantId: string; viewerId: string },
   filters: ListMachinesQueryDto,
 ): Promise<number> => {
-  const { where, params } = buildFilter(tenantId, filters);
+  const { where, params } = buildFilter(
+    scope.tenantId,
+    scope.viewerId,
+    filters,
+  );
   const result = await client.query<{ count: string }>(
     `SELECT count(*) ${FLEET_FROM} WHERE ${where}`,
     params,

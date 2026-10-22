@@ -1,6 +1,11 @@
 import { PoolClient } from 'pg';
 import { DatabaseService } from '../database/database.service';
-import { SessionRow, TenantRow, UserLoginRow, UserRow } from './types/authRows';
+import {
+  MeUserRow,
+  SessionRow,
+  TenantRow,
+  UserLoginRow,
+} from './types/authRows';
 import { getRequestSource } from '../common/requestSource/requestSource';
 
 export const insertTenant = async (
@@ -68,10 +73,10 @@ export const findTenantById = async (
 export const findUserById = async (
   client: PoolClient,
   userId: string,
-): Promise<UserRow | null> => {
-  const result = await client.query<UserRow>(
+): Promise<MeUserRow | null> => {
+  const result = await client.query<MeUserRow>(
     `SELECT id, tenant_id, email, first_name, last_name, status, avatar_url,
-            avatar_storage_key
+            avatar_storage_key, phone_number, site, language
      FROM users WHERE id = $1`,
     [userId],
   );
