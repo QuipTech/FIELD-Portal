@@ -3,7 +3,11 @@ import { Client, PoolClient } from 'pg';
 import { buildPoolConfig } from '../src/database/buildPoolConfig';
 import { readDatabaseUrl } from './dbTestConnection';
 import { asTenantRole } from './isolationFixtures';
-import { CatalogFixture, seedCatalog } from './knowledgeCatalogFixtures';
+import {
+  CatalogFixture,
+  seedCatalog,
+  seededIds,
+} from './knowledgeCatalogFixtures';
 import { KnowledgeAccess } from '../src/knowledgeCatalog/access/knowledgeAccess';
 import { listCatalogDocuments } from '../src/knowledgeCatalog/documents/catalogDocuments.repository';
 import { loadVisibleDocument } from '../src/knowledgeCatalog/documents/catalogDocumentAccess';
@@ -16,7 +20,7 @@ import { SearchCatalogQueryDto } from '../src/knowledgeCatalog/dto/searchCatalog
 import { ForMyMachinesQueryDto } from '../src/knowledgeCatalog/dto/forMyMachinesQueryDto';
 
 // The catalogue SQL against a real database (npm run test:db), run as the
-// tenant role with app.user_id set, so RLS and knowledge_can_read_document
+// tenant role as user A (seedCatalog), so RLS and knowledge_can_read_document
 // apply. Fixtures are written as the migration owner; everything is rolled
 // back.
 
@@ -39,7 +43,7 @@ const listQuery = (
 ): ListCatalogDocumentsQueryDto =>
   Object.assign(new ListCatalogDocumentsQueryDto(), overrides);
 
-const ids = (rows: { id: string }[]) => rows.map((row) => row.id).sort();
+const ids = (rows: { id: string }[]) => seededIds(seed, rows);
 
 beforeAll(() => client.connect());
 afterAll(() => client.end());
@@ -48,9 +52,6 @@ beforeEach(async () => {
   await client.query('BEGIN');
   seed = await seedCatalog(client);
   await asTenantRole(client, seed.tenantA);
-  await client.query("SELECT set_config('app.user_id', $1, true)", [
-    seed.userA,
-  ]);
 });
 
 afterEach(() => client.query('ROLLBACK'));
@@ -114,6 +115,7 @@ describe('search and facets', () => {
   it('finds the page and section, with the matched words marked', async () => {
     const query = Object.assign(new SearchCatalogQueryDto(), {
       q: 'relief valve',
+      brandId: seed.cat.brandId,
     });
     const [hit, ...rest] = await searchCatalogPages(db, access(), query);
     expect(rest).toEqual([]);

@@ -108,6 +108,7 @@ const seedSharedCatPages = async (client: Client, versionId: string) => {
   );
 };
 
+// Also makes user A the transaction's app.user_id.
 export const seedCatalog = async (client: Client): Promise<CatalogFixture> => {
   const tenantA = await insertTenant(client, 'catalog-a');
   const tenantB = await insertTenant(client, 'catalog-b');
@@ -117,6 +118,7 @@ export const seedCatalog = async (client: Client): Promise<CatalogFixture> => {
      VALUES ($1, $2, 'Tess', 'Tech', $2) RETURNING id`,
     [tenantA, `tech-${Date.now()}@example.com`],
   );
+  await client.query("SELECT set_config('app.user_id', $1, true)", [userA]);
   const cat = await insertKnowledgeBrand(client, 'CAT');
   const komatsu = await insertKnowledgeBrand(client, 'Komatsu');
   const retiredBrand = await insertKnowledgeBrand(client, 'Retired', false);
@@ -155,4 +157,17 @@ export const seedCatalog = async (client: Client): Promise<CatalogFixture> => {
       retired: await seedOwn(tenantA, 'Retired brand manual', retiredBrand),
     },
   };
+};
+
+// The dev database also holds real library documents: the ids of `rows`
+// that this fixture seeded, sorted.
+export const seededIds = (
+  fixture: CatalogFixture,
+  rows: { id: string }[],
+): string[] => {
+  const seeded = Object.values(fixture.docs);
+  return rows
+    .map((row) => row.id)
+    .filter((id) => seeded.includes(id))
+    .sort();
 };

@@ -99,7 +99,10 @@ const search = (scope: { brandId?: string } = {}) =>
 
 describe('retrieval', () => {
   it('resolves each chunk to the section on its page', async () => {
-    const rows = await search();
+    // The dev database also holds real library documents.
+    const rows = (await search()).filter((row) =>
+      [catDoc, komatsuDoc].includes(row.knowledge_item_id),
+    );
     expect(rows.map((row) => row.knowledge_item_id).sort()).toEqual(
       [catDoc, komatsuDoc].sort(),
     );
