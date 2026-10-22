@@ -1,5 +1,5 @@
 import { DatabaseService } from '../database/database.service';
-import { ITEM_BRAND_SQL, chunkSectionLateral } from '../knowledge/knowledgeSql';
+import { chunkSectionLateral } from '../knowledge/knowledgeSql';
 
 export interface ChunkMatchRow {
   chunk_id: string;
@@ -17,12 +17,12 @@ export interface ChunkMatchRow {
 
 // The only query AI retrieval uses. A chunk is searchable only when it
 // belongs to its document's live version (documents.live_version_id), the
-// document isn't archived or deleted, it's the caller's organisation's or
-// the shared library's, and its brand is in the plan (or it has none).
-// Scope is explicit in SQL (the backend's DB role may bypass RLS). Ordered
-// by cosine distance (HNSW index, migration 0013).
-// $4 narrows it to one document (Ask AI on a Knowledge article), $5 to one
-// brand; $6 is the plan's brands (NULL = every brand).
+// document isn't archived, withdrawn or deleted, and the caller may read it
+// (knowledge_can_read_document: own organisation or shared library, active
+// brand). Ordered by cosine distance (HNSW index, migration 0013); sections
+// are looked up for the nearest chunks only.
+// $4 narrows it to one document (Ask AI on a Knowledge article), $6 to one
+// brand, $7 to one category.
 const LIVE_CHUNK_SEARCH = `
   WITH nearest AS (
     SELECT c.id AS chunk_id, ki.id AS knowledge_item_id, ki.title, ki.type,
@@ -34,12 +34,11 @@ const LIVE_CHUNK_SEARCH = `
                     AND d.live_version_id = c.document_version_id
     JOIN knowledge_items ki ON ki.id = d.knowledge_item_id
                            AND ki.deleted_at IS NULL
-                           AND ki.status <> 'archived'
-    CROSS JOIN LATERAL (SELECT ${ITEM_BRAND_SQL} AS brand_id) b
-    WHERE (c.tenant_id IS NULL OR c.tenant_id = $2)
+                           AND ki.status NOT IN ('archived','withdrawn')
+    WHERE knowledge_can_read_document(d.id,$2,$5)
       AND ($4::uuid IS NULL OR ki.id = $4)
-      AND ($5::uuid IS NULL OR b.brand_id = $5)
-      AND ($6::uuid[] IS NULL OR b.brand_id IS NULL OR b.brand_id = ANY($6::uuid[]))
+      AND ($6::uuid IS NULL OR c.brand_id=$6)
+      AND ($7::uuid IS NULL OR c.category_id=$7)
     ORDER BY c.embedding <=> $1::vector
     LIMIT $3
   )
@@ -51,14 +50,15 @@ const LIVE_CHUNK_SEARCH = `
   ORDER BY n.similarity DESC`;
 
 export const searchLiveChunks = async (
-  databaseService: DatabaseService,
+  databaseService: Pick<DatabaseService, 'query'>,
   params: {
     queryVector: string;
     tenantId: string;
+    userId: string;
+    brandId?: string;
+    categoryId?: string;
     limit: number;
     documentId?: string | null;
-    brandId?: string | null;
-    planBrandIds: string[] | null;
   },
 ): Promise<ChunkMatchRow[]> => {
   const result = await databaseService.query<ChunkMatchRow>(LIVE_CHUNK_SEARCH, [
@@ -66,8 +66,9 @@ export const searchLiveChunks = async (
     params.tenantId,
     params.limit,
     params.documentId ?? null,
+    params.userId,
     params.brandId ?? null,
-    params.planBrandIds,
+    params.categoryId ?? null,
   ]);
   return result.rows;
 };

@@ -92,7 +92,10 @@ export class SharedLibraryStorageService {
 
   private assertSharedKey = (key: string): void => {
     const isShared =
-      key.startsWith(`${SHARED_DOCUMENTS_PREFIX}/`) &&
+      (key.startsWith(`${SHARED_DOCUMENTS_PREFIX}/`) ||
+        /^knowledge\/brands\/[a-f0-9-]{36}\/[a-f0-9-]{36}\/[a-f0-9-]{36}\/v[1-9][0-9]*\/[^/]+$/.test(
+          key,
+        )) &&
       !key.split('/').some((part) => part === '..' || part === '');
     if (!isShared) throw new ForbiddenException('Not a shared-library file.');
   };

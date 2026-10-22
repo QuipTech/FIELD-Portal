@@ -1,19 +1,18 @@
-import { ITEM_BRAND_SQL } from '../knowledge/knowledgeSql';
 import { KnowledgeAccess } from './access/knowledgeAccess';
 import { CatalogFilters, CatalogSort } from './types/catalogFilters';
 
 // Every catalogue query starts from `catalog` ($1 = the caller's tenant):
-// the organisation's own knowledge items and the shared library, each with
-// its brand, its state and the version to show (live, else the latest).
-// Scope is explicit in SQL (the backend's DB role may bypass RLS); run the
-// queries inside withTenant(caller) too.
+// the organisation's own knowledge items and the shared library that the
+// caller may read (knowledge_can_read_document: active brands), each with
+// its brand and category (on documents, migration 0084), its state and the
+// version to show (live, else the latest). Scope is explicit in SQL (the
+// backend's DB role may bypass RLS); run the queries inside
+// withActor(caller), which the access check reads app.user_id from.
 //
-// brand_id: see ITEM_BRAND_SQL.
 // state mirrors deriveDocumentState() (knowledge/knowledgeFileRules.ts).
 export const CATALOG_CTE = `catalog AS (
   SELECT ki.id, ki.title, ki.type, ki.status, ki.tenant_id, ki.updated_at,
-         ki.category_id, ki.review_note, ki.licence_expires_at,
-         ${ITEM_BRAND_SQL} AS brand_id,
+         d.brand_id, d.category_id, ki.review_note, ki.licence_expires_at,
          d.live_version_id,
          COALESCE(lv.id, latest.id) AS version_id,
          COALESCE(lv.version_number, latest.version_number) AS version_number,
@@ -40,6 +39,7 @@ export const CATALOG_CTE = `catalog AS (
     ORDER BY v.version_number DESC LIMIT 1
   ) latest ON true
   WHERE ki.deleted_at IS NULL AND (ki.tenant_id IS NULL OR ki.tenant_id = $1)
+    AND knowledge_can_read_document(d.id, $1)
 )`;
 
 // What technicians (and AI retrieval, knowledgeLibraryScope) may read.
@@ -50,7 +50,7 @@ export const CATALOG_COLUMNS = `
   c.id, c.title, c.type, c.status, c.state, c.tenant_id, c.updated_at, c.live_version_id,
   c.version_id, c.version_number, c.page_count, c.file_name, c.content_type,
   c.size_bytes, c.storage_key, c.summary, c.review_note, c.error_message,
-  c.licence_expires_at, c.brand_id, mf.name AS brand_name, c.category_id,
+  c.licence_expires_at, c.brand_id, kb.name AS brand_name, c.category_id,
   kc.name AS category_name,
   (SELECT array_agg(kmf.name || ' ' || mm.name ORDER BY km.mention_count DESC)
      FROM knowledge_item_machine_models km
@@ -59,11 +59,11 @@ export const CATALOG_COLUMNS = `
      WHERE km.knowledge_item_id = c.id) AS models`;
 
 export const CATALOG_JOINS = `
-  LEFT JOIN machine_manufacturers mf ON mf.id = c.brand_id
-  LEFT JOIN knowledge_categories kc ON kc.id = c.category_id AND kc.deleted_at IS NULL`;
+  JOIN knowledge_brands kb ON kb.id = c.brand_id
+  JOIN knowledge_categories kc ON kc.id = c.category_id`;
 
-// The caller's visibility (live only for non-admins, the plan's brands)
-// plus the request's filters. Pushes values onto `params` after $1.
+// The caller's visibility (live only for non-admins) plus the request's
+// filters. Pushes values onto `params` after $1.
 export const buildCatalogConditions = (
   access: KnowledgeAccess,
   filters: CatalogFilters,
@@ -78,11 +78,6 @@ export const buildCatalogConditions = (
   if (!access.isAdmin || options.readableOnly) conditions.push(READABLE_SQL);
   if (access.isAdmin && filters.status) {
     conditions.push(`c.state = ${addParam(filters.status)}`);
-  }
-  if (access.brandIds) {
-    conditions.push(
-      `(c.brand_id IS NULL OR c.brand_id = ANY(${addParam(access.brandIds)}::uuid[]))`,
-    );
   }
   if (filters.brandId)
     conditions.push(`c.brand_id = ${addParam(filters.brandId)}`);

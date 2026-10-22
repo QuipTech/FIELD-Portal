@@ -1,13 +1,5 @@
-// SQL fragments shared by the Knowledge catalogue and AI retrieval, so a
-// document's brand and a passage's section mean the same thing everywhere.
-
-// A knowledge item's brand (alias `ki`): the admin-set manufacturer, else
-// the maker of the model the document mentions most.
-export const ITEM_BRAND_SQL = `COALESCE(ki.manufacturer_id, (
-  SELECT mm.manufacturer_id FROM knowledge_item_machine_models km
-  JOIN machine_models mm ON mm.id = km.machine_model_id
-  WHERE km.knowledge_item_id = ki.id
-  ORDER BY km.mention_count DESC, mm.name LIMIT 1))`;
+// SQL shared by the Knowledge catalogue, AI retrieval and AI citations, so a
+// passage's section means the same thing everywhere.
 
 // LEFT JOIN LATERAL giving `sec.ordinal` / `sec.heading`: the section a
 // chunk (alias `chunkAlias`) belongs to — the one with its heading, else

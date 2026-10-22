@@ -54,7 +54,8 @@ export const listMessages = async (
   params: { tenantId: string; conversationId: string },
 ): Promise<MessageRow[]> => {
   const result = await client.query<MessageRow>(
-    `SELECT id, role, content, created_at FROM ai_messages
+    `SELECT id, role, CASE WHEN knowledge_message_available(id,$2,NULLIF(current_setting('app.user_id',true),'')::uuid)
+       THEN content ELSE '[This answer is unavailable because access to its sources has changed.]' END AS content, created_at FROM ai_messages
      WHERE conversation_id = $1 AND tenant_id = $2
      ORDER BY created_at, id`,
     [params.conversationId, params.tenantId],
@@ -67,10 +68,13 @@ export const listMessages = async (
 // (like knowledge search) and scopes by the reference's tenant instead.
 export const listMessageSources = async (
   databaseService: DatabaseService,
-  params: { tenantId: string; conversationId: string },
+  params: { tenantId: string; conversationId: string; userId?: string },
 ): Promise<MessageSourceRow[]> => {
-  const result = await databaseService.query<MessageSourceRow>(
-    `SELECT r.message_id, r.chunk_id, ki.id AS document_id, ki.title,
+  const result = await databaseService.withActor(
+    { tenantId: params.tenantId, userId: params.userId ?? '' },
+    (client) =>
+      client.query<MessageSourceRow>(
+        `SELECT r.message_id, r.chunk_id, ki.id AS document_id, ki.title,
             r.page_number, r.section_heading,
             sec.ordinal AS section_ordinal, sec.heading AS section_title
      FROM ai_source_references r
@@ -81,8 +85,10 @@ export const listMessageSources = async (
      LEFT JOIN knowledge_items ki ON ki.id = d.knowledge_item_id
                                  AND ki.deleted_at IS NULL
      WHERE msg.conversation_id = $1 AND r.tenant_id = $2
+       AND knowledge_can_read_document(d.id,$2,$3)
      ORDER BY r.message_id, r.created_at, r.id`,
-    [params.conversationId, params.tenantId],
+        [params.conversationId, params.tenantId, params.userId ?? null],
+      ),
   );
   return result.rows;
 };

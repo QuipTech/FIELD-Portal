@@ -1,5 +1,6 @@
 "use client";
 
+import { HighlightedSnippet } from "./highlightedSnippet";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons/icon";
 import { Tag } from "@/components/ui/tag";
@@ -13,7 +14,9 @@ const typeLabel = (type: string) => knowledgeDocumentTypes.find((option) => opti
 // "CAT 793F · p. 2 · Rev 4" — the page of the passage that matched (none
 // when browsing).
 const formatMeta = (result: KnowledgeResult) =>
-  [result.models[0], result.page ? `p. ${result.page}` : null, `Rev ${result.versionNumber}`].filter(Boolean).join(" · ");
+  [result.models[0], result.page ? `p. ${result.page}` : null, `Rev ${result.versionNumber}`]
+    .filter(Boolean)
+    .join(" · ");
 
 interface KnowledgeResultCardProps {
   result: KnowledgeResult;
@@ -42,8 +45,14 @@ export const KnowledgeResultCard = ({ result, navigation }: KnowledgeResultCardP
         <span className="ml-auto text-xs text-mutedGray">{formatMeta(result)}</span>
       </div>
       <span className="text-base font-medium text-ink">{result.title}</span>
-      {result.heading && <span className="text-xs font-medium uppercase tracking-wide text-mutedGray">{result.heading}</span>}
-      {result.snippet && <span className="text-[15px] text-bodyGray">{result.snippet}</span>}
+      {result.heading && (
+        <span className="text-xs font-medium uppercase tracking-wide text-mutedGray">{result.heading}</span>
+      )}
+      {result.snippet && (
+        <span className="text-[15px] text-bodyGray">
+          <HighlightedSnippet text={result.snippet} highlights={result.highlights} />
+        </span>
+      )}
     </ClickableRow>
   );
 };

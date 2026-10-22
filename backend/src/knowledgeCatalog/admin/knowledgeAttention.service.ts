@@ -38,9 +38,8 @@ export class KnowledgeAttentionService {
 
   list = async (actor: AuthenticatedUser): Promise<KnowledgeAttention> => {
     const access = await this.knowledgeAccess.resolve(actor);
-    const rows = await this.databaseService.withTenant(
-      actor.tenantId,
-      (client) => listAttentionDocuments(client, access),
+    const rows = await this.databaseService.withActor(actor, (client) =>
+      listAttentionDocuments(client, access),
     );
     const counts = emptyCounts();
     for (const row of rows) counts[row.reason] += 1;

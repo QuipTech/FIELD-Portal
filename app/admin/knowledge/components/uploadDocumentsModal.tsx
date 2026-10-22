@@ -1,5 +1,8 @@
 "use client";
 
+import { KnowledgeClassificationFields } from "@/components/knowledge/knowledgeClassificationFields";
+import { KnowledgeModelFields } from "@/components/knowledge/knowledgeModelFields";
+import type { KnowledgeClassification } from "@/lib/types/knowledgeBrand";
 import { useState, type FormEvent } from "react";
 import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
@@ -12,19 +15,30 @@ import type { PendingUpload } from "../useKnowledgeUploads";
 
 interface UploadDocumentsModalProps {
   files: File[];
-  onUpload: (uploads: PendingUpload[], type: KnowledgeDocumentType) => void;
+  onUpload: (uploads: PendingUpload[], type: KnowledgeDocumentType, classification: KnowledgeClassification) => void;
   onClose: () => void;
 }
 
 // Files that break the upload rules are listed with the reason and left out.
 export const UploadDocumentsModal = ({ files, onUpload, onClose }: UploadDocumentsModalProps) => {
+  const [classification, setClassification] = useState<KnowledgeClassification>({
+    brandId: "",
+    categoryId: "",
+    machineModelIds: [],
+  });
   const { can } = usePermissions();
   const [type, setType] = useState<KnowledgeDocumentType>("manual");
   const [pending, setPending] = useState<PendingUpload[]>(() =>
-    files.filter((file) => !findKnowledgeFileProblem(file)).map((file) => ({ file, title: titleFromFileName(file.name) })),
+    files
+      .filter((file) => !findKnowledgeFileProblem(file))
+      .map((file) => ({ file, title: titleFromFileName(file.name) })),
   );
   const rejected = files.filter((file) => findKnowledgeFileProblem(file));
-  const canUpload = pending.length > 0 && pending.every((item) => item.title.trim());
+  const canUpload =
+    classification.brandId &&
+    classification.categoryId &&
+    pending.length > 0 &&
+    pending.every((item) => item.title.trim());
 
   const renameUpload = (index: number, title: string) =>
     setPending((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, title } : item)));
@@ -32,16 +46,25 @@ export const UploadDocumentsModal = ({ files, onUpload, onClose }: UploadDocumen
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (!canUpload) return;
-    onUpload(pending.map((item) => ({ ...item, title: item.title.trim() })), type);
+    onUpload(
+      pending.map((item) => ({ ...item, title: item.title.trim() })),
+      type,
+      classification,
+    );
     onClose();
   };
 
   return (
     <Modal title="Upload documents" onClose={onClose} widthClassName="w-[520px]">
       <form onSubmit={handleSubmit} className="flex flex-col gap-3.5 p-5">
+        <KnowledgeClassificationFields value={classification} onChange={setClassification} required />
+        <KnowledgeModelFields
+          value={classification.machineModelIds ?? []}
+          onChange={(ids) => setClassification({ ...classification, machineModelIds: ids })}
+        />
         <div className="flex flex-col gap-1.5">
           <span className="text-xs font-medium uppercase tracking-wide text-mutedGray">Type</span>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {knowledgeDocumentTypes.map((option) => (
               <Button
                 key={option.value}
@@ -58,7 +81,12 @@ export const UploadDocumentsModal = ({ files, onUpload, onClose }: UploadDocumen
         {pending.map((item, index) => (
           <div key={`${item.file.name}-${index}`} className="flex flex-col gap-1.5">
             <span className="truncate text-xs text-mutedGray">{item.file.name}</span>
-            <Input value={item.title} onChange={(event) => renameUpload(index, event.target.value)} maxLength={300} required />
+            <Input
+              value={item.title}
+              onChange={(event) => renameUpload(index, event.target.value)}
+              maxLength={300}
+              required
+            />
           </div>
         ))}
         {rejected.map((file) => (
@@ -68,8 +96,8 @@ export const UploadDocumentsModal = ({ files, onUpload, onClose }: UploadDocumen
         ))}
         <span className="text-xs text-mutedGray">
           {can(PERMISSIONS.managePlatform)
-            ? "Shared with every organisation once indexed and approved."
-            : "Available to your organisation once indexed."}{" "}
+            ? "Available to every organisation once approved."
+            : "Available to your organisation after review."}{" "}
           Files go straight to secure storage.
         </span>
         <div className="flex">

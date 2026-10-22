@@ -1,5 +1,9 @@
 // A shared knowledge item joined with its latest document version.
 export interface KnowledgeDocumentRow {
+  brand_id: string;
+  category_id: string;
+  document_type: string;
+  machine_model_ids: string[];
   id: string;
   // NULL for the shared library.
   tenant_id: string | null;

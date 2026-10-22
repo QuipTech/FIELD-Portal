@@ -11,15 +11,15 @@ import { JwtAuthGuard } from '../../auth/guards/jwtAuthGuard';
 import { CurrentUser } from '../../auth/decorators/currentUser.decorator';
 import { AuthenticatedUser } from '../../auth/types/authenticatedUser';
 import { CatalogFacetsQueryDto } from '../dto/catalogFacetsQueryDto';
-import { ListCatalogDocumentsQueryDto } from '../dto/listCatalogDocumentsQueryDto';
 import { SearchCatalogQueryDto } from '../dto/searchCatalogQueryDto';
 import { DocumentPagesService } from '../pages/documentPages.service';
 import { CatalogSearchService } from '../search/catalogSearch.service';
 import { CatalogDocumentsService } from './catalogDocuments.service';
 
-// Browsing, searching and reading documents. Non-admins only ever see live
-// documents; a brand outside the plan is hidden from lists and 403 when
-// opened directly (catalogDocumentAccess.ts).
+// The app's reader: page-level search, facets, a document's contents, its
+// pages and its file. Non-admins only ever see live documents; anything the
+// caller can't read is 404 (catalogDocumentAccess.ts). Listing documents
+// and their detail are GET /knowledge/documents[/:id] (knowledgeBrands).
 @Controller('knowledge')
 @UseGuards(JwtAuthGuard)
 export class CatalogDocumentsController {
@@ -29,15 +29,7 @@ export class CatalogDocumentsController {
     private readonly search: CatalogSearchService,
   ) {}
 
-  @Get('documents')
-  list(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Query() query: ListCatalogDocumentsQueryDto,
-  ) {
-    return this.documents.list(actor, query);
-  }
-
-  @Get('search')
+  @Get('search/pages')
   searchPages(
     @CurrentUser() actor: AuthenticatedUser,
     @Query() query: SearchCatalogQueryDto,
@@ -53,12 +45,12 @@ export class CatalogDocumentsController {
     return this.search.getFacets(actor, query);
   }
 
-  @Get('documents/:documentId')
-  detail(
+  @Get('documents/:documentId/contents')
+  contents(
     @CurrentUser() actor: AuthenticatedUser,
     @Param('documentId', ParseUUIDPipe) documentId: string,
   ) {
-    return this.documents.getDetail(actor, documentId);
+    return this.documents.getContents(actor, documentId);
   }
 
   @Get('documents/:documentId/pages/:page')

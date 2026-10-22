@@ -29,12 +29,11 @@ export class MyKnowledgeService {
   ) {}
 
   // Only documents the caller can still open (a document archived or
-  // dropped from the plan since disappears from the list).
+  // whose brand was deactivated since disappears from the list).
   listRecent = async (actor: AuthenticatedUser): Promise<RecentDocument[]> => {
     const access = await this.knowledgeAccess.resolve(actor);
-    const rows = await this.databaseService.withTenant(
-      actor.tenantId,
-      (client) => myKnowledgeRepository.listRecentDocuments(client, access),
+    const rows = await this.databaseService.withActor(actor, (client) =>
+      myKnowledgeRepository.listRecentDocuments(client, access),
     );
     return rows.map((row) => ({
       ...toCatalogDocument(row, access),
@@ -49,7 +48,7 @@ export class MyKnowledgeService {
     dto: RecordRecentViewDto,
   ): Promise<void> => {
     const access = await this.knowledgeAccess.resolve(actor);
-    await this.databaseService.withTenant(actor.tenantId, async (client) => {
+    await this.databaseService.withActor(actor, async (client) => {
       await loadVisibleDocument(client, access, dto.documentId);
       await myKnowledgeRepository.upsertRecentView(client, {
         tenantId: actor.tenantId,
@@ -65,7 +64,7 @@ export class MyKnowledgeService {
     machineId: string,
     query: PaginationQueryDto,
   ): Promise<Paged<MachineDocument>> => {
-    await this.databaseService.withTenant(actor.tenantId, (client) =>
+    await this.databaseService.withActor(actor, (client) =>
       assertMachineInTenant(client, actor.tenantId, machineId),
     );
     return this.listForMyMachines(
@@ -79,10 +78,8 @@ export class MyKnowledgeService {
     query: ForMyMachinesQueryDto,
   ): Promise<Paged<MachineDocument>> => {
     const access = await this.knowledgeAccess.resolve(actor);
-    const rows = await this.databaseService.withTenant(
-      actor.tenantId,
-      (client) =>
-        myKnowledgeRepository.listDocumentsForMachines(client, access, query),
+    const rows = await this.databaseService.withActor(actor, (client) =>
+      myKnowledgeRepository.listDocumentsForMachines(client, access, query),
     );
     return {
       items: rows.map((row) => ({

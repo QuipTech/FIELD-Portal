@@ -40,15 +40,17 @@ export interface FacetOption {
   documentCount: number;
 }
 
-export interface ModelFacetOption extends FacetOption {
-  brandId: string | null;
+// Categories nest within their brand: build the tree from parentId.
+export interface CategoryFacetOption extends FacetOption {
+  brandId: string;
+  parentId: string | null;
 }
 
 // GET /knowledge/facets — also the body of brand and category detail.
 export interface CatalogFacets {
   brands: FacetOption[];
-  categories: ModelFacetOption[];
-  models: ModelFacetOption[];
+  categories: CategoryFacetOption[];
+  models: FacetOption[];
   types: { type: string; documentCount: number }[];
 }
 

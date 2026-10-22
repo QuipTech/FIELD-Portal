@@ -139,6 +139,8 @@ then point that environment's `DATABASE_URL` at `field_app` instead of
 `postgres` — the app should never run as the migration/superuser role
 outside local dev.
 
+Brand-scoped Knowledge (migrations 0084–0091) supersedes the shared-library visibility described below. See [Knowledge access and rollout](src/knowledgeBrands/README.md) before deploying.
+
 ## Key conventions specific to this app
 
 - Follows the root `CLAUDE.md` NestJS suffix conventions: `<name>.module.ts`,
@@ -638,6 +640,7 @@ read as "not found" rather than "access denied"):
       "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
       "Resource": [
         "arn:aws:s3:::<bucket>/documents/*",
+        "arn:aws:s3:::<bucket>/knowledge/*",
         "arn:aws:s3:::<bucket>/photos/*",
         "arn:aws:s3:::<bucket>/avatars/*",
         "arn:aws:s3:::<bucket>/branding/*",
@@ -723,7 +726,11 @@ archived, and only the caller's organisation + the shared library
 - `DATABASE_URL` — Postgres connection string, `sslmode=verify-full`
 - `JWT_SECRET` — signs access tokens
 - `JWT_REFRESH_SECRET` — signs refresh tokens (must differ from `JWT_SECRET`)
-- `PORTAL_ORIGIN` — allowed CORS origin(s) for the frontend, comma-separated
+- `PORTAL_ORIGIN` — allowed CORS origin(s) for the frontend, comma-separated;
+  also the only pages Face ID / Touch ID (passkey) sign-in is accepted from
+- `WEBAUTHN_RP_ID` — optional; the domain passkeys belong to (defaults to the
+  first `PORTAL_ORIGIN`'s host, e.g. `localhost` in dev). A passkey only works
+  on the domain it was set up on, so keep this stable once users enrol
 - `COGNITO_USER_POOL_ID` — Cognito User Pool that issues Google/Apple ID tokens
 - `COGNITO_CLIENT_ID` — the portal's Cognito app client (the ID token audience)
 - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` — only when not running under

@@ -15,8 +15,7 @@ import { PaginationQueryDto } from '../../common/dto/paginationQueryDto';
 import { MyKnowledgeService } from './myKnowledge.service';
 
 // A machine's Manuals tab: live documents linked to its model that the
-// caller may open (brands in the plan). 404 for a machine outside the
-// caller's organisation.
+// caller may open. 404 for a machine outside the caller's organisation.
 @Controller('machines/:machineId/manuals')
 @UseGuards(JwtAuthGuard, RequirePermissionsGuard)
 export class MachineManualsController {

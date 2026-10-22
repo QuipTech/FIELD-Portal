@@ -22,13 +22,11 @@ export class AiConversationsService {
   listConversations = async (
     actor: AuthenticatedUser,
   ): Promise<AssistantConversation[]> => {
-    const rows = await this.databaseService.withTenant(
-      actor.tenantId,
-      (client) =>
-        aiConversationsRepository.listConversations(client, {
-          tenantId: actor.tenantId,
-          userId: actor.userId,
-        }),
+    const rows = await this.databaseService.withActor(actor, (client) =>
+      aiConversationsRepository.listConversations(client, {
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+      }),
     );
     return rows.map(toAssistantConversation);
   };
@@ -37,8 +35,8 @@ export class AiConversationsService {
     actor: AuthenticatedUser,
     conversationId: string,
   ): Promise<AssistantThread> => {
-    const { conversation, messages } = await this.databaseService.withTenant(
-      actor.tenantId,
+    const { conversation, messages } = await this.databaseService.withActor(
+      actor,
       async (client) => {
         const found = await aiConversationsRepository.findConversation(client, {
           tenantId: actor.tenantId,
@@ -57,7 +55,7 @@ export class AiConversationsService {
     );
     const sources = await aiConversationsRepository.listMessageSources(
       this.databaseService,
-      { tenantId: actor.tenantId, conversationId },
+      { tenantId: actor.tenantId, conversationId, userId: actor.userId },
     );
     return {
       conversation: toAssistantConversation(conversation),

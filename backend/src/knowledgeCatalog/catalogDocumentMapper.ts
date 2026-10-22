@@ -3,13 +3,15 @@ import { toSectionAnchor, toSectionId } from '../knowledge/sectionId';
 import { KnowledgeAccess } from './access/knowledgeAccess';
 import {
   CatalogDocumentRow,
+  CategoryFacetRow,
   CountedCatalogDocumentRow,
   FacetRow,
 } from './types/catalogRows';
 import {
   CatalogDocument,
+  CategoryFacetOption,
   DocumentSectionRef,
-  ModelFacetOption,
+  FacetOption,
   NamedRef,
 } from './types/catalogResponse';
 
@@ -42,11 +44,18 @@ export const toCatalogDocument = (
 export const toTotal = (rows: CountedCatalogDocumentRow[]): number =>
   rows.length ? Number(rows[0].total_count) : 0;
 
-export const toFacetOption = (row: FacetRow): ModelFacetOption => ({
+export const toFacetOption = (row: FacetRow): FacetOption => ({
   id: row.id,
   name: row.name,
-  brandId: row.brand_id,
   documentCount: Number(row.document_count),
+});
+
+export const toCategoryFacetOption = (
+  row: CategoryFacetRow,
+): CategoryFacetOption => ({
+  ...toFacetOption(row),
+  brandId: row.brand_id,
+  parentId: row.parent_id,
 });
 
 export const toSectionRef = (section: {

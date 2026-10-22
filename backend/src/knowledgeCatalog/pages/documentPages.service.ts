@@ -29,8 +29,8 @@ export class DocumentPagesService {
     page: number,
   ): Promise<CatalogDocumentPage> => {
     const access = await this.knowledgeAccess.resolve(actor);
-    const loaded = await this.databaseService.withTenant(
-      actor.tenantId,
+    const loaded = await this.databaseService.withActor(
+      actor,
       async (client) => {
         const row = await loadReadableDocument(client, access, itemId);
         if (page < 1 || (row.page_count !== null && page > row.page_count)) {

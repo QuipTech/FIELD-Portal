@@ -20,7 +20,7 @@ const LICENCE_WARNING_DAYS = 30;
 
 // Documents an admin needs to act on, most urgent reason first: the
 // organisation's own, plus the shared library for platform admins (the
-// only ones who can change it). Run inside withTenant(caller).
+// only ones who can change it). Run inside withActor(caller).
 export const listAttentionDocuments = async (
   client: PoolClient,
   access: KnowledgeAccess,

@@ -6,7 +6,15 @@ import { KnowledgeLibraryView } from "./components/knowledgeLibraryView";
 
 interface KnowledgeSearchPageProps {
   // e.g. /knowledge?model=<machine model id>&q=suspension
-  searchParams: { q?: string; type?: string; make?: string; model?: string };
+  searchParams: {
+    q?: string;
+    type?: string;
+    make?: string;
+    model?: string;
+    brandId?: string;
+    categoryId?: string;
+    page?: string;
+  };
 }
 
 const toDocumentType = (value: string | undefined): KnowledgeDocumentType | "" =>
@@ -14,6 +22,9 @@ const toDocumentType = (value: string | undefined): KnowledgeDocumentType | "" =
 
 const KnowledgeSearchPage = ({ searchParams }: KnowledgeSearchPageProps) => {
   const initialFilters: KnowledgeLibraryFilters = {
+    brandId: searchParams.brandId ?? "",
+    categoryId: searchParams.categoryId ?? "",
+    page: searchParams.page ?? "1",
     search: searchParams.q ?? "",
     type: toDocumentType(searchParams.type),
     make: searchParams.make ?? "",

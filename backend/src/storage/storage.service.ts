@@ -37,10 +37,11 @@ export class StorageService {
   uploadDocument = (
     file: IncomingFile | undefined,
     tenantId: string,
+    knowledgeKey?: string,
   ): Promise<StoredFile> => {
     const { contentType } = validateIncomingFile(file, DOCUMENT_RULE);
     return this.storeFile(
-      buildDocumentKey(tenantId, file!.originalname),
+      knowledgeKey ?? buildDocumentKey(tenantId, file!.originalname),
       file!,
       contentType,
     );

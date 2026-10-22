@@ -1,4 +1,5 @@
-import { Transform } from 'class-transformer';
+import { KnowledgeClassificationDto } from '../../knowledgeBrands/dto/knowledgeBrandDto';
+import { Expose, Transform } from 'class-transformer';
 import {
   IsIn,
   IsOptional,
@@ -15,7 +16,7 @@ const trimToUndefined = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() || undefined : value;
 
 // Multipart form fields sent alongside the `file` part.
-export class UploadDocumentDto {
+export class UploadDocumentDto extends KnowledgeClassificationDto {
   // Defaults to the file name when left out.
   @IsOptional()
   @Transform(trimToUndefined)
@@ -24,6 +25,8 @@ export class UploadDocumentDto {
   @MaxLength(300)
   title?: string;
 
+  @Expose()
+  @Transform(({ value, obj }) => value ?? obj.documentType)
   @IsIn(KNOWLEDGE_DOCUMENT_TYPES)
   type: KnowledgeDocumentType;
 }

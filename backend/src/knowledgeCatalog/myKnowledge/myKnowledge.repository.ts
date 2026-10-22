@@ -32,13 +32,13 @@ export interface MachineDocumentRow extends CountedCatalogDocumentRow {
   matched_machines: MatchedMachine[];
 }
 
-// The documents the caller can read right now (live, brand in plan).
+// The documents the caller can read right now (live, active brand).
 const withReadable = (access: KnowledgeAccess, params: unknown[]): string =>
   `WITH ${CATALOG_CTE}, scoped AS (SELECT c.* FROM catalog c ${toWhereClause(
     buildCatalogConditions(access, {}, params, { readableOnly: true }),
   )})`;
 
-// Run inside withTenant(caller).
+// Run inside withActor(caller).
 
 export const findLastViewedPage = async (
   client: PoolClient,

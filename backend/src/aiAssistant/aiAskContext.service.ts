@@ -16,7 +16,7 @@ import * as aiConversationsRepository from './aiConversations.repository';
 import { toThreadTitle } from './aiAssistantMapper';
 import { formatMachineContext } from './formatMachineContext';
 import { AskAssistantDto } from './dto/askAssistantDto';
-import { AiRetrievalService } from './aiRetrieval.service';
+import { AiRetrievalService, hasAskScope } from './aiRetrieval.service';
 import { assertFullMachineAccess } from '../machineLifecycle/activeMachine/activeMachine.repository';
 
 // Earlier messages resent with each question (5 exchanges).
@@ -60,11 +60,14 @@ export class AiAskContextService {
     actor: AuthenticatedUser,
     dto: AskAssistantDto,
   ): Promise<PreparedQuestion> => {
-    const scope = { documentId: dto.documentId, brandId: dto.brandId };
+    const scope = {
+      documentId: dto.documentId,
+      brandId: dto.brandId,
+      categoryId: dto.categoryId,
+    };
     await this.retrieval.assertScopeAllowed(actor, scope);
-    const thread = await this.databaseService.withTenant(
-      actor.tenantId,
-      (client) => this.loadThread(client, actor, dto),
+    const thread = await this.databaseService.withActor(actor, (client) =>
+      this.loadThread(client, actor, dto),
     );
     const chunks = await this.retrieval.retrieveChunks(
       actor,
@@ -84,7 +87,9 @@ export class AiAskContextService {
         question: dto.question,
         chunks,
         image: dto.image,
-        history: thread.history,
+        // A scoped question ignores the thread so far: earlier answers
+        // may come from sources outside the chosen scope.
+        history: hasAskScope(scope) ? [] : thread.history,
         systemPrompt: thread.systemPrompt,
         machineContext: thread.machineContext,
       },

@@ -37,9 +37,8 @@ export class CatalogSearchService {
     query: SearchCatalogQueryDto,
   ): Promise<Paged<CatalogSearchHit>> => {
     const access = await this.knowledgeAccess.resolve(actor);
-    const rows = await this.databaseService.withTenant(
-      actor.tenantId,
-      (client) => searchCatalogPages(client, access, query),
+    const rows = await this.databaseService.withActor(actor, (client) =>
+      searchCatalogPages(client, access, query),
     );
     return {
       items: rows.map((row) => ({
@@ -63,7 +62,7 @@ export class CatalogSearchService {
     query: CatalogFacetsQueryDto,
   ): Promise<CatalogFacets> => {
     const access = await this.knowledgeAccess.resolve(actor);
-    return this.databaseService.withTenant(actor.tenantId, (client) =>
+    return this.databaseService.withActor(actor, (client) =>
       loadCatalogFacets(client, access, query),
     );
   };

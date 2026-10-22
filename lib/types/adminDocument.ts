@@ -1,21 +1,20 @@
 import type { IconName } from "@/components/icons/icon";
 import type { Tone } from "@/components/ui/tone";
 
-export type KnowledgeDocumentType = "manual" | "bulletin" | "procedure" | "policy" | "parts_book";
+export type KnowledgeDocumentType =
+  "guide" | "knownIssue" | "manual" | "bulletin" | "procedure" | "policy" | "parts_book";
 export type KnowledgeDocumentState =
-  | "uploading"
-  | "queued"
-  | "indexing"
-  | "failed"
-  | "needs_review"
-  | "live"
-  | "archived";
+  "uploading" | "queued" | "indexing" | "failed" | "needs_review" | "live" | "archived";
 
 // States that change on their own (the backend worker); poll until final.
 export const IN_PROGRESS_DOCUMENT_STATES: KnowledgeDocumentState[] = ["queued", "indexing"];
 
 // One document in the shared knowledge library (visible to every organisation).
 export interface KnowledgeDocument {
+  brandId?: string;
+  categoryId?: string;
+  documentType?: string;
+  machineModelIds?: string[];
   id: string;
   // True for the QuipTech library every organisation shares.
   isShared: boolean;
@@ -66,6 +65,9 @@ export interface KnowledgeUploadTicket {
 }
 
 export interface CreateKnowledgeUploadPayload {
+  brandId: string;
+  categoryId: string;
+  machineModelIds?: string[];
   title: string;
   type: KnowledgeDocumentType;
   fileName: string;
@@ -74,6 +76,8 @@ export interface CreateKnowledgeUploadPayload {
 }
 
 export const knowledgeDocumentTypes: { value: KnowledgeDocumentType; label: string }[] = [
+  { value: "guide", label: "Guide" },
+  { value: "knownIssue", label: "Known issue" },
   { value: "manual", label: "Manual" },
   { value: "bulletin", label: "Bulletin" },
   { value: "procedure", label: "Procedure" },
@@ -111,6 +115,8 @@ export interface DocumentStatus {
 }
 
 export const documentTypeIcon: Record<string, { icon: IconName; tone: Tone }> = {
+  guide: { icon: "file", tone: "default" },
+  knownIssue: { icon: "alert", tone: "amber" },
   manual: { icon: "book", tone: "default" },
   bulletin: { icon: "alert", tone: "amber" },
   procedure: { icon: "file", tone: "default" },

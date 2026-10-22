@@ -6,32 +6,20 @@ import { Button } from "@/components/ui/button";
 import type { ArticleNavigation } from "@/lib/knowledge/knowledgeLinks";
 import type { KnowledgeArticle } from "@/lib/types/knowledgeArticle";
 
-interface OfflineCopyControls {
-  isSaved: boolean;
-  isJustSaved: boolean;
-  hasPdf: boolean;
-  isBusy: boolean;
-  save: () => void;
-  remove: () => void;
-}
-
 interface ArticleHeaderBarProps {
   title: string;
   article: KnowledgeArticle | null;
   navigation: ArticleNavigation;
-  offline: OfflineCopyControls;
   onDownload: () => void;
 }
-
-const PDF_NOT_SAVED_NOTE = "The article is saved; its PDF couldn't be saved for offline use.";
 
 const linkButtonClasses =
   "inline-flex h-9 flex-none items-center gap-2 rounded-lg border border-borderGrayStrong bg-surface px-3.5 text-[15px] font-medium text-ink hover:bg-surfaceGray";
 
 // "Knowledge › {title}" (back to the same results, or "Manuals" inside a
 // machine page), then Open PDF,
-// Download and Save offline.
-export const ArticleHeaderBar = ({ title, article, navigation, offline, onDownload }: ArticleHeaderBarProps) => (
+// Download. Brand access is checked online.
+export const ArticleHeaderBar = ({ title, article, navigation, onDownload }: ArticleHeaderBarProps) => (
   <div className="flex flex-none items-center gap-2.5 border-b border-slate-200/80 bg-surface px-6 py-4">
     <Link href={navigation.listHref} className="text-[15px] text-bodyGray hover:text-ink">
       {navigation.listLabel}
@@ -50,24 +38,9 @@ export const ArticleHeaderBar = ({ title, article, navigation, offline, onDownlo
           <Icon name="download" />
           Download
         </Button>
-        {offline.isJustSaved && (
-          <Button disabled title={offline.hasPdf ? undefined : PDF_NOT_SAVED_NOTE}>
-            <Icon name="check" />
-            Saved offline ✓
-          </Button>
-        )}
-        {offline.isSaved && !offline.isJustSaved && (
-          <Button onClick={offline.remove} disabled={offline.isBusy} title={offline.hasPdf ? undefined : PDF_NOT_SAVED_NOTE}>
-            <Icon name="x" />
-            Remove offline copy
-          </Button>
-        )}
-        {!offline.isSaved && (
-          <Button onClick={offline.save} disabled={offline.isBusy}>
-            <Icon name="cloud" />
-            {offline.isBusy ? "Saving…" : "Save offline"}
-          </Button>
-        )}
+        <span className="text-xs text-mutedGray" title="Knowledge access is checked online.">
+          Online access required
+        </span>
       </div>
     )}
   </div>

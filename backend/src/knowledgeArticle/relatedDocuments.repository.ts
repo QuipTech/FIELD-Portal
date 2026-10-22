@@ -12,7 +12,7 @@ const SAME_MODEL_DOCUMENTS = `
   JOIN documents d ON d.knowledge_item_id = ki.id
                   AND d.deleted_at IS NULL AND d.live_version_id IS NOT NULL
   WHERE ki.id <> $1 AND ki.deleted_at IS NULL AND ki.status NOT IN ('archived', 'review')
-    AND (ki.tenant_id IS NULL OR ki.tenant_id = $2)
+    AND knowledge_can_read_document(d.id,$2)
     AND EXISTS (
       SELECT 1 FROM knowledge_item_machine_models km
       JOIN knowledge_item_machine_models mine

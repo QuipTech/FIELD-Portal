@@ -18,7 +18,7 @@ const HEADLINE_OPTIONS =
 // comes from document_pages; versions indexed before pages were saved use
 // their chunks (each keeps the page it starts on). The hit's section is the
 // best-matching one starting on that page, else the one running onto it.
-// Run inside withTenant(caller).
+// Run inside withActor(caller).
 export const searchCatalogPages = async (
   client: PoolClient,
   access: KnowledgeAccess,

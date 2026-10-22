@@ -6,19 +6,12 @@ import { toDocumentDisplayTitle } from '../../knowledge/documentDisplayTitle';
 import { loadArticleSections } from '../../knowledgeArticle/loadArticleSections';
 import { toArticleSummary } from '../../knowledgeArticle/articleSummary';
 import { KnowledgeAccessService } from '../access/knowledgeAccess.service';
-import {
-  toCatalogDocument,
-  toSectionRef,
-  toTotal,
-} from '../catalogDocumentMapper';
-import { ListCatalogDocumentsQueryDto } from '../dto/listCatalogDocumentsQueryDto';
+import { toCatalogDocument, toSectionRef } from '../catalogDocumentMapper';
 import { findLastViewedPage } from '../myKnowledge/myKnowledge.repository';
-import { CatalogDocument, Paged } from '../types/catalogResponse';
 import {
-  CatalogDocumentDetail,
+  CatalogDocumentContents,
   CatalogDocumentFile,
 } from '../types/catalogDocumentResponse';
-import { listCatalogDocuments } from './catalogDocuments.repository';
 import {
   loadReadableDocument,
   loadVisibleDocument,
@@ -35,29 +28,12 @@ export class CatalogDocumentsService {
     private readonly knowledgeAccess: KnowledgeAccessService,
   ) {}
 
-  list = async (
-    actor: AuthenticatedUser,
-    query: ListCatalogDocumentsQueryDto,
-  ): Promise<Paged<CatalogDocument>> => {
-    const access = await this.knowledgeAccess.resolve(actor);
-    const rows = await this.databaseService.withTenant(
-      actor.tenantId,
-      (client) => listCatalogDocuments(client, access, query),
-    );
-    return {
-      items: rows.map((row) => toCatalogDocument(row, access)),
-      total: toTotal(rows),
-      page: query.page,
-      pageSize: query.pageSize,
-    };
-  };
-
-  getDetail = async (
+  getContents = async (
     actor: AuthenticatedUser,
     itemId: string,
-  ): Promise<CatalogDocumentDetail> => {
+  ): Promise<CatalogDocumentContents> => {
     const access = await this.knowledgeAccess.resolve(actor);
-    return this.databaseService.withTenant(actor.tenantId, async (client) => {
+    return this.databaseService.withActor(actor, async (client) => {
       const row = await loadVisibleDocument(client, access, itemId);
       const sections = row.live_version_id
         ? await loadArticleSections(client, {
@@ -83,9 +59,8 @@ export class CatalogDocumentsService {
     itemId: string,
   ): Promise<CatalogDocumentFile> => {
     const access = await this.knowledgeAccess.resolve(actor);
-    const row = await this.databaseService.withTenant(
-      actor.tenantId,
-      (client) => loadReadableDocument(client, access, itemId),
+    const row = await this.databaseService.withActor(actor, (client) =>
+      loadReadableDocument(client, access, itemId),
     );
     if (!row.storage_key) throw new ConflictException(FILE_NOT_READY_MESSAGE);
     const signed = await this.storageService.getSignedDownloadUrl(

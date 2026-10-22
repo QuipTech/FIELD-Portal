@@ -13,13 +13,17 @@ export const buildVisibleItemsCte = (
 ): string => {
   const conditions = [
     'ki.deleted_at IS NULL',
-    "ki.status <> 'archived'",
-    '(ki.tenant_id IS NULL OR ki.tenant_id = $1)',
+    "ki.status NOT IN ('archived','withdrawn')",
+    'knowledge_can_read_document(d.id,$1)',
   ];
   const addParam = (value: unknown) => {
     params.push(value);
     return `$${params.length}`;
   };
+  if (filters.brandId)
+    conditions.push(`d.brand_id = ${addParam(filters.brandId)}`);
+  if (filters.categoryId)
+    conditions.push(`d.category_id = ${addParam(filters.categoryId)}`);
   if (filters.type) conditions.push(`ki.type = ${addParam(filters.type)}`);
   if (filters.make) {
     conditions.push(`EXISTS (
@@ -34,7 +38,7 @@ export const buildVisibleItemsCte = (
   }
   return `visible AS (
     SELECT ki.id, ki.title, ki.type, ki.tenant_id, ki.source_oem, ki.updated_at,
-           d.id AS document_id, d.live_version_id, v.version_number
+           d.id AS document_id, d.live_version_id, v.version_number, d.brand_id, d.category_id, d.document_type
     FROM knowledge_items ki
     JOIN documents d ON d.knowledge_item_id = ki.id
                     AND d.deleted_at IS NULL AND d.live_version_id IS NOT NULL
@@ -47,7 +51,7 @@ export const buildVisibleItemsCte = (
 // relation `b` (chunk_text, page_number, section_heading).
 export const RESULT_COLUMNS = `
   vi.id, vi.title, vi.type, vi.tenant_id, vi.source_oem, vi.updated_at,
-  vi.version_number, vi.live_version_id, b.chunk_text, b.page_number, b.section_heading,
+  vi.version_number, vi.live_version_id, vi.brand_id,vi.category_id,vi.document_type, b.chunk_text, b.page_number, b.section_heading,
   (SELECT array_agg(mf.name || ' ' || mm.name ORDER BY km.mention_count DESC)
      FROM knowledge_item_machine_models km
      JOIN machine_models mm ON mm.id = km.machine_model_id

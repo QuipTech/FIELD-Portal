@@ -28,7 +28,7 @@ export class AdminDashboardService {
     actor: AuthenticatedUser,
   ): Promise<AdminDashboard> => {
     const access = await this.knowledgeAccess.resolve(actor);
-    return this.databaseService.withTenant(actor.tenantId, async (client) => {
+    return this.databaseService.withActor(actor, async (client) => {
       const capabilities = toMeCapabilities(
         await findUserPermissionCodes(client, actor.userId),
       );
@@ -45,7 +45,7 @@ export class AdminDashboardService {
         actor.tenantId,
       );
       // Admin access so the status filter applies, whatever the caller's
-      // Knowledge role; brands still follow the plan.
+      // Knowledge role; what may be read still follows brand access.
       const bulletins = await listCatalogDocuments(
         client,
         { ...access, isAdmin: true },

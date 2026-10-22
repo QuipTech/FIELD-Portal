@@ -1,6 +1,6 @@
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
-import { KnowledgeAccess, assertCanOpenBrand } from '../access/knowledgeAccess';
+import { KnowledgeAccess } from '../access/knowledgeAccess';
 import { CatalogDocumentRow } from '../types/catalogRows';
 import { findCatalogDocument } from './catalogDocuments.repository';
 
@@ -11,9 +11,8 @@ const isReadable = (row: CatalogDocumentRow): boolean =>
   row.live_version_id !== null &&
   !['archived', 'withdrawn'].includes(row.status);
 
-// 404 for anything the caller can't see (another organisation's, or not
-// live for a non-admin), so ids give nothing away; 403 only when the
-// document is visible but its brand isn't in the plan.
+// 404 for anything the caller can't see (another organisation's, an
+// inactive brand's, or not live for a non-admin), so ids give nothing away.
 export const loadVisibleDocument = async (
   client: PoolClient,
   access: KnowledgeAccess,
@@ -23,7 +22,6 @@ export const loadVisibleDocument = async (
   if (!row || (!access.isAdmin && !isReadable(row))) {
     throw new NotFoundException(NOT_FOUND_MESSAGE);
   }
-  assertCanOpenBrand(access, row.brand_id);
   return row;
 };
 

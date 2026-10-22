@@ -107,7 +107,7 @@ beforeAll(async () => {
       {
         provide: DatabaseService,
         useValue: {
-          withTenant: (_tenantId: string, work: (client: unknown) => unknown) =>
+          withActor: (_actor: unknown, work: (client: unknown) => unknown) =>
             work(fakeClient),
         },
       },

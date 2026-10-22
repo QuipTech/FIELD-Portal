@@ -35,8 +35,12 @@ export interface CountedCatalogDocumentRow extends CatalogDocumentRow {
 export interface FacetRow {
   id: string;
   name: string;
-  brand_id: string | null;
   document_count: string;
+}
+
+export interface CategoryFacetRow extends FacetRow {
+  brand_id: string;
+  parent_id: string | null;
 }
 
 export interface TypeFacetRow {

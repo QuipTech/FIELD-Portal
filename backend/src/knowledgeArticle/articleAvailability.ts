@@ -15,7 +15,8 @@ export interface UnreadableArticle {
 export const findArticleBlocker = (
   row: ArticleDocumentRow,
 ): UnreadableArticle | null =>
-  row.live_version_id && !['archived', 'review'].includes(row.status)
+  row.live_version_id &&
+  !['archived', 'review', 'withdrawn'].includes(row.status)
     ? null
     : {
         state: deriveDocumentState(row.status, row.latest_ingestion_status),

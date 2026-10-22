@@ -8,26 +8,21 @@ import {
 import { JwtAuthGuard } from '../../auth/guards/jwtAuthGuard';
 import { CurrentUser } from '../../auth/decorators/currentUser.decorator';
 import { AuthenticatedUser } from '../../auth/types/authenticatedUser';
-import { KnowledgeBrandsService } from './knowledgeBrands.service';
+import { CatalogBrandsService } from './catalogBrands.service';
 
-// The app's Knowledge home: brands in the organisation's plan, then each
-// brand's categories and models. Any signed-in user.
+// One brand or category with its categories, models and document types,
+// for the app's Knowledge home. Any signed-in user.
 @Controller('knowledge')
 @UseGuards(JwtAuthGuard)
-export class KnowledgeBrandsController {
-  constructor(private readonly knowledgeBrands: KnowledgeBrandsService) {}
-
-  @Get('brands')
-  listBrands(@CurrentUser() actor: AuthenticatedUser) {
-    return this.knowledgeBrands.listBrands(actor);
-  }
+export class CatalogBrandsController {
+  constructor(private readonly catalogBrands: CatalogBrandsService) {}
 
   @Get('brands/:brandId')
   getBrand(
     @CurrentUser() actor: AuthenticatedUser,
     @Param('brandId', ParseUUIDPipe) brandId: string,
   ) {
-    return this.knowledgeBrands.getBrand(actor, brandId);
+    return this.catalogBrands.getBrand(actor, brandId);
   }
 
   @Get('categories/:categoryId')
@@ -35,6 +30,6 @@ export class KnowledgeBrandsController {
     @CurrentUser() actor: AuthenticatedUser,
     @Param('categoryId', ParseUUIDPipe) categoryId: string,
   ) {
-    return this.knowledgeBrands.getCategory(actor, categoryId);
+    return this.catalogBrands.getCategory(actor, categoryId);
   }
 }

@@ -22,6 +22,29 @@ export const insertTenant = async (
   return result.rows[0].id;
 };
 
+export interface KnowledgeBrandFixture {
+  brandId: string;
+  categoryId: string;
+}
+
+// A Knowledge brand (migration 0084) with one top-level category.
+export const insertKnowledgeBrand = async (
+  client: Client,
+  name: string,
+  isActive = true,
+): Promise<KnowledgeBrandFixture> => {
+  const brand = await client.query<{ id: string }>(
+    `INSERT INTO knowledge_brands (name, slug, is_active) VALUES ($1, $2, $3) RETURNING id`,
+    [name, `isolation-test-${name.toLowerCase()}-${Date.now()}`, isActive],
+  );
+  const category = await client.query<{ id: string }>(
+    `INSERT INTO knowledge_categories (brand_id, name, slug)
+     VALUES ($1, 'Engine', 'engine') RETURNING id`,
+    [brand.rows[0].id],
+  );
+  return { brandId: brand.rows[0].id, categoryId: category.rows[0].id };
+};
+
 export const asTenantRole = async (client: Client, tenantId: string) => {
   await client.query(`SET LOCAL ROLE ${TENANT_ROLE}`);
   await client.query("SELECT set_config('app.tenant_id', $1, true)", [

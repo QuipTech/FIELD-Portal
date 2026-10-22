@@ -1,7 +1,7 @@
 import { CatalogDocument, DocumentSectionRef } from './catalogResponse';
 
-// GET /knowledge/documents/:id
-export interface CatalogDocumentDetail extends CatalogDocument {
+// GET /knowledge/documents/:id/contents
+export interface CatalogDocumentContents extends CatalogDocument {
   // The saved AI summary, else the first section's opening paragraph.
   summary: string | null;
   // Table of contents of the live version; empty when nothing is live.

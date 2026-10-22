@@ -16,7 +16,7 @@ import {
   SectionRow,
 } from '../types/catalogRows';
 
-// Run inside withTenant(caller).
+// Run inside withActor(caller).
 
 export const listCatalogDocuments = async (
   client: PoolClient,
@@ -39,8 +39,8 @@ export const listCatalogDocuments = async (
   return result.rows;
 };
 
-// Any item the organisation can see, whatever its state or brand: the
-// caller decides between 404 and 403 (catalogDocumentAccess.ts).
+// Any item the caller can read, whatever its state: the caller decides
+// what a non-admin may open (catalogDocumentAccess.ts).
 export const findCatalogDocument = async (
   client: PoolClient,
   tenantId: string,

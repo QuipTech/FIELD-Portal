@@ -3,7 +3,7 @@ import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 import { trimString } from '../../common/utils/trimTransforms';
 import { CatalogFilterQueryDto } from './catalogFilterQueryDto';
 
-// GET /knowledge/search
+// GET /knowledge/search/pages
 export class SearchCatalogQueryDto extends CatalogFilterQueryDto {
   // Web-search syntax: words, "exact phrase", -excluded.
   @Transform(trimString)

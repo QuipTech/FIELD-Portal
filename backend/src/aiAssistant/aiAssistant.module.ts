@@ -9,7 +9,6 @@ import { AiConversationsService } from './aiConversations.service';
 import { AiRetrievalService } from './aiRetrieval.service';
 import { AiFeedbackService } from './feedback/aiFeedback.service';
 import { AiUsageService } from './usage/aiUsage.service';
-import { KnowledgeAccessModule } from '../knowledgeCatalog/access/knowledgeAccess.module';
 import { EntitlementsModule } from '../entitlements/entitlements.module';
 import { BillingModule } from '../billing/billing.module';
 
@@ -18,7 +17,6 @@ import { BillingModule } from '../billing/billing.module';
     BedrockModule,
     KnowledgeSearchModule,
     AlertEngineModule,
-    KnowledgeAccessModule,
     EntitlementsModule,
     BillingModule,
   ],

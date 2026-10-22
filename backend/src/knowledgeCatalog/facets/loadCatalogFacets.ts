@@ -1,6 +1,6 @@
 import { PoolClient } from 'pg';
 import { KnowledgeAccess } from '../access/knowledgeAccess';
-import { toFacetOption } from '../catalogDocumentMapper';
+import { toCategoryFacetOption, toFacetOption } from '../catalogDocumentMapper';
 import { CatalogFacets } from '../types/catalogResponse';
 import * as facetsRepository from './catalogFacets.repository';
 
@@ -24,12 +24,8 @@ export const loadCatalogFacets = async (
   );
   const types = await facetsRepository.listTypeFacets(client, access, filters);
   return {
-    brands: brands.map(({ id, name, document_count }) => ({
-      id,
-      name,
-      documentCount: Number(document_count),
-    })),
-    categories: categories.map(toFacetOption),
+    brands: brands.map(toFacetOption),
+    categories: categories.map(toCategoryFacetOption),
     models: models.map(toFacetOption),
     types: types.map((row) => ({
       type: row.type,

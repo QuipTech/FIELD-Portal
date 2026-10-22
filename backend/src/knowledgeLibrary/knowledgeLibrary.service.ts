@@ -1,3 +1,4 @@
+import { snippetHighlights } from './snippetHighlights';
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
@@ -38,13 +39,15 @@ export class KnowledgeLibraryService {
     actor: AuthenticatedUser,
     filters: SearchKnowledgeLibraryQueryDto,
   ): Promise<KnowledgeLibraryResults> => {
-    const { rows, searchMode } = await this.findResults(
-      actor.tenantId,
-      filters,
-    );
-    const makes = await facetsRepository.listMentionedMakes(
-      this.databaseService,
-      actor.tenantId,
+    filters = {
+      ...filters,
+      search: filters.q ?? filters.search,
+      type: filters.documentType ?? filters.type,
+      model: filters.machineModelId ?? filters.model,
+    };
+    const { rows, searchMode } = await this.findResults(actor, filters);
+    const makes = await this.databaseService.withActor(actor, (client) =>
+      facetsRepository.listMentionedMakes(client, actor.tenantId),
     );
     const modelName = filters.model
       ? await facetsRepository.findModelDisplayName(
@@ -52,19 +55,18 @@ export class KnowledgeLibraryService {
           filters.model,
         )
       : null;
-    const sections = await this.findSections(
-      actor.tenantId,
-      filters,
-      rows,
-      searchMode,
-    );
+    const sections = await this.findSections(actor, filters, rows, searchMode);
     return {
-      items: rows.map((row) =>
-        toKnowledgeResult(
+      items: rows.map((row) => {
+        const item = toKnowledgeResult(
           row,
           sections && (sections.get(row.live_version_id) ?? null),
-        ),
-      ),
+        );
+        return {
+          ...item,
+          highlights: snippetHighlights(item.snippet, filters.search),
+        };
+      }),
       total: toTotal(rows),
       searchMode,
       makes,
@@ -76,36 +78,36 @@ export class KnowledgeLibraryService {
   };
 
   private findResults = async (
-    tenantId: string,
+    actor: AuthenticatedUser,
     filters: SearchKnowledgeLibraryQueryDto,
   ): Promise<{ rows: KnowledgeResultRow[]; searchMode: LibrarySearchMode }> => {
     const search = filters.search;
     if (!search) {
       return {
-        rows: await libraryRepository.browseKnowledge(
-          this.databaseService,
-          tenantId,
-          filters,
+        rows: await this.databaseService.withActor(actor, (client) =>
+          libraryRepository.browseKnowledge(client, actor.tenantId, filters),
         ),
         searchMode: 'browse',
       };
     }
-    const queryVector = await this.embedQuery(search, tenantId);
+    const queryVector = await this.embedQuery(search, actor.tenantId);
     if (queryVector) {
       return {
-        rows: await libraryRepository.semanticSearchKnowledge(
-          this.databaseService,
-          tenantId,
-          { ...filters, queryVector },
+        rows: await this.databaseService.withActor(actor, (client) =>
+          libraryRepository.semanticSearchKnowledge(client, actor.tenantId, {
+            ...filters,
+            queryVector,
+          }),
         ),
         searchMode: 'semantic',
       };
     }
     return {
-      rows: await libraryRepository.keywordSearchKnowledge(
-        this.databaseService,
-        tenantId,
-        { ...filters, search },
+      rows: await this.databaseService.withActor(actor, (client) =>
+        libraryRepository.keywordSearchKnowledge(client, actor.tenantId, {
+          ...filters,
+          search,
+        }),
       ),
       searchMode: 'keyword',
     };
@@ -113,14 +115,15 @@ export class KnowledgeLibraryService {
 
   // Each result's best section for the search; null when browsing.
   private findSections = async (
-    tenantId: string,
+    actor: AuthenticatedUser,
     filters: SearchKnowledgeLibraryQueryDto,
     rows: KnowledgeResultRow[],
     searchMode: LibrarySearchMode,
   ): Promise<Map<string, MatchingSectionRow> | null> => {
     if (searchMode === 'browse' || !filters.search) return null;
     const found = await findMatchingSections(this.databaseService, {
-      tenantId,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
       search: filters.search,
       matches: rows.map((row) => ({
         versionId: row.live_version_id,

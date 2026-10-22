@@ -9,7 +9,7 @@ import {
 } from '../types/catalogFilters';
 import { CatalogFilterQueryDto } from './catalogFilterQueryDto';
 
-// GET /knowledge/documents
+// The admin dashboard's document list (listCatalogDocuments).
 export class ListCatalogDocumentsQueryDto extends CatalogFilterQueryDto {
   // Ignored for non-admins, who only ever get live documents.
   @IsOptional()

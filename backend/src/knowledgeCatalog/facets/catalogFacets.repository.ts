@@ -6,7 +6,7 @@ import {
   toWhereClause,
 } from '../catalogScope';
 import { CatalogFilters } from '../types/catalogFilters';
-import { FacetRow, TypeFacetRow } from '../types/catalogRows';
+import { CategoryFacetRow, FacetRow, TypeFacetRow } from '../types/catalogRows';
 
 // `scoped`: the readable documents the caller may open, narrowed by
 // `filters`. Facets count what a technician would find, so admins get the
@@ -25,7 +25,7 @@ const withScoped = (
   };
 };
 
-// Run inside withTenant(caller).
+// Run inside withActor(caller).
 
 export const listBrandFacets = async (
   client: PoolClient,
@@ -34,34 +34,33 @@ export const listBrandFacets = async (
   const scoped = withScoped(access, {});
   const result = await client.query<FacetRow>(
     `${scoped.sql}
-     SELECT mf.id, mf.name, NULL::uuid AS brand_id, count(*) AS document_count
-     FROM scoped c JOIN machine_manufacturers mf ON mf.id = c.brand_id
-     GROUP BY mf.id, mf.name ORDER BY mf.name`,
+     SELECT kb.id, kb.name, count(*) AS document_count
+     FROM scoped c JOIN knowledge_brands kb ON kb.id = c.brand_id
+     GROUP BY kb.id, kb.name, kb.sort_order ORDER BY kb.sort_order, kb.name`,
     scoped.params,
   );
   return result.rows;
 };
 
 // Every category of the brands the caller may open (empty ones included,
-// so a brand page shows its whole structure).
+// so a brand page shows its whole structure). Counts are each category's
+// own documents, not its subcategories'.
 export const listCategoryFacets = async (
   client: PoolClient,
   access: KnowledgeAccess,
   brandId?: string,
-): Promise<FacetRow[]> => {
+): Promise<CategoryFacetRow[]> => {
   const scoped = withScoped(access, { brandId });
-  const params = [...scoped.params, brandId ?? null, access.brandIds];
-  const brandParam = `$${params.length - 1}`;
-  const allowedParam = `$${params.length}`;
-  const result = await client.query<FacetRow>(
+  const params = [...scoped.params, brandId ?? null];
+  const brandParam = `$${params.length}::uuid`;
+  const result = await client.query<CategoryFacetRow>(
     `${scoped.sql}
-     SELECT kc.id, kc.name, kc.manufacturer_id AS brand_id, count(c.id) AS document_count
+     SELECT kc.id, kc.name, kc.brand_id, kc.parent_id, count(c.id) AS document_count
      FROM knowledge_categories kc
      LEFT JOIN scoped c ON c.category_id = kc.id
-     WHERE kc.deleted_at IS NULL
-       AND (${brandParam}::uuid IS NULL OR kc.manufacturer_id = ${brandParam}::uuid)
-       AND (${allowedParam}::uuid[] IS NULL OR kc.manufacturer_id = ANY(${allowedParam}::uuid[]))
-     GROUP BY kc.id, kc.name, kc.manufacturer_id, kc.sort_order
+     WHERE knowledge_has_brand_access(kc.brand_id, $1)
+       AND (${brandParam} IS NULL OR kc.brand_id = ${brandParam})
+     GROUP BY kc.id, kc.name, kc.brand_id, kc.parent_id, kc.sort_order
      ORDER BY kc.sort_order, kc.name`,
     params,
   );
@@ -76,13 +75,13 @@ export const listModelFacets = async (
   const scoped = withScoped(access, filters);
   const result = await client.query<FacetRow>(
     `${scoped.sql}
-     SELECT mm.id, mf.name || ' ' || mm.name AS name, mm.manufacturer_id AS brand_id,
+     SELECT mm.id, mf.name || ' ' || mm.name AS name,
             count(DISTINCT c.id) AS document_count
      FROM scoped c
      JOIN knowledge_item_machine_models km ON km.knowledge_item_id = c.id
      JOIN machine_models mm ON mm.id = km.machine_model_id AND mm.deleted_at IS NULL
      JOIN machine_manufacturers mf ON mf.id = mm.manufacturer_id
-     GROUP BY mm.id, mf.name, mm.name, mm.manufacturer_id
+     GROUP BY mm.id, mf.name, mm.name
      ORDER BY mf.name, mm.name`,
     scoped.params,
   );

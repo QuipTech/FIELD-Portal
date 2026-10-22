@@ -10,7 +10,6 @@ import {
   bedrockErrorName,
 } from '../bedrock/retryBedrockCall';
 import { toSectionId } from '../knowledge/sectionId';
-import { KnowledgeAccessService } from '../knowledgeCatalog/access/knowledgeAccess.service';
 import * as knowledgeSearchRepository from './knowledgeSearch.repository';
 
 export interface KnowledgeMatch {
@@ -27,22 +26,22 @@ export interface KnowledgeMatch {
   score: number;
 }
 
-// Narrows retrieval to one document (a knowledge item id) or one brand,
-// within what the caller sees.
+// Narrows retrieval to one document (a knowledge item id), brand or
+// category, within what the caller sees.
 export interface KnowledgeSearchScope {
   documentId?: string;
   brandId?: string;
+  categoryId?: string;
 }
 
 // Retrieval for the AI assistant: embeds the question with the same model
 // as the documents and returns the closest live chunks the caller may see
-// (own organisation + shared library, brands in the plan).
+// (own organisation + shared library, active brands).
 @Injectable()
 export class KnowledgeSearchService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly embedder: BedrockEmbedderService,
-    private readonly knowledgeAccess: KnowledgeAccessService,
   ) {}
 
   search = async (
@@ -51,20 +50,17 @@ export class KnowledgeSearchService {
     limit: number,
     scope: KnowledgeSearchScope = {},
   ): Promise<KnowledgeMatch[]> => {
-    const access = await this.knowledgeAccess.resolve(actor);
     const queryVector = toVectorLiteral(
       await this.embedQuery(query, actor.tenantId),
     );
-    const rows = await knowledgeSearchRepository.searchLiveChunks(
-      this.databaseService,
-      {
+    const rows = await this.databaseService.withActor(actor, (client) =>
+      knowledgeSearchRepository.searchLiveChunks(client, {
         queryVector,
         tenantId: actor.tenantId,
+        userId: actor.userId,
+        ...scope,
         limit,
-        documentId: scope.documentId,
-        brandId: scope.brandId,
-        planBrandIds: access.brandIds,
-      },
+      }),
     );
     return rows.map((row) => ({
       chunkId: row.chunk_id,
