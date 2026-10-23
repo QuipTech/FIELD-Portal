@@ -19,6 +19,7 @@ machineLifecycle/
 ├── machineLifecycle.controller.ts ← /machines/:id/lifecycle, /machines/lifecycle/bulk, /machines/:id/custody
 ├── machineActivations.repository.ts ← peak-rule count, billing.apply_machine_transition()
 ├── enterpriseThreshold.service.ts ← one sales review task at the Enterprise threshold (T8)
+├── organisationBillingAccount.service.ts ← self-serve: first activation creates the organisation's billing account
 ├── activeMachine/                 ← RequireActiveMachineGuard + the shared active check (403 machine_inactive)
 ├── transfers/                     ← transfer requests, approval (moves the machine), approvals inbox, chain of custody
 └── dto/                           ← request validation
@@ -38,6 +39,11 @@ Part of the API (`npm run start:dev` from `backend/`). Tests:
   activation day counts. Days are in the billing account's time zone.
 - Changes need `machine.lifecycle` (Organisation Admin, Owner). Each one is
   audited with actor, from, to and reason, in the same transaction.
+- An organisation with no billing account gets one on its first activate /
+  reactivate: the organisation's name, the activating admin's email, the
+  default billing time zone (audited; Stripe customer created if Stripe is
+  configured). A user's personal TECH account is separate and never used.
+  Platform admins can also set one up first at Admin → Billing accounts.
 - A suspended account can't activate or reactivate; it can still
   deactivate, archive and read everything.
 - Reaching `ENTERPRISE_THRESHOLD_MACHINES` never refuses an activation.
