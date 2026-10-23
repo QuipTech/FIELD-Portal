@@ -1,3 +1,5 @@
+import type { LifecycleAction, LifecycleState } from "./machineLifecycle";
+
 export type OperatingStatus = "running" | "down" | "service_due";
 
 export interface FleetMachine {
@@ -12,6 +14,10 @@ export interface FleetMachine {
   site: string | null;
   operatingHours: number | null;
   status: OperatingStatus;
+  // Missing from older backends, which had no lifecycle.
+  lifecycleState?: LifecycleState;
+  // What the caller may do next; empty without machine.lifecycle.
+  availableActions?: LifecycleAction[];
 }
 
 export interface FeaturedDownMachine {

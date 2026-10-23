@@ -4,6 +4,8 @@ export const PERMISSIONS = {
   viewMachines: "machine.view",
   registerMachine: "machine.create",
   manageMachine: "machine.manage",
+  // Organisation Admin and Owner: activate (start billing), archive, reactivate.
+  manageMachineLifecycle: "machine.lifecycle",
   addHistoryEntry: "history.create",
   useAiAssistant: "ai.use",
   raiseSupportCase: "support.create",
@@ -23,6 +25,7 @@ export const permissionLabels: Record<PermissionCode, string> = {
   "machine.view": "View machines",
   "machine.create": "Register a new machine",
   "machine.manage": "Edit machine records",
+  "machine.lifecycle": "Activate, archive and reactivate machines",
   "history.create": "Add history entries",
   "ai.use": "Use the AI assistant",
   "support.create": "Raise support cases",

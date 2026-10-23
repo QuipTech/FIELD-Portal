@@ -21,6 +21,7 @@ export const toMachine = (response: MachineDetailResponse): Machine => ({
   site: response.site,
   owner: response.owner,
   openCaseCount: response.openCaseCount,
+  lifecycleState: response.lifecycleState ?? "active",
 });
 
 export const toGalleryPhoto = (photo: GalleryPhotoResponse): MachineGalleryPhoto => ({
