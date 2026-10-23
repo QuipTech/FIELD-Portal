@@ -69,6 +69,7 @@ import { PersonalInvoiceService } from './personalSubscription/personalInvoice.s
   ],
   exports: [
     BillingConfigService,
+    BillingAccountsService,
     PriceBooksService,
     BillingAccountDetailsService,
     SubscriptionsService,

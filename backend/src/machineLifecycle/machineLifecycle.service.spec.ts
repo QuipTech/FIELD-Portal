@@ -33,6 +33,25 @@ describe('MachineLifecycleService.applyAction', () => {
     ]);
   });
 
+  it('sets up the organisation billing account on its first activation', async () => {
+    const { service, createdAccounts } = setUpLifecycleService({
+      hasNoBillingAccount: true,
+    });
+    await service.applyAction(actor, 'machine-1', 'activate', null, now);
+    expect(createdAccounts).toEqual([
+      { organisationId: 'tenant-1', name: 'Pit Crew', billingEmail: 'a@b.c' },
+    ]);
+  });
+
+  it('never creates a billing account to deactivate', async () => {
+    const { service, createdAccounts } = setUpLifecycleService({
+      lifecycleState: 'active',
+      hasNoBillingAccount: true,
+    });
+    await service.applyAction(actor, 'machine-1', 'deactivate', null, now);
+    expect(createdAccounts).toEqual([]);
+  });
+
   it('deactivates: still billed this month, not from next month', async () => {
     const { service } = setUpLifecycleService({ lifecycleState: 'active' });
     const result = await service.applyAction(

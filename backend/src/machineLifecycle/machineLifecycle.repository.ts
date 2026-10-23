@@ -56,3 +56,16 @@ export const listLifecycleEvents = async (
   );
   return result.rows;
 };
+
+// The organisation's name and billing account (NULL until one is set up).
+export const findOrganisationBilling = async (
+  client: PoolClient,
+  tenantId: string,
+): Promise<{ name: string; billing_account_id: string | null } | null> => {
+  const result = await client.query<{ name: string; billing_account_id: string | null }>(
+    `SELECT name, billing_account_id FROM tenants
+     WHERE id = $1 AND deleted_at IS NULL`,
+    [tenantId],
+  );
+  return result.rows[0] ?? null;
+};

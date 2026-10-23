@@ -13,6 +13,7 @@ import { DatabaseService } from '../database/database.service';
 import { ServiceDatabaseService } from '../database/serviceDatabase.service';
 import { toPersonName } from '../machineHistory/machineHistoryMapper';
 import { EnterpriseThresholdService } from './enterpriseThreshold.service';
+import { OrganisationBillingAccountService } from './organisationBillingAccount.service';
 import {
   canRequestTransfer,
   LifecycleAction,
@@ -47,6 +48,7 @@ export class MachineLifecycleService {
     private readonly databaseService: DatabaseService,
     private readonly serviceDatabase: ServiceDatabaseService,
     private readonly enterpriseThresholdService: EnterpriseThresholdService,
+    private readonly organisationBillingAccountService: OrganisationBillingAccountService,
   ) {}
 
   getLifecycle = (
@@ -94,6 +96,8 @@ export class MachineLifecycleService {
     reason: string | null,
     now = new Date(),
   ): Promise<LifecycleChangeResult> => {
+    if (BECOMES_ACTIVE.includes(action))
+      await this.organisationBillingAccountService.ensureForActivation(actor);
     const machine = await this.databaseService.withTenant(
       actor.tenantId,
       (client) =>
