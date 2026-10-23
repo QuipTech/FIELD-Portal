@@ -11,6 +11,7 @@ export interface HistoryEntryFilters {
   to?: string;
   authorId?: string;
   entryId?: string;
+  componentId?: string;
   limit?: number;
   offset?: number;
 }
@@ -47,6 +48,7 @@ export const listHistoryEntries = async (
        AND ($5::timestamptz IS NULL OR e.created_at <= $5)
        AND ($6::uuid IS NULL OR e.created_by = $6)
        AND ($7::uuid IS NULL OR e.id = $7)
+       AND ($10::uuid IS NULL OR e.installed_component_id = $10)
      ORDER BY e.created_at DESC
      LIMIT $8 OFFSET $9`,
     [
@@ -59,6 +61,7 @@ export const listHistoryEntries = async (
       filters.entryId ?? null,
       filters.limit ?? null,
       filters.offset ?? 0,
+      filters.componentId ?? null,
     ],
   );
   return result.rows;

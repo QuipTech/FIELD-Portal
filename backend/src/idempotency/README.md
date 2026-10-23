@@ -16,6 +16,7 @@ Applied to:
 idempotency/
 ├── idempotency.interceptor.ts   ← claim → run → save response, or replay; frees the key on failure
 ├── idempotency.repository.ts    ← idempotency_keys SQL (claim, complete, release)
+├── requestFingerprint.ts        ← SHA-256 of the body (key order ignored) + uploaded file
 └── idempotency.http.spec.ts     ← the interceptor end to end with an in-memory store
 ```
 
@@ -26,7 +27,7 @@ Runs inside the API after migration `0106`. Tests: `npx jest src/idempotency`; d
 ## Key conventions
 
 - Keys are per user, 8–100 characters of `A-Z a-z 0-9 _ . : -`. Without the header a route behaves as before.
-- A key reused for a different request (method + path) is 422. A retry while the first attempt is still running is 409; retry shortly after.
+- A key reused for a different request (method + path) or with a different body (JSON body + uploaded file, SHA-256 in `request_hash`, migration `0108`) is 422. A retry while the first attempt is still running is 409; retry shortly after.
 - A failed attempt (any error) frees the key, so the outbox can retry. A claim stuck for 2 minutes (crashed request) can be reclaimed.
 - A replayed photo response carries the signed URL from the first attempt, which expires after 15 minutes; reload the entry to refresh it.
 - To add a route: `@UseInterceptors(IdempotencyInterceptor)` after `JwtAuthGuard`.

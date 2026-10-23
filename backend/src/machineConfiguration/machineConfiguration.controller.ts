@@ -9,6 +9,7 @@ import { RequireActiveMachineGuard } from '../machineLifecycle/activeMachine/req
 import { MachineConfigurationService } from './machineConfiguration.service';
 import { SnapshotDiffService } from './snapshotDiff.service';
 import { SnapshotRestoreService } from './snapshotRestore.service';
+import { ComponentDetailService } from './componentDetail.service';
 import { ListComponentsQueryDto } from './dto/listComponentsQueryDto';
 import { ExportSnapshotDiffQueryDto, SnapshotDiffQueryDto } from './dto/snapshotDiffQueryDto';
 import { UpdateSnapshotDto } from './dto/updateSnapshotDto';
@@ -22,6 +23,7 @@ export class MachineConfigurationController {
     private readonly machineConfigurationService: MachineConfigurationService,
     private readonly snapshotDiffService: SnapshotDiffService,
     private readonly snapshotRestoreService: SnapshotRestoreService,
+    private readonly componentDetailService: ComponentDetailService,
   ) {}
 
   @Get('systems')
@@ -38,6 +40,17 @@ export class MachineConfigurationController {
     @Query() query: ListComponentsQueryDto,
   ) {
     return this.machineConfigurationService.listComponents(user, machineId, query.system ?? null);
+  }
+
+  // One component plus the history entries logged against it.
+  @Get('components/:componentId')
+  @RequirePermissions('machine.view')
+  getComponent(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('machineId', ParseUUIDPipe) machineId: string,
+    @Param('componentId', ParseUUIDPipe) componentId: string,
+  ) {
+    return this.componentDetailService.getComponent(user, { machineId, componentId });
   }
 
   @Get('snapshots')

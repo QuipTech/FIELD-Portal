@@ -1,3 +1,5 @@
+import { HistoryEntry } from '../../machineHistory/types/machineHistoryResponse';
+
 export interface MachineSystem {
   id: string;
   name: string;
@@ -7,6 +9,8 @@ export interface MachineSystem {
 // about its condition has been recorded.
 export type ComponentCondition = 'ok' | 'worn' | 'service_due' | 'fault';
 
+export type ConditionSeverity = 'ok' | 'warning' | 'critical';
+
 export interface MachineComponent {
   id: string;
   systemId: string;
@@ -14,6 +18,27 @@ export interface MachineComponent {
   name: string;
   condition: ComponentCondition | null;
   caption: string;
+  partNumber: string | null;
+  serialNumber: string | null;
+  manufacturer: string | null;
+  // A flagged condition in words, e.g. "Worn" or "Fault code 168-0123".
+  conditionNote: string | null;
+  // Set on the component, else derived from condition.
+  conditionSeverity: ConditionSeverity | null;
+  installedAt: string | null;
+  hoursAtInstall: number | null;
+  // Machine hours now minus hours at install.
+  hoursSinceInstall: number | null;
+  // The latest service or repair entry logged against the component.
+  lastServicedAt: string | null;
+  nextServiceDueHours: number | null;
+  notes: string | null;
+}
+
+// GET /machines/:machineId/components/:componentId
+export interface MachineComponentDetail extends MachineComponent {
+  // Entries logged against this component, newest first.
+  history: HistoryEntry[];
 }
 
 export type SnapshotTrigger =

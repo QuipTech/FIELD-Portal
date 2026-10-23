@@ -19,6 +19,7 @@ import { ClaimOutcome } from './idempotency.repository';
 // in-memory map with the same claim / complete / release behaviour.
 interface StoredKey {
   route: string;
+  requestHash: string;
   status?: number;
   body?: unknown;
 }
@@ -27,18 +28,26 @@ const keys = new Map<string, StoredKey>();
 jest.mock('./idempotency.repository', () => ({
   claimKey: async (
     _client: unknown,
-    ref: { userId: string; key: string; route: string },
+    ref: { userId: string; key: string; route: string; requestHash: string },
   ): Promise<ClaimOutcome> => {
     const stored = keys.get(`${ref.userId}:${ref.key}`);
     if (!stored) {
-      keys.set(`${ref.userId}:${ref.key}`, { route: ref.route });
+      keys.set(`${ref.userId}:${ref.key}`, {
+        route: ref.route,
+        requestHash: ref.requestHash,
+      });
       return { state: 'claimed' };
     }
     return stored.status === undefined
-      ? { state: 'in_progress', route: stored.route }
+      ? {
+          state: 'in_progress',
+          route: stored.route,
+          requestHash: stored.requestHash,
+        }
       : {
           state: 'done',
           route: stored.route,
+          requestHash: stored.requestHash,
           status: stored.status,
           body: stored.body,
         };
@@ -120,8 +129,8 @@ describe('IdempotencyInterceptor', () => {
     created = 0;
   });
 
-  const post = (path: string, key?: string) => {
-    const call = request(app.getHttpServer()).post(path);
+  const post = (path: string, key?: string, body: object = { note: 'a' }) => {
+    const call = request(app.getHttpServer()).post(path).send(body);
     return key ? call.set('Idempotency-Key', key) : call;
   };
 
@@ -142,6 +151,18 @@ describe('IdempotencyInterceptor', () => {
   it('refuses a key reused for a different request', async () => {
     await post('/things/a', 'key-00000001').expect(201);
     await post('/things/b', 'key-00000001').expect(422);
+  });
+
+  it('refuses a key reused with a different body', async () => {
+    await post('/things/a', 'key-00000001', { note: 'a' }).expect(201);
+    await post('/things/a', 'key-00000001', { note: 'b' }).expect(422);
+    expect(created).toBe(1);
+  });
+
+  it('replays a retry whose body has the same fields in another order', async () => {
+    await post('/things/a', 'key-00000001', { a: 1, b: 2 }).expect(201);
+    await post('/things/a', 'key-00000001', { b: 2, a: 1 }).expect(201);
+    expect(created).toBe(1);
   });
 
   it('frees the key when the write fails, so the retry runs', async () => {

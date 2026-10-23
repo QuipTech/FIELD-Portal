@@ -15,6 +15,7 @@ import { DatabaseService } from '../database/database.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import * as idempotencyRepository from './idempotency.repository';
 import { IdempotencyKeyRef } from './idempotency.repository';
+import { fingerprintRequest } from './requestFingerprint';
 
 export const IDEMPOTENCY_HEADER = 'idempotency-key';
 const KEY_PATTERN = /^[A-Za-z0-9_.:-]{8,100}$/;
@@ -23,12 +24,14 @@ const INVALID_KEY_MESSAGE =
   'Idempotency-Key must be 8–100 letters, digits or _ . : - (a UUID works).';
 const OTHER_REQUEST_MESSAGE =
   'This Idempotency-Key was already used for a different request.';
+const OTHER_BODY_MESSAGE =
+  'This Idempotency-Key was already used with a different body. Use a new key for a new request.';
 const IN_PROGRESS_MESSAGE =
   'The first request with this Idempotency-Key is still running. Retry shortly.';
 
 // For writes the app queues offline (its outbox): with an Idempotency-Key
 // header, the first successful response is saved and every retry with the
-// same key gets it back instead of writing again. A failed attempt frees
+// same key and body gets it back instead of writing again. A failed attempt frees
 // the key. Without the header the route behaves as before. Use after
 // JwtAuthGuard; keys are per user.
 @Injectable()
@@ -54,12 +57,21 @@ export class IdempotencyInterceptor implements NestInterceptor {
       key,
     };
     const route = `${request.method} ${request.path}`;
+    const requestHash = fingerprintRequest(request);
     const outcome = await this.databaseService.withTenant(
       ref.tenantId,
-      (client) => idempotencyRepository.claimKey(client, { ...ref, route }),
+      (client) =>
+        idempotencyRepository.claimKey(client, { ...ref, route, requestHash }),
     );
     if (outcome.state !== 'claimed' && outcome.route !== route) {
       throw new UnprocessableEntityException(OTHER_REQUEST_MESSAGE);
+    }
+    if (
+      outcome.state !== 'claimed' &&
+      outcome.requestHash !== null &&
+      outcome.requestHash !== requestHash
+    ) {
+      throw new UnprocessableEntityException(OTHER_BODY_MESSAGE);
     }
     if (outcome.state === 'in_progress')
       throw new ConflictException(IN_PROGRESS_MESSAGE);

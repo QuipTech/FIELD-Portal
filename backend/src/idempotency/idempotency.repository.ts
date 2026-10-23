@@ -9,37 +9,45 @@ export interface IdempotencyKeyRef {
   key: string;
 }
 
+// requestHash is null for keys saved before bodies were fingerprinted.
 export type ClaimOutcome =
   | { state: 'claimed' }
-  | { state: 'in_progress'; route: string }
-  | { state: 'done'; route: string; status: number; body: unknown };
+  | { state: 'in_progress'; route: string; requestHash: string | null }
+  | {
+      state: 'done';
+      route: string;
+      requestHash: string | null;
+      status: number;
+      body: unknown;
+    };
 
 // Run each inside withTenant(caller), separately from the request's own
 // transaction, so the claim is visible to a concurrent retry.
 
 export const claimKey = async (
   client: PoolClient,
-  ref: IdempotencyKeyRef & { route: string },
+  ref: IdempotencyKeyRef & { route: string; requestHash: string },
 ): Promise<ClaimOutcome> => {
   const claimed = await client.query(
-    `INSERT INTO idempotency_keys (user_id, key, tenant_id, route)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO idempotency_keys (user_id, key, tenant_id, route, request_hash)
+     VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (user_id, key) DO UPDATE
-       SET route = EXCLUDED.route, created_at = now()
+       SET route = EXCLUDED.route, request_hash = EXCLUDED.request_hash, created_at = now()
        WHERE idempotency_keys.status = 'in_progress'
          AND idempotency_keys.route = EXCLUDED.route
          AND idempotency_keys.created_at < now() - ${STALE_CLAIM_INTERVAL}
      RETURNING 1`,
-    [ref.userId, ref.key, ref.tenantId, ref.route],
+    [ref.userId, ref.key, ref.tenantId, ref.route, ref.requestHash],
   );
   if (claimed.rowCount) return { state: 'claimed' };
   const existing = await client.query<{
     status: 'in_progress' | 'done';
     route: string;
+    request_hash: string | null;
     response_status: number | null;
     response_body: unknown;
   }>(
-    `SELECT status, route, response_status, response_body FROM idempotency_keys
+    `SELECT status, route, request_hash, response_status, response_body FROM idempotency_keys
      WHERE user_id = $1 AND key = $2 AND tenant_id = $3`,
     [ref.userId, ref.key, ref.tenantId],
   );
@@ -48,10 +56,11 @@ export const claimKey = async (
     ? {
         state: 'done',
         route: row.route,
+        requestHash: row.request_hash,
         status: row.response_status ?? 200,
         body: row.response_body,
       }
-    : { state: 'in_progress', route: row.route };
+    : { state: 'in_progress', route: row.route, requestHash: row.request_hash };
 };
 
 export const completeKey = async (

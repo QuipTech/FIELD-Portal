@@ -84,6 +84,7 @@ session (set per-request by `DatabaseService.withTenant`).
 | `0105` | Profile preferences — `users.site` (where the person usually works) and `users.language` (BCP 47 tag, default `en`, checked) |
 | `0106` | App devices, preferences and sync — `device_registrations.app_version`/`last_seen_at`, one row per user and token, deletable; `user_notification_preferences` (push/email on-off, muted kinds); `idempotency_keys` (saved responses for the app's outbox retries) |
 | `0107` | Knowledge catalogue cleanup — removes the first draft of 0102's manufacturer-based brands (`tenant_brand_access`, `tenants.knowledge_brands_restricted`, `knowledge_items.manufacturer_id`/`category_id` and their functions); aligns `document_pages` visibility. A no-op where that draft never ran; 0084 drops the draft's `knowledge_categories` first |
+| `0108` | Component details and Idempotency-Key body checks — `installed_components` part number, manufacturer, condition note/severity, install date/hours, next service due hours, notes; `idempotency_keys.request_hash` (same key + different body = 422) |
 
 See [Knowledge rollout](../../src/knowledgeBrands/README.md) for deployment order and compatibility.
 
