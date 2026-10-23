@@ -5,8 +5,11 @@ import { RequirePermissionsGuard } from '../auth/guards/requirePermissions.guard
 import { RequirePermissions } from '../auth/decorators/requirePermissions.decorator';
 import { CurrentUser } from '../auth/decorators/currentUser.decorator';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
+import { RequireActiveMachineGuard } from '../machineLifecycle/activeMachine/requireActiveMachine.guard';
 import { MachineConfigurationService } from './machineConfiguration.service';
 import { SnapshotDiffService } from './snapshotDiff.service';
+import { SnapshotRestoreService } from './snapshotRestore.service';
+import { ComponentDetailService } from './componentDetail.service';
 import { ListComponentsQueryDto } from './dto/listComponentsQueryDto';
 import { ExportSnapshotDiffQueryDto, SnapshotDiffQueryDto } from './dto/snapshotDiffQueryDto';
 import { UpdateSnapshotDto } from './dto/updateSnapshotDto';
@@ -14,11 +17,13 @@ import { UpdateSnapshotDto } from './dto/updateSnapshotDto';
 // A machine's systems & components and its configuration snapshots, for
 // the portal's Components and Configuration history tabs.
 @Controller('machines/:machineId')
-@UseGuards(JwtAuthGuard, RequirePermissionsGuard)
+@UseGuards(JwtAuthGuard, RequirePermissionsGuard, RequireActiveMachineGuard)
 export class MachineConfigurationController {
   constructor(
     private readonly machineConfigurationService: MachineConfigurationService,
     private readonly snapshotDiffService: SnapshotDiffService,
+    private readonly snapshotRestoreService: SnapshotRestoreService,
+    private readonly componentDetailService: ComponentDetailService,
   ) {}
 
   @Get('systems')
@@ -37,6 +42,17 @@ export class MachineConfigurationController {
     return this.machineConfigurationService.listComponents(user, machineId, query.system ?? null);
   }
 
+  // One component plus the history entries logged against it.
+  @Get('components/:componentId')
+  @RequirePermissions('machine.view')
+  getComponent(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('machineId', ParseUUIDPipe) machineId: string,
+    @Param('componentId', ParseUUIDPipe) componentId: string,
+  ) {
+    return this.componentDetailService.getComponent(user, { machineId, componentId });
+  }
+
   @Get('snapshots')
   @RequirePermissions('machine.view')
   listSnapshots(@CurrentUser() user: AuthenticatedUser, @Param('machineId', ParseUUIDPipe) machineId: string) {
@@ -49,7 +65,8 @@ export class MachineConfigurationController {
     return this.machineConfigurationService.takeSnapshot(user, machineId);
   }
 
-  @Get('snapshots/diff')
+  // Field-level comparison; /compare is the mobile app's name for it.
+  @Get(['snapshots/diff', 'snapshots/compare'])
   @RequirePermissions('machine.view')
   getDiff(
     @CurrentUser() user: AuthenticatedUser,
@@ -76,6 +93,17 @@ export class MachineConfigurationController {
     response.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
     response.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
     response.send(typeof file.body === 'string' ? file.body : Buffer.from(file.body));
+  }
+
+  // Puts the recorded configuration back to this snapshot (see SnapshotRestoreService).
+  @Post('snapshots/:snapshotId/restore')
+  @RequirePermissions('machine.manage')
+  restoreSnapshot(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('machineId', ParseUUIDPipe) machineId: string,
+    @Param('snapshotId', ParseUUIDPipe) snapshotId: string,
+  ) {
+    return this.snapshotRestoreService.restore(user, { machineId, snapshotId });
   }
 
   @Patch('snapshots/:snapshotId')

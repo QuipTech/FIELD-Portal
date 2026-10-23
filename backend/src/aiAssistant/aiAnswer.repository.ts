@@ -121,7 +121,7 @@ export const insertReviewItem = async (
   params: {
     tenantId: string;
     messageId: string;
-    reasonCode: 'no_source';
+    reasonCode: 'no_source' | 'marked_wrong';
     reason: string;
   },
 ): Promise<string> => {

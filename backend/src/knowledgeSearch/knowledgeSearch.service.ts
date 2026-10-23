@@ -9,6 +9,7 @@ import {
   BEDROCK_SETUP_ERRORS,
   bedrockErrorName,
 } from '../bedrock/retryBedrockCall';
+import { toSectionId } from '../knowledge/sectionId';
 import * as knowledgeSearchRepository from './knowledgeSearch.repository';
 
 export interface KnowledgeMatch {
@@ -18,13 +19,24 @@ export interface KnowledgeMatch {
   type: string;
   page: number | null;
   heading: string | null;
+  // "4.3", or `s{ordinal}`; null when the version has no saved sections.
+  sectionId: string | null;
   text: string;
   // Cosine similarity, 0–1 (higher is closer).
   score: number;
 }
 
+// Narrows retrieval to one document (a knowledge item id), brand or
+// category, within what the caller sees.
+export interface KnowledgeSearchScope {
+  documentId?: string;
+  brandId?: string;
+  categoryId?: string;
+}
+
 // Retrieval for the AI assistant: embeds the question with the same model
-// as the documents and returns the closest live chunks the caller may see.
+// as the documents and returns the closest live chunks the caller may see
+// (own organisation + shared library, active brands).
 @Injectable()
 export class KnowledgeSearchService {
   constructor(
@@ -36,9 +48,7 @@ export class KnowledgeSearchService {
     actor: AuthenticatedUser,
     query: string,
     limit: number,
-    // Only this document (a knowledge item id), within what the caller sees.
-    documentId?: string,
-    scope?: { brandId?: string; categoryId?: string },
+    scope: KnowledgeSearchScope = {},
   ): Promise<KnowledgeMatch[]> => {
     const queryVector = toVectorLiteral(
       await this.embedQuery(query, actor.tenantId),
@@ -50,7 +60,6 @@ export class KnowledgeSearchService {
         userId: actor.userId,
         ...scope,
         limit,
-        documentId,
       }),
     );
     return rows.map((row) => ({
@@ -60,6 +69,10 @@ export class KnowledgeSearchService {
       type: row.type,
       page: row.page_number,
       heading: row.section_heading,
+      sectionId:
+        row.section_ordinal === null
+          ? null
+          : toSectionId(row.section_ordinal, row.section_title),
       text: row.chunk_text,
       score: Number(row.similarity),
     }));

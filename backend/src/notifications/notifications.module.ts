@@ -4,14 +4,17 @@ import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
 import { NotificationsGateway } from './notifications.gateway';
 import { NotificationListenerService } from './notificationListener.service';
+import { NotificationSettingsController } from './notificationSettings.controller';
+import { NotificationSettingsService } from './notificationSettings.service';
 
 @Module({
   imports: [JwtModule.register({})],
-  controllers: [NotificationsController],
+  controllers: [NotificationsController, NotificationSettingsController],
   providers: [
     NotificationsService,
     NotificationsGateway,
     NotificationListenerService,
+    NotificationSettingsService,
   ],
 })
 export class NotificationsModule {}

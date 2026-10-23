@@ -9,6 +9,8 @@ export interface FleetMachineRow {
   site: string | null;
   operating_hours: number | null;
   status: string;
+  lifecycle_state: string;
+  photo_storage_key: string | null;
 }
 
 export interface FeaturedDownRow extends FleetMachineRow {

@@ -40,6 +40,25 @@ describe('validateIncomingFile', () => {
     ).toThrow(BadRequestException);
   });
 
+  it('types a phone photo by its bytes when the name has no or the wrong extension', () => {
+    expect(validateIncomingFile(file('photo', JPEG), PHOTO_RULE)).toEqual({
+      extension: 'jpg',
+      contentType: 'image/jpeg',
+    });
+    expect(
+      validateIncomingFile(file('IMG_0012.HEIC', JPEG), PHOTO_RULE).contentType,
+    ).toBe('image/jpeg');
+    expect(() =>
+      validateIncomingFile(file('photo', [0x4d, 0x5a, 0x90, 0x00]), PHOTO_RULE),
+    ).toThrow(BadRequestException);
+  });
+
+  it('never sniffs a document type from an unnamed file', () => {
+    expect(() =>
+      validateIncomingFile(file('upload', PDF), DOCUMENT_RULE),
+    ).toThrow(BadRequestException);
+  });
+
   it('rejects types a folder doesn’t accept', () => {
     expect(() =>
       validateIncomingFile(file('photo.heic', HEIC), AVATAR_RULE),

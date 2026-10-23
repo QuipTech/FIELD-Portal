@@ -31,8 +31,12 @@ import { MyDataModule } from './myData/myData.module';
 import { OrganisationSubscriptionModule } from './organisationSubscription/organisationSubscription.module';
 import { SupportCasesModule } from './supportCases/supportCases.module';
 import { MachineFleetModule } from './machineFleet/machineFleet.module';
+import { MachineLifecycleModule } from './machineLifecycle/machineLifecycle.module';
+import { MachineAssignmentsModule } from './machineAssignments/machineAssignments.module';
+import { TeamModule } from './team/team.module';
 import { KnowledgeLibraryModule } from './knowledgeLibrary/knowledgeLibrary.module';
 import { KnowledgeArticleModule } from './knowledgeArticle/knowledgeArticle.module';
+import { KnowledgeCatalogModule } from './knowledgeCatalog/knowledgeCatalog.module';
 import { AiAssistantModule } from './aiAssistant/aiAssistant.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -74,9 +78,13 @@ import { RequestSourceMiddleware } from './common/requestSource/requestSource.mi
     OrganisationSubscriptionModule,
     SupportCasesModule,
     MachineFleetModule,
+    MachineLifecycleModule,
+    MachineAssignmentsModule,
+    TeamModule,
     KnowledgeLibraryModule,
     KnowledgeBrandsModule,
     KnowledgeArticleModule,
+    KnowledgeCatalogModule,
     AiAssistantModule,
     DashboardModule,
     NotificationsModule,

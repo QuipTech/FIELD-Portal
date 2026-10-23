@@ -1,10 +1,8 @@
-import { assertKnowledgeScope } from '../knowledge/knowledgeAccess';
 import { randomUUID } from 'crypto';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { DatabaseService } from '../database/database.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
-import { KnowledgeSearchService } from '../knowledgeSearch/knowledgeSearch.service';
 import * as machineHistoryRepository from '../machineHistory/machineHistory.repository';
 import * as historyEntriesRepository from '../machineHistory/historyEntries.repository';
 import { MachineRow } from '../machineHistory/types/machineHistoryRows';
@@ -18,13 +16,12 @@ import * as aiConversationsRepository from './aiConversations.repository';
 import { toThreadTitle } from './aiAssistantMapper';
 import { formatMachineContext } from './formatMachineContext';
 import { AskAssistantDto } from './dto/askAssistantDto';
+import { AiRetrievalService, hasAskScope } from './aiRetrieval.service';
+import { assertFullMachineAccess } from '../machineLifecycle/activeMachine/activeMachine.repository';
 
 // Earlier messages resent with each question (5 exchanges).
 const HISTORY_MESSAGE_LIMIT = 10;
 const RECENT_HISTORY_ENTRIES = 5;
-const RETRIEVAL_LIMIT = 6;
-// Cosine similarity below which an excerpt is noise, not a source.
-const MIN_SOURCE_SCORE = 0.2;
 
 const CONVERSATION_NOT_FOUND_MESSAGE = 'Thread not found.';
 const MACHINE_NOT_FOUND_MESSAGE = 'Machine not found.';
@@ -56,23 +53,27 @@ interface ThreadState {
 export class AiAskContextService {
   constructor(
     private readonly databaseService: DatabaseService,
-    private readonly knowledgeSearch: KnowledgeSearchService,
+    private readonly retrieval: AiRetrievalService,
   ) {}
 
   prepare = async (
     actor: AuthenticatedUser,
     dto: AskAssistantDto,
   ): Promise<PreparedQuestion> => {
-    await assertKnowledgeScope(this.databaseService, actor, dto);
+    const scope = {
+      documentId: dto.documentId,
+      brandId: dto.brandId,
+      categoryId: dto.categoryId,
+    };
+    await this.retrieval.assertScopeAllowed(actor, scope);
     const thread = await this.databaseService.withActor(actor, (client) =>
       this.loadThread(client, actor, dto),
     );
-    const chunks = await this.retrieveChunks(
+    const chunks = await this.retrieval.retrieveChunks(
       actor,
       dto.question,
       thread.machine,
-      dto.documentId,
-      { brandId: dto.brandId, categoryId: dto.categoryId },
+      scope,
     );
     return {
       conversationId: thread.conversationId,
@@ -86,8 +87,9 @@ export class AiAskContextService {
         question: dto.question,
         chunks,
         image: dto.image,
-        history:
-          dto.brandId || dto.categoryId || dto.documentId ? [] : thread.history,
+        // A scoped question ignores the thread so far: earlier answers
+        // may come from sources outside the chosen scope.
+        history: hasAskScope(scope) ? [] : thread.history,
         systemPrompt: thread.systemPrompt,
         machineContext: thread.machineContext,
       },
@@ -116,6 +118,11 @@ export class AiAskContextService {
         })
       : [];
     const machineId = conversation ? conversation.machine_id : dto.machineId;
+    // AI context needs an active machine; checked when a thread starts
+    // only, so a thread already under way is never cut off.
+    if (!conversation && machineId) {
+      await assertFullMachineAccess(client, actor.tenantId, machineId);
+    }
     const machine = machineId
       ? await this.loadMachine(client, actor.tenantId, machineId)
       : null;
@@ -153,37 +160,5 @@ export class AiAskContextService {
       { limit: RECENT_HISTORY_ENTRIES },
     );
     return { row, context: formatMachineContext(row, entries) };
-  };
-
-  // The machine's make and model steer retrieval toward its manuals. With
-  // documentId, only that document is searched, and its closest passages
-  // are used however weak the match: the technician chose the source.
-  private retrieveChunks = async (
-    actor: AuthenticatedUser,
-    question: string,
-    machine: MachineRow | null,
-    documentId?: string,
-    scope?: { brandId?: string; categoryId?: string },
-  ): Promise<RetrievedChunk[]> => {
-    const query = machine
-      ? `${machine.manufacturer_name} ${machine.model_name}: ${question}`
-      : question;
-    const matches = await this.knowledgeSearch.search(
-      actor,
-      query,
-      RETRIEVAL_LIMIT,
-      documentId,
-      scope,
-    );
-    return matches
-      .filter((match) => documentId || match.score >= MIN_SOURCE_SCORE)
-      .map((match) => ({
-        chunkId: match.chunkId,
-        documentId: match.documentId,
-        title: match.title,
-        page: match.page,
-        heading: match.heading,
-        text: match.text,
-      }));
   };
 }

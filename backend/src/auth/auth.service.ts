@@ -7,7 +7,8 @@ import { resolveAvatarUrl } from '../users/resolveAvatarUrl';
 import { issueSession } from './authSessionIssuer';
 import * as authRepository from './auth.repository';
 import { findUserAccess } from './userAccess.repository';
-import { AuthResponse } from './types/authResponse';
+import { AuthResponse, MeResponse } from './types/authResponse';
+import { toMeCapabilities } from './meCapabilities';
 import { RefreshTokenPayload } from './types/jwtPayload';
 
 const INVALID_SESSION_MESSAGE = 'Session expired or invalid.';
@@ -61,12 +62,16 @@ export class AuthService {
     );
   };
 
-  me = async (userId: string, tenantId: string) =>
+  me = async (userId: string, tenantId: string): Promise<MeResponse> =>
     this.databaseService.withTenant(tenantId, async (client) => {
       const user = await authRepository.findUserById(client, userId);
-      if (!user) {
+      const tenant = await authRepository.findTenantById(client, tenantId);
+      if (!user || !tenant) {
         throw new UnauthorizedException();
       }
+      // Re-read on each call, so role/permission changes reach the
+      // portal without signing in again.
+      const access = await findUserAccess(client, user.id);
       return {
         id: user.id,
         email: user.email,
@@ -74,9 +79,12 @@ export class AuthService {
         lastName: user.last_name,
         avatarUrl: await resolveAvatarUrl(this.storageService, user),
         status: user.status,
-        // Re-read on each call, so role/permission changes reach the
-        // portal without signing in again.
-        ...(await findUserAccess(client, user.id)),
+        phoneNumber: user.phone_number,
+        site: user.site,
+        language: user.language,
+        ...access,
+        capabilities: toMeCapabilities(access.permissions),
+        tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug },
       };
     });
 

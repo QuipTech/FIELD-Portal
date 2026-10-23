@@ -1,7 +1,6 @@
 import { AppShell } from "@/components/shell/appShell";
 import { TopBar } from "@/components/shell/topBar";
 import { SettingsRow } from "@/components/settings/settingsRow";
-import { SubscriptionSummaryCard } from "@/components/settings/subscriptionSummaryCard";
 import { ExportDataButton } from "@/components/settings/exportDataButton";
 import { DeleteAccountButton } from "@/components/settings/deleteAccountButton";
 import { ProfileHeaderCard } from "./components/profileHeaderCard";
@@ -20,9 +19,6 @@ const SettingsPage = () => {
       <main className="flex flex-1 flex-col gap-3 overflow-y-auto p-5">
         <h1 className="text-[22px] font-medium text-ink">Profile &amp; settings</h1>
         <ProfileHeaderCard />
-
-        <h2 className="text-base font-medium text-ink">Subscription</h2>
-        <SubscriptionSummaryCard showBillingLink />
 
         <SecuritySettingsSection />
         <PasskeySettingsSection />

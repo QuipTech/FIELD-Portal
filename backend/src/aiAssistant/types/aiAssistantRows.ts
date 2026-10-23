@@ -20,6 +20,9 @@ export interface MessageSourceRow {
   title: string | null;
   page_number: number | null;
   section_heading: string | null;
+  // knowledgeSql.chunkSectionLateral; null once the chunk is gone.
+  section_ordinal: number | null;
+  section_title: string | null;
 }
 
 export interface LivePromptRow {

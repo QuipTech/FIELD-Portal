@@ -1,5 +1,6 @@
 import {
   ComponentCondition,
+  ConditionSeverity,
   MachineComponent,
   Snapshot,
   SnapshotTrigger,
@@ -18,6 +19,22 @@ const ENTRY_OUTCOMES: Record<string, { condition: ComponentCondition | null; ver
   note: { condition: null, verb: 'Note added' },
 };
 
+const SEVERITY_BY_CONDITION: Record<ComponentCondition, ConditionSeverity> = {
+  ok: 'ok',
+  worn: 'warning',
+  service_due: 'warning',
+  fault: 'critical',
+};
+
+const SEVERITIES: ConditionSeverity[] = ['ok', 'warning', 'critical'];
+
+const toIsoOrNull = (date: Date | null) => (date ? new Date(date).toISOString() : null);
+
+const toHoursSinceInstall = (row: ComponentRow): number | null =>
+  row.machine_operating_hours === null || row.hours_at_install === null
+    ? null
+    : Math.max(0, row.machine_operating_hours - row.hours_at_install);
+
 const describeFitted = (row: ComponentRow) =>
   [row.serial_number && `S/N ${row.serial_number}`, row.firmware_version && `FW ${row.firmware_version}`]
     .filter(Boolean)
@@ -25,13 +42,26 @@ const describeFitted = (row: ComponentRow) =>
 
 export const toMachineComponent = (row: ComponentRow): MachineComponent => {
   const outcome = row.last_entry_type ? ENTRY_OUTCOMES[row.last_entry_type] : undefined;
+  const condition = outcome?.condition ?? null;
+  const setSeverity = SEVERITIES.find((severity) => severity === row.condition_severity);
   return {
     id: row.id,
     systemId: row.system_id,
     systemName: row.system_name,
     name: row.name,
-    condition: outcome?.condition ?? null,
+    condition,
     caption: outcome && row.last_entry_at ? `${outcome.verb} ${formatDay(row.last_entry_at)}` : describeFitted(row),
+    partNumber: row.part_number,
+    serialNumber: row.serial_number,
+    manufacturer: row.manufacturer,
+    conditionNote: row.condition_note,
+    conditionSeverity: setSeverity ?? (condition ? SEVERITY_BY_CONDITION[condition] : null),
+    installedAt: toIsoOrNull(row.installed_at),
+    hoursAtInstall: row.hours_at_install,
+    hoursSinceInstall: toHoursSinceInstall(row),
+    lastServicedAt: toIsoOrNull(row.last_serviced_at),
+    nextServiceDueHours: row.next_service_due_hours,
+    notes: row.notes,
   };
 };
 

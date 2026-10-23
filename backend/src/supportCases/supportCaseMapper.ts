@@ -1,3 +1,4 @@
+import { toCaseSla } from './caseSla';
 import {
   CASE_STATUSES,
   CaseAttachment,
@@ -69,6 +70,7 @@ export const toSupportCase = (row: SupportCaseRow): SupportCase => ({
   closedAt: toIso(row.closed_at),
   slaDueAt: toIso(row.sla_due_at),
   slaPausedAt: toIso(row.sla_paused_at),
+  sla: toCaseSla(row),
 });
 
 export const toCaseMessage = (

@@ -1,3 +1,4 @@
+import { toLifecycleState } from '../machineLifecycle/lifecycleTransitions';
 import { StorageService } from '../storage/storage.service';
 import { toMachinePhoto } from './machinePhotoMapper';
 import { HistoryEntryRow, MachineDetailRow, MachineRow } from './types/machineHistoryRows';
@@ -18,11 +19,15 @@ export const toMachineSummary = (row: MachineRow): MachineSummary => ({
   status: row.status,
 });
 
-export const toMachineDetail = (row: MachineDetailRow): MachineDetail => ({
+// photoUrl and assignedTechnicians are filled in by the service.
+export const toMachineDetail = (
+  row: MachineDetailRow,
+): Omit<MachineDetail, 'photoUrl' | 'assignedTechnicians'> => ({
   ...toMachineSummary(row),
   modelId: row.model_id,
   plantId: row.asset_number || null,
   hoursReadAt: row.operating_hours_read_at ? new Date(row.operating_hours_read_at).toISOString() : null,
+  lifecycleState: toLifecycleState(row.lifecycle_state),
   owner: row.owner_id
     ? { id: row.owner_id, name: toPersonName(row.owner_first_name, row.owner_last_name), avatarUrl: row.owner_avatar_url }
     : null,

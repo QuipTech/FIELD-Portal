@@ -1,5 +1,6 @@
 import {
   CasePerson,
+  CaseSla,
   CasePriority,
   CaseStatus,
   SupportCase,
@@ -35,6 +36,7 @@ export interface AdminSupportCaseListItem {
   updatedAt: string;
   slaDueAt: string | null;
   slaPausedAt: string | null;
+  sla: CaseSla;
   // A message the viewer hasn't read yet.
   isUnread: boolean;
 }

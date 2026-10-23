@@ -11,6 +11,8 @@ export interface RetrievedChunk {
   title: string;
   page: number | null;
   heading: string | null;
+  // "4.3", or `s{ordinal}`; null when the version has no saved sections.
+  sectionId: string | null;
   text: string;
 }
 

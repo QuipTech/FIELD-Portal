@@ -7,26 +7,27 @@ import {
   TENANT_ROLE,
   tableVisibilityLevel,
 } from '../src/dataGovernance/dataSchemas.config';
+import {
+  asServiceRole as asServiceRoleOn,
+  asTenantRole as asTenantRoleOn,
+  expectRefused as expectRefusedOn,
+  insertTenant as insertTenantOn,
+} from './isolationFixtures';
 
 // Runs against a real database (npm run test:db, see dbTestConnection) as
 // the migration owner, so it can create fixtures and SET ROLE to the
 // tenant and service roles. Every test runs inside a transaction that is
 // rolled back — nothing is left behind.
 
-const PERMISSION_DENIED = '42501';
-
 const client = new Client(buildPoolConfig(readDatabaseUrl()));
 let tenantA: string;
 let tenantB: string;
 
-const insertTenant = async (label: string): Promise<string> => {
-  const slug = `isolation-test-${label}-${Date.now()}`;
-  const result = await client.query<{ id: string }>(
-    `INSERT INTO tenants (name, slug, status) VALUES ($1, $2, 'active') RETURNING id`,
-    [`Isolation test ${label}`, slug],
-  );
-  return result.rows[0].id;
-};
+const insertTenant = (label: string) => insertTenantOn(client, label);
+const asTenantRole = (tenantId: string) => asTenantRoleOn(client, tenantId);
+const asServiceRole = () => asServiceRoleOn(client);
+const expectRefused = (sql: string, params: unknown[] = []) =>
+  expectRefusedOn(client, sql, params);
 
 // One row per app table for the tenant, written as the migration owner.
 const seedAppRows = async (tenantId: string) => {
@@ -36,40 +37,17 @@ const seedAppRows = async (tenantId: string) => {
   );
   await client.query('SELECT app.sync_entitlements($1)', [tenantId]);
   await client.query(
-    `INSERT INTO app.billing_accounts (tenant_id, billing_email) VALUES ($1, 'billing@example.com')`,
-    [tenantId],
-  );
-  await client.query(
     `INSERT INTO app.usage_events (tenant_id, event_type) VALUES ($1, 'ai_query')`,
     [tenantId],
   );
-  await client.query(
-    `INSERT INTO billing.stripe_customers (tenant_id, stripe_customer_id) VALUES ($1, $2)`,
-    [tenantId, `cus_test_${tenantId}`],
+  const account = await client.query<{ id: string }>(
+    `INSERT INTO billing.billing_accounts (name, billing_email) VALUES ($1, 'billing@example.com') RETURNING id`,
+    [`Billing ${tenantId}`],
   );
-};
-
-const asTenantRole = async (tenantId: string) => {
-  await client.query(`SET LOCAL ROLE ${TENANT_ROLE}`);
-  await client.query("SELECT set_config('app.tenant_id', $1, true)", [
-    tenantId,
-  ]);
-};
-
-const asServiceRole = () => client.query(`SET LOCAL ROLE ${SERVICE_ROLE}`);
-
-// Runs a statement that must be refused; the savepoint keeps the
-// surrounding transaction usable afterwards.
-const expectRefused = async (sql: string, params: unknown[] = []) => {
-  await client.query('SAVEPOINT refused');
-  let code: string | undefined;
-  try {
-    await client.query(sql, params);
-  } catch (error) {
-    code = (error as { code?: string }).code;
-  }
-  await client.query('ROLLBACK TO SAVEPOINT refused');
-  expect({ sql, code }).toEqual({ sql, code: PERMISSION_DENIED });
+  await client.query(
+    'UPDATE tenants SET billing_account_id = $2 WHERE id = $1',
+    [tenantId, account.rows[0].id],
+  );
 };
 
 beforeAll(() => client.connect());
@@ -132,19 +110,17 @@ describe('schemas match dataSchemas.config.ts', () => {
 });
 
 describe('tenant role (field_app)', () => {
-  it.each([
-    'billing_accounts',
-    'subscriptions',
-    'entitlements',
-    'usage_events',
-  ])("sees only its own tenant's app.%s rows", async (table) => {
-    await asTenantRole(tenantA);
-    const result = await client.query<{ tenant_id: string }>(
-      `SELECT DISTINCT tenant_id FROM app.${table} WHERE tenant_id IN ($1, $2)`,
-      [tenantA, tenantB],
-    );
-    expect(result.rows.map((row) => row.tenant_id)).toEqual([tenantA]);
-  });
+  it.each(['subscriptions', 'entitlements', 'usage_events'])(
+    "sees only its own tenant's app.%s rows",
+    async (table) => {
+      await asTenantRole(tenantA);
+      const result = await client.query<{ tenant_id: string }>(
+        `SELECT DISTINCT tenant_id FROM app.${table} WHERE tenant_id IN ($1, $2)`,
+        [tenantA, tenantB],
+      );
+      expect(result.rows.map((row) => row.tenant_id)).toEqual([tenantA]);
+    },
+  );
 
   it('cannot read tenant B even when asking for it by id', async () => {
     await asTenantRole(tenantA);
@@ -170,7 +146,7 @@ describe('tenant role (field_app)', () => {
     ]);
   });
 
-  it.each(['stripe_customers', 'stripe_invoices', 'stripe_webhook_log'])(
+  it.each(['stripe_webhook_events', 'config', 'price_books', 'price_bands'])(
     'cannot read billing.%s at all',
     async (table) => {
       await asTenantRole(tenantA);
@@ -213,11 +189,13 @@ describe('tenant role (field_app)', () => {
 describe('service role (field_service)', () => {
   it('reads billing and every tenant’s app rows', async () => {
     await asServiceRole();
-    const customers = await client.query(
-      `SELECT tenant_id FROM billing.stripe_customers WHERE tenant_id IN ($1, $2)`,
+    const accounts = await client.query(
+      `SELECT t.id FROM tenants t
+       JOIN billing.billing_accounts a ON a.id = t.billing_account_id
+       WHERE t.id IN ($1, $2)`,
       [tenantA, tenantB],
     );
-    expect(customers.rowCount).toBe(2);
+    expect(accounts.rowCount).toBe(2);
     const subscriptions = await client.query(
       `SELECT tenant_id FROM app.subscriptions WHERE tenant_id IN ($1, $2)`,
       [tenantA, tenantB],

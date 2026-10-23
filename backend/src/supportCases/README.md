@@ -41,7 +41,7 @@ supportCases/
 
 ## How to run locally
 
-Runs inside the API (`npm run start:dev` in `backend/`) after migrations `0069`–`0072`. Unit and HTTP tests: `npx jest src/supportCases`. Database tests (real RLS, rolled back): `npm run test:db`.
+Runs inside the API (`npm run start:dev` in `backend/`) after migrations `0069`–`0072` and `0103`. Unit and HTTP tests: `npx jest src/supportCases`. Database tests (real RLS, rolled back): `npm run test:db`.
 
 To make someone support staff, give them the **Support Agent** role (or Owner for an admin) on the admin Users page.
 
@@ -49,6 +49,8 @@ To make someone support staff, give them the **Support Agent** role (or Owner fo
 
 - **Cross-organisation access:** staff requests look the case up with `support_case_tenant_id()`, decide the role in `caseAccessPolicy`, then run everything under the case's own tenant (`withTenant` / `withActor`), so RLS still applies and the audit entry lands in that organisation's log. The queue's lists are SECURITY DEFINER functions (`0071`) that take `p_only_assignee` for agents.
 - **Internal notes:** filtered in SQL (`includeInternal`), emitted only to the `case:N:staff` socket room, never emailed, and the in-app notification trigger skips the customer. A database CHECK refuses an internal note from a customer.
+- **SLA:** every case carries `sla { state, dueAt, pausedAt, firstResponseAt, minutesRemaining }` (`caseSla.ts`). The state is `on_track`, `due_soon` (last quarter of its allowed time), `breached`, `paused` (waiting on customer), or `met`/`missed` once resolved. `firstResponseAt` is the first staff reply the customer could see (trigger, `0103`). `slaDueAt`/`slaPausedAt` stay for the portal.
+- **Polling:** `GET …/messages?since=` and `…/events?since=` (customer and staff routes) return only what was added, or for internal notes edited, after that time. Merge the results by id; the socket remains the live path.
 - **Status rules:** assigning a `new` case opens it; unassigning an `open` one makes it `new`; a customer reply turns `waiting_on_customer` back into `open`. The SLA clock, `resolved_at` and `closed_at` follow the status in a database trigger (`0069`).
 - **Every change** (assign, status, priority, reopen) writes `case_events` + an audit entry through `recordCaseChange`.
 - **Attachments:** upload first (`POST /cases/attachments` or `/admin/cases/:n/attachments`), then send the ids in `attachmentIds`; only the uploader's own unsent files can be attached.

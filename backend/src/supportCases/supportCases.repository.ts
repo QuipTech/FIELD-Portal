@@ -20,7 +20,7 @@ const CASE_SELECT = `
   SELECT c.id, c.tenant_id, c.case_number, c.subject, c.description, c.category,
          c.custom_category,
          c.status, c.priority, c.created_at, c.updated_at, c.resolved_at, c.closed_at,
-         c.sla_due_at, c.sla_paused_at,
+         c.sla_due_at, c.sla_paused_at, c.first_response_at,
          m.id AS machine_id,
          COALESCE(m.asset_number, m.fleet_number, m.serial_number) AS machine_label,
          mm.name AS machine_model_name,

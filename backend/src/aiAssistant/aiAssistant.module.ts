@@ -6,10 +6,28 @@ import { AiAssistantController } from './aiAssistant.controller';
 import { AiAskContextService } from './aiAskContext.service';
 import { AiAskService } from './aiAsk.service';
 import { AiConversationsService } from './aiConversations.service';
+import { AiRetrievalService } from './aiRetrieval.service';
+import { AiFeedbackService } from './feedback/aiFeedback.service';
+import { AiUsageService } from './usage/aiUsage.service';
+import { EntitlementsModule } from '../entitlements/entitlements.module';
+import { BillingModule } from '../billing/billing.module';
 
 @Module({
-  imports: [BedrockModule, KnowledgeSearchModule, AlertEngineModule],
+  imports: [
+    BedrockModule,
+    KnowledgeSearchModule,
+    AlertEngineModule,
+    EntitlementsModule,
+    BillingModule,
+  ],
   controllers: [AiAssistantController],
-  providers: [AiAskContextService, AiAskService, AiConversationsService],
+  providers: [
+    AiAskContextService,
+    AiAskService,
+    AiConversationsService,
+    AiRetrievalService,
+    AiFeedbackService,
+    AiUsageService,
+  ],
 })
 export class AiAssistantModule {}

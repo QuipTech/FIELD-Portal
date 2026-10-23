@@ -53,8 +53,12 @@ backend/
 │   ├── organisationNotifications/ ← /organisation/notifications — alert rules + delivery channels (Owner)
 │   ├── organisationSubscription/ ← GET /organisation/subscription — the caller's plan, or Free
 │   ├── supportCases/         ← /support-cases REST + Socket.IO gateway (live case chat)
-│   ├── machineFleet/         ← GET/POST /machines (the Machines list), GET /machine-catalog
+│   ├── machineFleet/         ← GET/POST/PATCH /machines (the Machines list), GET /machine-catalog
+│   ├── machineAssignments/   ← /machines/:id/technicians — technicians assigned to a machine
+│   ├── team/                 ← /team — an organisation admin's people and roles
+│   ├── idempotency/          ← Idempotency-Key replay for the app's offline outbox
 │   ├── knowledgeLibrary/     ← GET /knowledge/library — the Knowledge screen's search
+│   ├── knowledgeCatalog/     ← the app's Knowledge: brands, documents, pages, search, /me/knowledge, admin
 │   ├── bedrock/              ← BedrockModule: Claude on Bedrock (streaming, retries, Sonnet/Haiku routing)
 │   ├── aiAssistant/          ← /ai — POST /ai/ask (SSE answers), threads; saves messages + citations
 │   ├── demoRequests/         ← POST /public/demo-requests (marketing site) + /admin/demo-requests (Owner only)
@@ -63,7 +67,7 @@ backend/
 │   ├── adminOverview/        ← GET /admin/overview — the admin portal's Overview (scoped like other admin screens)
 │   ├── dataGovernance/       ← dataSchemas.config.ts: the platform/app/billing split (page + DB test)
 │   ├── adminDataRetention/   ← /admin/settings/data-retention + nightly AI log purge job
-│   ├── billing/              ← the ONLY Stripe code: webhook → app.subscriptions/entitlements
+│   ├── billing/              ← the ONLY Stripe code: billing accounts, FIELD-calculated invoices, webhook → invoice status (see STRIPE_SETUP.md)
 │   ├── entitlements/         ← feature checks, read from app.entitlements only
 │   ├── myData/               ← /me/data-export, /me/deletion-request + export worker
 │   └── users/
@@ -265,10 +269,10 @@ and `/auth/me` then work as before):
   `model_system` / `model_component`) in the same transaction.
 - **Data separation & retention** (migrations `0046`–`0049`):
   - Schemas: `platform` (plan catalogue, features — all tenants read,
-    service role writes), `app` (billing accounts, subscriptions,
-    entitlements, usage events — RLS, a tenant reads its own rows, only the
-    service role writes), `billing` (Stripe customers, invoices, webhook
-    log — no tenant access, outside RLS). 0043's `tenant_subscriptions` moved
+    service role writes), `app` (subscriptions, entitlements, usage events
+    — RLS, a tenant reads its own rows, only the service role writes),
+    `billing` (billing accounts, invoices and lines, Stripe webhook events —
+    no tenant access, outside RLS; 0094). 0043's `tenant_subscriptions` moved
     to `app.subscriptions`. `src/dataGovernance/dataSchemas.config.ts` is the
     single description; `npm run test:db` checks the database against it and
     proves tenant A can't read tenant B and no tenant role can read billing.
@@ -287,14 +291,16 @@ and `/auth/me` then work as before):
     retention: { aiQueryLogsMonths, allowedMonths } }`; `PATCH` `{
     aiQueryLogsMonths }` changes the caller's organisation (audited).
 - **Billing** (`src/billing`) — the only code allowed to import `stripe`
-  (ESLint `no-restricted-imports` + `stripeImportBoundary.spec.ts`).
-  `POST /billing/stripe/webhook` verifies the signature on the raw body and
-  applies each event once (`billing.stripe_webhook_log`): customers link to
-  an organisation via `metadata.tenant_id`; subscription events map the
-  price to a plan (`platform.plans.stripe_price_id`) and sync
-  `app.subscriptions` + `app.entitlements`; invoices go to
-  `billing.stripe_invoices`. Feature checks use `EntitlementsService`
-  (`GET /organisation/entitlements`), never Stripe.
+  (ESLint `no-restricted-imports` + `stripeImportBoundary.spec.ts`). FIELD
+  calculates every amount; Stripe only presents the invoice, adds GST and
+  collects payment (Invoice Items on a Stripe Invoice — no Subscriptions,
+  Prices or Checkout). Platform administrator only: billing accounts
+  (`/admin/billing/organisations`, `/admin/billing/accounts`) and invoices
+  (`/admin/billing/test-invoices`, `/admin/billing/invoices`).
+  `POST /webhooks/stripe` verifies the signature on the raw body, saves each
+  event id once (`billing.stripe_webhook_events`) and only updates invoice
+  status and totals — never subscriptions, entitlements or access. Setup,
+  test cards and curl examples: [STRIPE_SETUP.md](STRIPE_SETUP.md).
 - **Organisation subscription** (`src/organisationSubscription`, any signed-in
   user): `GET /organisation/subscription` returns the organisation's plan from
   `app.subscriptions`, or the Free plan when there is none, its term has ended,
@@ -307,6 +313,12 @@ and `/auth/me` then work as before):
   ranks by Bedrock embeddings; if the model can't be reached it falls back
   to Postgres full-text (any word, title weighted) and retries AI after 5
   minutes. `searchMode` says which: `semantic`, `keyword` or `browse`.
+- **Knowledge catalogue** (`src/knowledgeCatalog`, migration `0102`, any
+  signed-in user): the mobile app's Knowledge — brands in the organisation's
+  plan, documents, page text with section ids, page-level full-text search,
+  signed offline downloads, recent documents and documents for the fleet's
+  models, plus admin attention, brand access and categories. See
+  `src/knowledgeCatalog/README.md`.
 - **Machines list** (`src/machineFleet`, migration `0052`): `GET /machines`
   (`machine.view`; filters `search`, `site`, `make`, `status`, `machineClass`)
   returns up to 200 machines, the filtered `total`, filter choices from the
@@ -739,8 +751,9 @@ archived, and only the caller's organisation + the shared library
   `au.anthropic.claude-sonnet-4-5-20250929-v1:0`)
 - `SERVICE_DATABASE_URL` — connection string for the `field_service` role
   (billing module, background jobs); falls back to `DATABASE_URL`
-- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` — Stripe, used only by
-  `src/billing`; unset = billing endpoints answer 503
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_TAX_ENABLED` —
+  Stripe, used only by `src/billing`; unset key = billing endpoints answer
+  503; a live key (`sk_live_`) outside `NODE_ENV=production` stops startup
 - `AI_LOG_RETENTION_JOB_ENABLED` (default on), `AI_LOG_RETENTION_HOUR_UTC`
   (default 17) — the nightly AI query log purge
 - `DATA_EXPORT_WORKER_ENABLED` (default on; needs S3) — "My data" exports

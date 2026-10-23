@@ -36,6 +36,22 @@ export type CasePriority = (typeof CASE_PRIORITIES)[number];
 export type CaseAuthorRole = (typeof CASE_AUTHOR_ROLES)[number];
 export type CaseEventType = (typeof CASE_EVENT_TYPES)[number];
 
+// on_track / due_soon (last quarter of its time) / breached while the
+// clock runs; paused while waiting on the customer; met / missed once
+// resolved. null when the case has no due time.
+export type CaseSlaState =
+  'on_track' | 'due_soon' | 'breached' | 'paused' | 'met' | 'missed';
+
+export interface CaseSla {
+  state: CaseSlaState | null;
+  dueAt: string | null;
+  pausedAt: string | null;
+  // Support staff's first reply the customer could see (not a note).
+  firstResponseAt: string | null;
+  // Until dueAt, negative once breached; null when paused or finished.
+  minutesRemaining: number | null;
+}
+
 export interface CasePerson {
   id: string;
   name: string;
@@ -70,6 +86,7 @@ export interface SupportCase {
   slaDueAt: string | null;
   // Set while waiting on the customer: the SLA clock stopped then.
   slaPausedAt: string | null;
+  sla: CaseSla;
 }
 
 export interface SupportCaseList {
