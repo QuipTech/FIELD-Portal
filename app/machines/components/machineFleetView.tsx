@@ -36,7 +36,7 @@ export const MachineFleetView = ({ search, reloadToken }: MachineFleetViewProps)
       {fleet.error && <p className="text-sm text-danger">{fleet.error}</p>}
       <div className="flex min-h-0 flex-1 gap-3.5">
         <div className="flex min-w-0 flex-1 flex-col gap-3">
-          <MachinesTable machines={data.items} emptyMessage={emptyMessage} />
+          <MachinesTable machines={data.items} emptyMessage={emptyMessage} onActivated={fleet.reload} />
           <Pagination page={page} pageSize={data.pageSize} total={data.total} onPageChange={setPage} />
         </div>
         <MachinesFilterCard

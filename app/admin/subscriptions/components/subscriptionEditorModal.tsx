@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, type FormEvent } from "react";
 import { Modal } from "@/components/ui/modal";
+import { FormField } from "@/components/ui/formField";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
@@ -17,13 +18,6 @@ interface SubscriptionEditorModalProps {
 
 const SAVE_FAILED_MESSAGE = "Couldn't save the subscription. Please try again.";
 const selectClasses = "h-10 rounded-lg border border-borderGrayStrong bg-surface px-3 text-[15px] text-ink";
-
-const Field = ({ label, children }: { label: string; children: ReactNode }) => (
-  <label className="flex flex-col gap-1.5">
-    <span className="text-xs font-medium uppercase tracking-wide text-mutedGray">{label}</span>
-    {children}
-  </label>
-);
 
 export const SubscriptionEditorModal = ({ item, onSave, onClose }: SubscriptionEditorModalProps) => {
   const [form, setForm] = useState<SubscriptionFormState>(() => toFormState(item));
@@ -55,7 +49,7 @@ export const SubscriptionEditorModal = ({ item, onSave, onClose }: SubscriptionE
       widthClassName="w-[560px]"
     >
       <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-3.5 p-5">
-        <Field label="Tier">
+        <FormField label="Tier">
           <select
             value={form.tier}
             onChange={(event) => update("tier", event.target.value as SubscriptionFormState["tier"])}
@@ -67,8 +61,8 @@ export const SubscriptionEditorModal = ({ item, onSave, onClose }: SubscriptionE
               </option>
             ))}
           </select>
-        </Field>
-        <Field label="Billing basis">
+        </FormField>
+        <FormField label="Billing basis">
           <select
             value={form.billingBasis}
             onChange={(event) => update("billingBasis", event.target.value as SubscriptionFormState["billingBasis"])}
@@ -81,22 +75,22 @@ export const SubscriptionEditorModal = ({ item, onSave, onClose }: SubscriptionE
               </option>
             ))}
           </select>
-        </Field>
-        {form.billingBasis === "negotiated" && <Field label="Licensed assets">{countInput("licensedAssets")}</Field>}
-        <Field label="AI queries / month">{countInput("aiMonthlyQueryAllowance")}</Field>
-        <Field label="Starts">
+        </FormField>
+        {form.billingBasis === "negotiated" && <FormField label="Licensed assets">{countInput("licensedAssets")}</FormField>}
+        <FormField label="AI queries / month">{countInput("aiMonthlyQueryAllowance")}</FormField>
+        <FormField label="Starts">
           <Input
             type="date"
             value={form.startsOn}
             onChange={(event) => update("startsOn", event.target.value)}
             required
           />
-        </Field>
-        <Field label="Ends (blank = no end date)">
+        </FormField>
+        <FormField label="Ends (blank = no end date)">
           <Input type="date" value={form.endsOn} onChange={(event) => update("endsOn", event.target.value)} />
-        </Field>
-        <Field label="Wearable seats">{countInput("wearableSeats")}</Field>
-        <Field label="Remote expert seats">{countInput("remoteExpertSeats")}</Field>
+        </FormField>
+        <FormField label="Wearable seats">{countInput("wearableSeats")}</FormField>
+        <FormField label="Remote expert seats">{countInput("remoteExpertSeats")}</FormField>
         <label className="col-span-2 flex items-center gap-2 text-sm text-bodyGray">
           <input
             type="checkbox"
@@ -106,9 +100,9 @@ export const SubscriptionEditorModal = ({ item, onSave, onClose }: SubscriptionE
           Single sign-on (SSO) add-on
         </label>
         <div className="col-span-2">
-          <Field label="Notes (optional)">
+          <FormField label="Notes (optional)">
             <Input value={form.notes} onChange={(event) => update("notes", event.target.value)} maxLength={2000} />
-          </Field>
+          </FormField>
         </div>
         {saveError && <span className="col-span-2 text-xs text-danger">{saveError}</span>}
         <div className="col-span-2 flex">

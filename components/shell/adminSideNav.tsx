@@ -34,6 +34,7 @@ const links: AdminNavLink[] = [
   { href: "/admin/audit-log", label: "Audit log", icon: "file", permission: PERMISSIONS.managePlatform },
   { href: SUPPORT_QUEUE_HREF, label: "Support cases", icon: "life", isStaffOnly: true },
   { href: "/admin/subscriptions", label: "Subscriptions", icon: "card", permission: PERMISSIONS.managePlatform },
+  { href: "/admin/billing-accounts", label: "Billing accounts", icon: "file", permission: PERMISSIONS.managePlatform },
   { href: "/admin/demo-requests", label: "Demo requests", icon: "mail", permission: PERMISSIONS.managePlatform },
 ];
 

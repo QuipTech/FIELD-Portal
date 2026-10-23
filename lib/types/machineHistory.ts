@@ -1,4 +1,5 @@
 import type { UploadedFile } from "./uploadedFile";
+import type { LifecycleState } from "./machineLifecycle";
 
 export type LiveHistoryEntryType = "service" | "repair" | "inspection" | "fault" | "note";
 
@@ -22,6 +23,8 @@ export interface MachineDetailResponse extends MachineSummary {
   hoursReadAt: string | null;
   owner: { id: string; name: string; avatarUrl: string | null } | null;
   openCaseCount: number;
+  // Missing from older backends, which had no lifecycle.
+  lifecycleState?: LifecycleState;
 }
 
 export interface GalleryPhotoResponse {
