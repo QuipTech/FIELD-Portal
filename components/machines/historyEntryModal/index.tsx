@@ -72,7 +72,7 @@ export const HistoryEntryModal = (props: HistoryEntryModalProps) => {
             options={componentOptions}
             value={draft.componentId}
             onChange={(componentId) => update({ componentId })}
-            placeholder="Hydraulics › Main pump"
+            placeholder="Search this machine's components…"
           />
           {draft.type === "repair" && draft.componentId && (
             <label className="flex items-center gap-2 text-[13px] text-bodyGray">
