@@ -8,12 +8,15 @@ import { AuthenticatedUser } from '../../auth/types/authenticatedUser';
 import { ServiceDatabaseService } from '../../database/serviceDatabase.service';
 import { BillingAccountsService } from '../billingAccounts/billingAccounts.service';
 import { findInvoice } from '../invoices/invoices.repository';
-import { InvoiceStripeSyncService } from '../invoices/invoiceStripeSync.service';
 import { StripeService } from '../stripe/stripe.service';
 import { toStripeGatewayError } from '../stripe/stripeErrors';
 import { PriceBooksService } from '../priceBooks/priceBooks.service';
 import { findPersonalPeriods } from './personalSubscription.repository';
 import { PersonalSubscriptionService } from './personalSubscription.service';
+import {
+  PersonalCheckoutService,
+  toReturnOrigin,
+} from './personalCheckout.service';
 import { PersonalPaymentDto } from './personalPaymentDto';
 import {
   needsReplacementInvoice,
@@ -31,7 +34,7 @@ export class PersonalInvoiceService {
     private readonly database: ServiceDatabaseService,
     private readonly subscriptions: PersonalSubscriptionService,
     private readonly accounts: BillingAccountsService,
-    private readonly sync: InvoiceStripeSyncService,
+    private readonly checkout: PersonalCheckoutService,
     private readonly stripe: StripeService,
     private readonly priceBooks: PriceBooksService,
   ) {}
@@ -54,6 +57,7 @@ export class PersonalInvoiceService {
         'This invoice needs a billing administrator to review it. Please contact support.',
       );
     }
+    // Invoices sent to Stripe before Checkout keep their hosted invoice page.
     if (invoice.hosted_invoice_url) {
       const fresh = await this.subscriptions.getStatus(actor);
       return {
@@ -61,6 +65,7 @@ export class PersonalInvoiceService {
         paymentUrl: fresh.paymentRequired ? invoice.hosted_invoice_url : null,
       };
     }
+    let paymentUrl: string | null;
     try {
       const account = await this.accounts.ensureStripeCustomer(
         await this.accounts.requireAccount(invoice.billing_account_id),
@@ -69,16 +74,16 @@ export class PersonalInvoiceService {
         account.stripe_customer_id!,
         address,
       );
-      await this.sync.pushInvoice(invoice);
+      paymentUrl = await this.checkout.openCheckout(
+        invoice,
+        account.stripe_customer_id!,
+        toReturnOrigin(address.returnOrigin),
+      );
     } catch (error) {
       throw toStripeGatewayError(error);
     }
     const fresh = await this.subscriptions.getStatus(actor);
-    if (!fresh.hostedInvoiceUrl)
-      throw new BadRequestException(
-        'Payment link is not ready. Please try again.',
-      );
-    return { ...fresh, paymentUrl: fresh.hostedInvoiceUrl };
+    return { ...fresh, paymentUrl: fresh.paymentRequired ? paymentUrl : null };
   };
 
   private prepareInvoice = (

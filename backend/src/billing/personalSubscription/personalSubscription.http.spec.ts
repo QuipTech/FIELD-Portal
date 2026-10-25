@@ -10,6 +10,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwtAuthGuard';
 import { PersonalSubscriptionController } from './personalSubscription.controller';
 import { PersonalSubscriptionService } from './personalSubscription.service';
 import { PersonalInvoiceService } from './personalInvoice.service';
+import { PersonalPaymentCheckService } from './personalPaymentCheck.service';
 
 const actor = {
   userId: 'user-a',
@@ -20,6 +21,9 @@ const payments = {
   createPayment: jest
     .fn()
     .mockResolvedValue({ paymentUrl: 'https://invoice.stripe.com/i/a' }),
+};
+const paymentCheck = {
+  checkPayment: jest.fn().mockResolvedValue({ paymentRequired: false }),
 };
 const billing = {
   getStatus: jest.fn().mockResolvedValue({ paymentRequired: true }),
@@ -40,6 +44,7 @@ beforeAll(async () => {
     providers: [
       { provide: PersonalSubscriptionService, useValue: billing },
       { provide: PersonalInvoiceService, useValue: payments },
+      { provide: PersonalPaymentCheckService, useValue: paymentCheck },
     ],
   })
     .overrideGuard(JwtAuthGuard)
@@ -118,5 +123,21 @@ describe('personal billing API access', () => {
       .send({ ...address, ...override })
       .expect(400);
     expect(payments.createPayment).not.toHaveBeenCalled();
+  });
+
+  it('checks the payment for the signed-in user only', async () => {
+    await request(app.getHttpServer())
+      .post('/me/billing/payment/check')
+      .set('Authorization', 'Bearer test-user-a')
+      .expect(201)
+      .expect({ paymentRequired: false });
+    expect(paymentCheck.checkPayment).toHaveBeenCalledWith(actor);
+  });
+
+  it('requires sign-in to check a payment', async () => {
+    await request(app.getHttpServer())
+      .post('/me/billing/payment/check')
+      .expect(403);
+    expect(paymentCheck.checkPayment).not.toHaveBeenCalled();
   });
 });

@@ -29,6 +29,8 @@ import { ReviewTasksService } from './reviewTasks/reviewTasks.service';
 import { PersonalSubscriptionController } from './personalSubscription/personalSubscription.controller';
 import { PersonalSubscriptionService } from './personalSubscription/personalSubscription.service';
 import { PersonalInvoiceService } from './personalSubscription/personalInvoice.service';
+import { PersonalPaymentCheckService } from './personalSubscription/personalPaymentCheck.service';
+import { PersonalCheckoutService } from './personalSubscription/personalCheckout.service';
 
 // FIELD-calculated invoicing: FIELD owns every amount, Stripe presents the
 // invoice, adds GST and collects payment. The only module that talks to
@@ -47,6 +49,8 @@ import { PersonalInvoiceService } from './personalSubscription/personalInvoice.s
   providers: [
     PersonalSubscriptionService,
     PersonalInvoiceService,
+    PersonalPaymentCheckService,
+    PersonalCheckoutService,
     BillingAccountsService,
     InvoicesService,
     InvoiceStripeSyncService,

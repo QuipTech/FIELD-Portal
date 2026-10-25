@@ -1,6 +1,5 @@
 import { ServiceDatabaseService } from '../../database/serviceDatabase.service';
 import { BillingAccountsService } from '../billingAccounts/billingAccounts.service';
-import { InvoiceStripeSyncService } from '../invoices/invoiceStripeSync.service';
 import { PriceBooksService } from '../priceBooks/priceBooks.service';
 import { StripeService } from '../stripe/stripe.service';
 import { findInvoice } from '../invoices/invoices.repository';
@@ -11,6 +10,7 @@ import {
 } from './personalSubscription.repository';
 import { PersonalInvoiceService } from './personalInvoice.service';
 import { PersonalSubscriptionService } from './personalSubscription.service';
+import { PersonalCheckoutService } from './personalCheckout.service';
 
 jest.mock('../invoices/invoices.repository', () => ({
   findInvoice: jest.fn(),
@@ -44,6 +44,8 @@ const status = {
   hostedInvoiceUrl: 'https://invoice.stripe.com/i/a',
 };
 
+const CHECKOUT_URL = 'https://checkout.stripe.com/c/pay/a';
+
 const setup = () => {
   const client = {
     query: jest.fn().mockResolvedValue({ rows: [{ id: 'invoice-a' }] }),
@@ -59,7 +61,7 @@ const setup = () => {
       .fn()
       .mockResolvedValue({ stripe_customer_id: 'cus_a' }),
   };
-  const sync = { pushInvoice: jest.fn().mockResolvedValue(undefined) };
+  const checkout = { openCheckout: jest.fn().mockResolvedValue(CHECKOUT_URL) };
   const stripe = { updateBillingAddress: jest.fn().mockResolvedValue({}) };
   const books = {
     getPinnedPriceBook: jest
@@ -81,11 +83,11 @@ const setup = () => {
     database as unknown as ServiceDatabaseService,
     subscriptions as unknown as PersonalSubscriptionService,
     accounts as unknown as BillingAccountsService,
-    sync as unknown as InvoiceStripeSyncService,
+    checkout as unknown as PersonalCheckoutService,
     stripe as unknown as StripeService,
     books as unknown as PriceBooksService,
   );
-  return { service, client, subscriptions, accounts, sync, stripe, books };
+  return { service, client, subscriptions, accounts, checkout, stripe, books };
 };
 
 beforeEach(() => jest.clearAllMocks());
@@ -112,10 +114,10 @@ describe('personal payment invoice creation', () => {
     expect(client.query).not.toHaveBeenCalled();
   });
 
-  it('locks per user, uses the pinned server price and audits before syncing', async () => {
-    const { service, client, books, stripe, sync } = setup();
+  it('locks per user, uses the pinned server price and audits before Checkout', async () => {
+    const { service, client, books, stripe, checkout } = setup();
     expect(await service.createPayment(actor, address)).toMatchObject({
-      paymentUrl: status.hostedInvoiceUrl,
+      paymentUrl: CHECKOUT_URL,
     });
     expect(client.query.mock.calls[0]).toEqual([
       'SELECT pg_advisory_xact_lock(hashtextextended($1, 0))',
@@ -131,17 +133,23 @@ describe('personal payment invoice creation', () => {
       expect.any(Array),
     );
     expect(stripe.updateBillingAddress).toHaveBeenCalledWith('cus_a', address);
-    expect(sync.pushInvoice).toHaveBeenCalledTimes(1);
+    expect(checkout.openCheckout).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'invoice-a' }),
+      'cus_a',
+      'http://localhost:3001',
+    );
   });
 
   it('reuses the existing period invoice after a failed Stripe attempt', async () => {
-    const { service, client, sync } = setup();
+    const { service, client, checkout } = setup();
     jest
       .mocked(findPersonalPeriods)
       .mockResolvedValue([
         { period_start: status.periodStart, invoice_id: 'invoice-a' },
       ] as Awaited<ReturnType<typeof findPersonalPeriods>>);
-    sync.pushInvoice.mockRejectedValueOnce(new Error('Stripe unavailable'));
+    checkout.openCheckout.mockRejectedValueOnce(
+      new Error('Stripe unavailable'),
+    );
     await expect(service.createPayment(actor, address)).rejects.toThrow(
       'Stripe unavailable',
     );
@@ -151,7 +159,7 @@ describe('personal payment invoice creation', () => {
         String(sql).includes('INSERT INTO billing.invoices'),
       ),
     ).toBe(false);
-    expect(sync.pushInvoice).toHaveBeenCalledTimes(2);
+    expect(checkout.openCheckout).toHaveBeenCalledTimes(2);
   });
 
   it.each([
@@ -160,7 +168,7 @@ describe('personal payment invoice creation', () => {
   ])(
     'replaces a %s invoice with a new one for the same month',
     async (_label, invoiceState) => {
-      const { service, client, sync } = setup();
+      const { service, client, checkout } = setup();
       jest.mocked(findPersonalPeriods).mockResolvedValue([
         {
           id: 'period-old',
@@ -179,7 +187,7 @@ describe('personal payment invoice creation', () => {
         expect.stringContaining('INSERT INTO billing.invoices'),
         ['account-a', 4900],
       );
-      expect(sync.pushInvoice).toHaveBeenCalledTimes(1);
+      expect(checkout.openCheckout).toHaveBeenCalledTimes(1);
     },
   );
 
@@ -199,7 +207,7 @@ describe('personal payment invoice creation', () => {
   });
 
   it('returns an existing hosted link without re-finalising a Stripe invoice', async () => {
-    const { service, sync, stripe } = setup();
+    const { service, checkout, stripe } = setup();
     jest
       .mocked(findPersonalPeriods)
       .mockResolvedValue([
@@ -213,7 +221,7 @@ describe('personal payment invoice creation', () => {
     expect(await service.createPayment(actor, address)).toMatchObject({
       paymentUrl: status.hostedInvoiceUrl,
     });
-    expect(sync.pushInvoice).not.toHaveBeenCalled();
+    expect(checkout.openCheckout).not.toHaveBeenCalled();
     expect(stripe.updateBillingAddress).not.toHaveBeenCalled();
   });
 });

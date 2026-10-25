@@ -9,6 +9,7 @@ import { audMoney } from "@/lib/format/audMoney";
 import type { PersonalInvoice } from "@/lib/types/personalBilling";
 import { Button } from "@/components/ui/button";
 import { PersonalPaymentDialog } from "@/components/billing/personalPaymentDialog";
+import { PaymentReturnBanner } from "@/components/billing/paymentReturnBanner";
 
 export const PersonalBillingView = () => {
   const { status, error, loading, refresh } = usePersonalBilling();
@@ -32,6 +33,7 @@ export const PersonalBillingView = () => {
   return (
     <>
       <h1 className="text-[22px] font-medium text-ink">Billing &amp; subscription</h1>
+      <PaymentReturnBanner paymentRequired={status?.paymentRequired} refresh={refresh} />
       {loading && <div role="status" className="h-36 animate-pulse rounded-xl bg-surface">Loading subscription…</div>}
       {error && <div role="alert" className="rounded-xl border border-borderGray bg-surface p-5"><p>{error}</p><Button onClick={() => void refresh()}>Try again</Button></div>}
       {status && (
