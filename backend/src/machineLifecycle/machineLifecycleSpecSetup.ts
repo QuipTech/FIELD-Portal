@@ -7,6 +7,8 @@ import { EnterpriseThresholdService } from './enterpriseThreshold.service';
 import { MachineLifecycleService } from './machineLifecycle.service';
 import { OrganisationBillingAccountService } from './organisationBillingAccount.service';
 import { BillingAccountsService } from '../billing/billingAccounts/billingAccounts.service';
+import { BillingSignUpService } from '../billing/signUp/billingSignUp.service';
+import { SubscriptionsService } from '../billing/subscriptions/subscriptions.service';
 
 // The lifecycle service over a recording service-role pool and a fake
 // tenant pool that returns one machine, for machineLifecycle.service.spec.
@@ -27,13 +29,18 @@ export interface Scenario {
   stateChangedMeanwhile?: boolean;
   // The organisation has no billing account until activation creates one.
   hasNoBillingAccount?: boolean;
+  // The account exists but has no live machine plan (ASSET_PRO etc.).
+  hasNoMachinePlan?: boolean;
 }
 
 export const setUpLifecycleService = (scenario: Scenario = {}) => {
   const database = createRecordingDatabase((sql) => {
     if (sql.includes('apply_machine_transition'))
       return [{ event_id: scenario.stateChangedMeanwhile ? null : 'event-1' }];
-    if (sql.includes('FROM billing.subscriptions')) return [{ id: 'sub-1' }];
+    if (sql.includes('FROM billing.subscriptions'))
+      return scenario.hasNoMachinePlan
+        ? []
+        : [{ id: 'sub-1', plan_code: 'ASSET_PRO' }];
     if (sql.includes('count(DISTINCT machine_id)'))
       return [{ count: String(scenario.activeMachinesAfter ?? 1) }];
     if (sql.includes('INSERT INTO billing.review_tasks'))
@@ -41,25 +48,30 @@ export const setUpLifecycleService = (scenario: Scenario = {}) => {
     return undefined;
   });
   const createdAccounts: unknown[] = [];
+  const createdSubscriptions: unknown[] = [];
   const tenantDatabase = {
     withTenant: async (_tenantId: string, work: (client: unknown) => unknown) =>
       work({
         query: async (sql: string) => ({
           rows: sql.includes('FROM tenants')
-            ? [{
-                name: 'Pit Crew',
-                billing_account_id:
-                  scenario.hasNoBillingAccount && createdAccounts.length === 0 ? null : 'account-1',
-              }]
+            ? [
+                {
+                  name: 'Pit Crew',
+                  billing_account_id:
+                    scenario.hasNoBillingAccount && createdAccounts.length === 0
+                      ? null
+                      : 'account-1',
+                },
+              ]
             : [
-            {
-              id: 'machine-1',
-              lifecycle_state: scenario.lifecycleState ?? 'registered',
-              billing_account_id: 'account-1',
-              timezone: 'Australia/Brisbane',
-              suspended_at: scenario.suspended ? new Date() : null,
-            },
-          ],
+                {
+                  id: 'machine-1',
+                  lifecycle_state: scenario.lifecycleState ?? 'registered',
+                  billing_account_id: 'account-1',
+                  timezone: 'Australia/Brisbane',
+                  suspended_at: scenario.suspended ? new Date() : null,
+                },
+              ],
         }),
       }),
   } as unknown as DatabaseService;
@@ -69,17 +81,36 @@ export const setUpLifecycleService = (scenario: Scenario = {}) => {
     }),
   } as unknown as BillingConfigService;
   const billingAccounts = {
-    createAccount: async (_actor: unknown, account: unknown) => {
-      createdAccounts.push(account);
-    },
+    requireAccount: async () => ({ timezone: 'Australia/Brisbane' }),
   } as unknown as BillingAccountsService;
+  const signUp = {
+    signUp: async (_actor: unknown, input: unknown) => {
+      createdAccounts.push(input);
+    },
+  } as unknown as BillingSignUpService;
+  const subscriptions = {
+    planNewTerm: async () => ({ term: 'monthly' }),
+    createSubscription: async (
+      _client: unknown,
+      _actor: unknown,
+      params: unknown,
+    ) => {
+      createdSubscriptions.push(params);
+    },
+  } as unknown as SubscriptionsService;
   const service = new MachineLifecycleService(
     tenantDatabase,
     database.serviceDatabase,
     new EnterpriseThresholdService(config, new ReviewTasksService()),
-    new OrganisationBillingAccountService(tenantDatabase, billingAccounts),
+    new OrganisationBillingAccountService(
+      tenantDatabase,
+      database.serviceDatabase,
+      billingAccounts,
+      signUp,
+      subscriptions,
+    ),
   );
-  return { database, service, createdAccounts };
+  return { database, service, createdAccounts, createdSubscriptions };
 };
 
 export const findTransitionParams = (

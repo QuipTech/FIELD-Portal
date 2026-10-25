@@ -32,6 +32,7 @@ billing/
 ├── invoices/                     ← draft → final → synced pipeline, amounts, statuses, invoice email
 ├── monthlyRun/                   ← daily snapshots, monthly drafts, review window, finalisation (see its README)
 ├── webhooks/                     ← POST /webhooks/stripe: signature check, once-only events, status/totals only
+├── adminInvoices/                ← admin billing page: every invoice by Paid/Unpaid/Failed/Pending/Refunded/Void; refresh from Stripe
 ├── customerBilling/              ← customers' own invoices, Stripe PDF links, Customer Portal sessions (org + personal)
 ├── planOptions/                  ← GET /organisation/subscription/options: plans + add-ons with today's list prices
 └── billingFakeDatabase.ts        ← in-memory service pool for the specs

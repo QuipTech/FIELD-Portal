@@ -5,6 +5,7 @@ import { applyLifecycleActionRequest } from "@/lib/api/machineLifecycleApi";
 import { requireAccessToken } from "@/lib/api/requireAccessToken";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import type { LifecycleChangeResult, LifecycleState } from "@/lib/types/machineLifecycle";
+import { ActivationPriceSummary } from "./activationPriceSummary";
 
 interface ActivateMachineDialogProps {
   machineId: string;
@@ -47,8 +48,13 @@ export const ActivateMachineDialog = ({
       onClose={onClose}
       toErrorMessage={(error) => toApiErrorMessage(error, ACTIVATE_FAILED_MESSAGE)}
     >
-      The machine counts toward this month&apos;s billing from today. Its full history, components, photos, AI and
-      support then open for everyone in your organisation, in the portal and the mobile app.
+      <div className="flex flex-col gap-3">
+        <p>
+          The machine counts toward this month&apos;s billing from today. Its full history, components, photos, AI and
+          support then open for everyone in your organisation, in the portal and the mobile app.
+        </p>
+        <ActivationPriceSummary />
+      </div>
     </ConfirmDialog>
   );
 };

@@ -31,6 +31,8 @@ import { PersonalSubscriptionService } from './personalSubscription/personalSubs
 import { PersonalInvoiceService } from './personalSubscription/personalInvoice.service';
 import { PersonalPaymentCheckService } from './personalSubscription/personalPaymentCheck.service';
 import { PersonalCheckoutService } from './personalSubscription/personalCheckout.service';
+import { AdminInvoicesController } from './adminInvoices/adminInvoices.controller';
+import { AdminInvoicesService } from './adminInvoices/adminInvoices.service';
 
 // FIELD-calculated invoicing: FIELD owns every amount, Stripe presents the
 // invoice, adds GST and collects payment. The only module that talks to
@@ -41,6 +43,7 @@ import { PersonalCheckoutService } from './personalSubscription/personalCheckout
     PersonalSubscriptionController,
     BillingAccountsController,
     InvoicesController,
+    AdminInvoicesController,
     InvoiceReviewController,
     StripeWebhookController,
     CustomerBillingController,
@@ -51,6 +54,7 @@ import { PersonalCheckoutService } from './personalSubscription/personalCheckout
     PersonalInvoiceService,
     PersonalPaymentCheckService,
     PersonalCheckoutService,
+    AdminInvoicesService,
     BillingAccountsService,
     InvoicesService,
     InvoiceStripeSyncService,

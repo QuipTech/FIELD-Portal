@@ -55,3 +55,27 @@ export const applyMachineTransition = async (
   );
   return result.rows[0]?.event_id ?? null;
 };
+
+// The month's peak so far: the most machines active on any day from the
+// first of the month to today. Deactivated machines still count on the
+// days they were active, so this can be above today's count.
+export const findPeakSoFar = async (
+  client: PoolClient,
+  billingAccountId: string,
+  monthStart: string,
+  today: string,
+): Promise<number> => {
+  const result = await client.query<{ peak: string | null }>(
+    `SELECT max(daily.count) AS peak FROM (
+       SELECT count(DISTINCT a.machine_id) AS count
+       FROM generate_series($2::date, $3::date, interval '1 day') AS d(day)
+       LEFT JOIN billing.machine_activations a
+         ON a.billing_account_id = $1 AND a.deleted_at IS NULL
+        AND a.activated_on <= d.day
+        AND (a.billing_end IS NULL OR d.day < a.billing_end)
+       GROUP BY d.day
+     ) daily`,
+    [billingAccountId, monthStart, today],
+  );
+  return Number(result.rows[0]?.peak ?? 0);
+};
