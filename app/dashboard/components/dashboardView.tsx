@@ -9,6 +9,7 @@ import { StatCard } from "@/components/ui/statCard";
 import { LoadingSpinner } from "@/components/ui/loadingSpinner";
 import { useApiResource } from "@/lib/hooks/useApiResource";
 import { useSignedInProfile } from "@/lib/auth/useSignedInProfile";
+import { usePersonalBilling } from "@/lib/hooks/usePersonalBilling";
 import { getDashboardRequest } from "@/lib/api/dashboardApi";
 import { getOrganisationSubscriptionRequest } from "@/lib/api/organisationSubscriptionApi";
 import type { DashboardSummary } from "@/lib/types/dashboard";
@@ -17,6 +18,7 @@ import { CasesByPriorityCard } from "./casesByPriorityCard";
 import { RecentActivityCard } from "./recentActivityCard";
 import { MyMachinesCard } from "./myMachinesCard";
 import { PortalGuideModal } from "./portalGuideModal";
+import { describePlanBadge } from "./planBadge";
 
 const DOWN_LABELS_SHOWN = 3;
 
@@ -37,20 +39,25 @@ const todayLabel = () => new Date().toLocaleDateString("en-GB", { weekday: "long
 const DashboardTopBar = () => {
   const profile = useSignedInProfile();
   const subscription = useApiResource(getOrganisationSubscriptionRequest, [], "Couldn't load your plan.");
+  // Refreshes on focus and polling, so the badge changes as soon as a payment is confirmed.
+  const personal = usePersonalBilling();
+  const plan = describePlanBadge(personal.status, subscription.data ?? null);
   const role = profile?.user.roles[0];
 
   return (
     <TopBar
       actions={
         <>
-          {subscription.data && (
+          {plan.label && (
             <Link href="/settings/billing">
-              <Tag tone="primary">{subscription.data.planName} plan</Tag>
+              <Tag tone="primary">{plan.label}</Tag>
             </Link>
           )}
-          <Link href="/settings/billing/upgrade">
-            <Tag>Upgrade</Tag>
-          </Link>
+          {plan.showUpgrade && (
+            <Link href="/settings/billing/upgrade">
+              <Tag>Upgrade</Tag>
+            </Link>
+          )}
           {role && <Tag tone="primary">{[role, profile?.tenant?.name].filter(Boolean).join(" · ")}</Tag>}
         </>
       }

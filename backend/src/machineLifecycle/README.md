@@ -19,7 +19,9 @@ machineLifecycle/
 ├── machineLifecycle.controller.ts ← /machines/:id/lifecycle, /machines/lifecycle/bulk, /machines/:id/custody
 ├── machineActivations.repository.ts ← peak-rule count, billing.apply_machine_transition()
 ├── enterpriseThreshold.service.ts ← one sales review task at the Enterprise threshold (T8)
-├── organisationBillingAccount.service.ts ← self-serve: first activation creates the organisation's billing account
+├── organisationBillingAccount.service.ts ← self-serve: first activation signs up the organisation (account + monthly ASSET_PRO)
+├── activationQuote.service.ts     ← GET /machines/lifecycle/activation-quote: price shown before activating
+├── activationQuote.ts             ← pure: this month's charge before/after, band crossing
 ├── activeMachine/                 ← RequireActiveMachineGuard + the shared active check (403 machine_inactive)
 ├── transfers/                     ← transfer requests, approval (moves the machine), approvals inbox, chain of custody
 └── dto/                           ← request validation
@@ -41,8 +43,14 @@ Part of the API (`npm run start:dev` from `backend/`). Tests:
   audited with actor, from, to and reason, in the same transaction.
 - An organisation with no billing account gets one on its first activate /
   reactivate: the organisation's name, the activating admin's email, the
-  default billing time zone (audited; Stripe customer created if Stripe is
-  configured). A user's personal TECH account is separate and never used.
+  default billing time zone and a monthly ASSET_PRO subscription (audited;
+  Stripe customer created if Stripe is configured). An account without a
+  machine plan (ASSET_PRO, ENTERPRISE or INTERNAL) gets the monthly ASSET_PRO
+  subscription on its next activation. Without it the monthly run would
+  never charge for the machines.
+- Activation takes no payment. Machines are billed monthly in arrears on
+  the month's peak (spec sections 3 and 9). The activation dialog shows the
+  rate, the new monthly charge and the invoice date from the activation quote. A user's personal TECH account is separate and never used.
   Platform admins can also set one up first at Admin → Billing accounts.
 - A suspended account can't activate or reactivate; it can still
   deactivate, archive and read everything.

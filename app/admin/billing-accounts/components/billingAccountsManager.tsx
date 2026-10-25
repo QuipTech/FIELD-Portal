@@ -15,7 +15,6 @@ export const BillingAccountsManager = () => {
   return (
     <>
       <div className="flex items-baseline">
-        <h1 className="text-[22px] font-medium text-ink">Billing accounts</h1>
         {organisations && (
           <span className="ml-auto text-xs text-mutedGray">
             {missingCount === 0 ? "Every organisation is set up" : `${missingCount} without a billing account`}

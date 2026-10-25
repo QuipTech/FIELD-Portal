@@ -32,14 +32,19 @@ export class PersonalPaymentCheckService {
     if (!invoice) return status;
     let recorded: boolean;
     try {
-      recorded = invoice.stripe_invoice_id
-        ? await this.recordHostedInvoice(invoice.stripe_invoice_id)
-        : await this.recordCheckout(invoice);
+      recorded = await this.reconcileInvoice(invoice);
     } catch (error) {
       throw toStripeGatewayError(error);
     }
     return recorded ? this.subscriptions.getStatus(actor) : status;
   };
+
+  // True when Stripe has a payment for the invoice that is now recorded.
+  // Also used by the admin "Refresh from Stripe" action.
+  reconcileInvoice = (invoice: InvoiceRow): Promise<boolean> =>
+    invoice.stripe_invoice_id
+      ? this.recordHostedInvoice(invoice.stripe_invoice_id)
+      : this.recordCheckout(invoice);
 
   // An invoice sent to Stripe and paid on its hosted invoice page.
   private recordHostedInvoice = async (stripeInvoiceId: string) => {

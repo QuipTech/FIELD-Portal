@@ -39,8 +39,35 @@ describe('MachineLifecycleService.applyAction', () => {
     });
     await service.applyAction(actor, 'machine-1', 'activate', null, now);
     expect(createdAccounts).toEqual([
-      { organisationId: 'tenant-1', name: 'Pit Crew', billingEmail: 'a@b.c' },
+      {
+        organisationId: 'tenant-1',
+        name: 'Pit Crew',
+        abn: null,
+        billingEmail: 'a@b.c',
+        timezone: null,
+        choice: { term: 'monthly' },
+      },
     ]);
+  });
+
+  it('adds a monthly ASSET_PRO plan when the account has none, so the machine is billed', async () => {
+    const { service, createdSubscriptions } = setUpLifecycleService({
+      hasNoMachinePlan: true,
+    });
+    await service.applyAction(actor, 'machine-1', 'activate', null, now);
+    expect(createdSubscriptions).toEqual([
+      expect.objectContaining({
+        billingAccountId: 'account-1',
+        planCode: 'ASSET_PRO',
+        reason: 'first machine activation',
+      }),
+    ]);
+  });
+
+  it('keeps the existing machine plan', async () => {
+    const { service, createdSubscriptions } = setUpLifecycleService();
+    await service.applyAction(actor, 'machine-1', 'activate', null, now);
+    expect(createdSubscriptions).toEqual([]);
   });
 
   it('never creates a billing account to deactivate', async () => {

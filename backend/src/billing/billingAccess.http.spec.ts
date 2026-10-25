@@ -13,6 +13,8 @@ import { BillingAccountsController } from './billingAccounts/billingAccounts.con
 import { BillingAccountsService } from './billingAccounts/billingAccounts.service';
 import { InvoicesController } from './invoices/invoices.controller';
 import { InvoicesService } from './invoices/invoices.service';
+import { AdminInvoicesController } from './adminInvoices/adminInvoices.controller';
+import { AdminInvoicesService } from './adminInvoices/adminInvoices.service';
 
 // The real controllers and permission guard; sign-in, the permission
 // lookup and the services are faked. Only platform.manage gets through.
@@ -45,7 +47,11 @@ let app: INestApplication;
 
 beforeAll(async () => {
   const moduleRef = await Test.createTestingModule({
-    controllers: [BillingAccountsController, InvoicesController],
+    controllers: [
+      BillingAccountsController,
+      InvoicesController,
+      AdminInvoicesController,
+    ],
     providers: [
       RequirePermissionsGuard,
       { provide: DatabaseService, useValue: fakeDatabase },
@@ -54,6 +60,7 @@ beforeAll(async () => {
         useValue: { listOrganisations: async () => [] },
       },
       { provide: InvoicesService, useValue: {} },
+      { provide: AdminInvoicesService, useValue: {} },
     ],
   })
     .overrideGuard(JwtAuthGuard)
@@ -72,6 +79,8 @@ const ADMIN_ROUTES: [string, string][] = [
   ['post', '/admin/billing/test-invoices'],
   ['get', '/admin/billing/invoices'],
   ['get', '/admin/billing/invoices/11111111-1111-4111-8111-111111111111'],
+  ['get', '/admin/billing/overview/invoices'],
+  ['post', '/admin/billing/overview/refresh-from-stripe'],
 ];
 
 describe('billing admin routes', () => {

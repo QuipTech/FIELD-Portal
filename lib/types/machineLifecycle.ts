@@ -15,3 +15,25 @@ export interface LifecycleChangeResult {
   billedUntilExclusive: string | null;
   enterpriseReviewRaised: boolean;
 }
+
+// What activating machines adds to this month's bill (GET
+// /machines/lifecycle/activation-quote). Amounts are AUD cents ex GST.
+export type ActivationQuote =
+  | { pricing: "contract"; timezone: string; invoicedOn: string }
+  | {
+      pricing: "per_machine";
+      term: "monthly" | "annual";
+      committedQty: number | null;
+      timezone: string;
+      // The 1st of next month: when this month's peak is invoiced.
+      invoicedOn: string;
+      activeToday: number;
+      machinesAfter: number;
+      billableBefore: number;
+      billableAfter: number;
+      rateBeforeCents: number | null;
+      rateAfterCents: number;
+      monthlyBeforeCents: number;
+      monthlyAfterCents: number;
+      bands: { from: number; to: number | null; unitCents: number }[];
+    };

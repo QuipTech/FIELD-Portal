@@ -6,6 +6,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from '../auth/decorators/currentUser.decorator';
@@ -19,6 +20,8 @@ import {
 } from './dto/lifecycleActionDtos';
 import { MACHINE_LIFECYCLE_PERMISSION } from './lifecycleTransitions';
 import { MachineLifecycleService } from './machineLifecycle.service';
+import { ActivationQuoteService } from './activationQuote.service';
+import { ActivationQuoteQueryDto } from './dto/activationQuoteQueryDto';
 import { MachineTransfersService } from './transfers/machineTransfers.service';
 
 // Activate, deactivate, archive and reactivate (spec section 4), the
@@ -30,7 +33,19 @@ export class MachineLifecycleController {
   constructor(
     private readonly lifecycleService: MachineLifecycleService,
     private readonly transfersService: MachineTransfersService,
+    private readonly activationQuoteService: ActivationQuoteService,
   ) {}
+
+  // What activating machines adds to this month's bill, shown before the
+  // admin confirms. Declared before :machineId so it isn't read as an id.
+  @Get('lifecycle/activation-quote')
+  @RequirePermissions(MACHINE_LIFECYCLE_PERMISSION)
+  activationQuote(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Query() query: ActivationQuoteQueryDto,
+  ) {
+    return this.activationQuoteService.getQuote(actor, query.count);
+  }
 
   // Declared before :machineId so "lifecycle" isn't read as an id.
   @Post('lifecycle/bulk')

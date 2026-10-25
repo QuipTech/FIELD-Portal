@@ -4,6 +4,7 @@ import { EnterpriseThresholdService } from './enterpriseThreshold.service';
 import { MachineLifecycleController } from './machineLifecycle.controller';
 import { MachineLifecycleService } from './machineLifecycle.service';
 import { OrganisationBillingAccountService } from './organisationBillingAccount.service';
+import { ActivationQuoteService } from './activationQuote.service';
 import { MachineTransfersController } from './transfers/machineTransfers.controller';
 import { MachineTransferApprovalService } from './transfers/machineTransferApproval.service';
 import { MachineTransfersService } from './transfers/machineTransfers.service';
@@ -19,6 +20,7 @@ import { MachineTransfersService } from './transfers/machineTransfers.service';
     MachineTransferApprovalService,
     EnterpriseThresholdService,
     OrganisationBillingAccountService,
+    ActivationQuoteService,
   ],
 })
 export class MachineLifecycleModule {}

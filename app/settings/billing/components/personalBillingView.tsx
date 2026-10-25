@@ -39,7 +39,7 @@ export const PersonalBillingView = () => {
       {status && (
         <section className="rounded-xl border border-borderGray bg-surface p-5">
           <h2 className="text-lg font-medium text-ink">{status.exempt ? "Owner account" : "FIELD Technician"}</h2>
-          {status.exempt ? <p className="mt-2 text-bodyGray">Owners are exempt from the personal monthly subscription. <Link href="/admin/subscriptions" className="text-primary underline">Manage organisation subscriptions</Link></p> : <>
+          {status.exempt ? <p className="mt-2 text-bodyGray">Owners are exempt from the personal monthly subscription. <Link href="/admin/billing-accounts" className="text-primary underline">View all billing</Link></p> : <>
             <p className="mt-2 text-2xl font-medium text-ink">{audMoney(status.monthlyCents)} <span className="text-sm font-normal text-bodyGray">per month ex GST</span></p>
             <p className="mt-2 text-sm text-bodyGray">Billing month: {status.periodStart} to the day before {status.periodEnd} · {status.timezone}</p>
             <p className="mt-2 text-sm text-bodyGray">Status: {status.paymentRequired ? "Payment required" : status.coveredByOrganisation ? "Paid by your organisation this month" : "Paid for this month"}</p>

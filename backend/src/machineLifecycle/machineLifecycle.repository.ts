@@ -62,7 +62,10 @@ export const findOrganisationBilling = async (
   client: PoolClient,
   tenantId: string,
 ): Promise<{ name: string; billing_account_id: string | null } | null> => {
-  const result = await client.query<{ name: string; billing_account_id: string | null }>(
+  const result = await client.query<{
+    name: string;
+    billing_account_id: string | null;
+  }>(
     `SELECT name, billing_account_id FROM tenants
      WHERE id = $1 AND deleted_at IS NULL`,
     [tenantId],
