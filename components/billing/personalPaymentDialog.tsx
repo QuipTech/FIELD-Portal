@@ -1,14 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { Modal } from "../ui/modal";
 import { Button } from "../ui/button";
 import { LogoutButton } from "../shell/logoutButton";
-import { createPersonalPayment } from "@/lib/api/personalBillingApi";
+import { checkPersonalPayment, createPersonalPayment } from "@/lib/api/personalBillingApi";
 import { getAccessToken } from "@/lib/auth/authSession";
 import { audMoney } from "@/lib/format/audMoney";
 import type { PersonalBillingStatus } from "@/lib/types/personalBilling";
+
+// Checkout for new payments; the hosted invoice page for invoices sent to Stripe earlier.
+const stripePaymentHosts = ["checkout.stripe.com", "invoice.stripe.com"];
 
 interface PersonalPaymentDialogProps {
   status: PersonalBillingStatus;
@@ -25,11 +28,28 @@ export const PersonalPaymentDialog = ({ status, refresh, onClose }: PersonalPaym
     form.current?.querySelector<HTMLInputElement>("input")?.focus();
     return () => previous?.focus();
   }, []);
+  const checkPayment = useCallback(async () => {
+    const token = getAccessToken();
+    if (!token) return;
+    try {
+      await checkPersonalPayment(token);
+      await refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to check your payment. Please try again.");
+    }
+  }, [refresh]);
   useEffect(() => {
+    // Returning from a payment started earlier: confirm it with Stripe straight away.
+    if (status.hostedInvoiceUrl) void checkPayment();
     // Coming Back from Stripe restores this page from the back/forward cache with the button still busy.
-    const resetAfterReturn = (event: PageTransitionEvent) => { if (event.persisted) setBusy(false); };
+    const resetAfterReturn = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      setBusy(false);
+      void checkPayment();
+    };
     window.addEventListener("pageshow", resetAfterReturn);
     return () => window.removeEventListener("pageshow", resetAfterReturn);
+    // Only on opening; usePersonalBilling keeps polling after that.
   }, []);
   const trapFocus = (event: KeyboardEvent<HTMLFormElement>) => {
     if (event.key === "Escape" && onClose) { event.preventDefault(); onClose(); return; }
@@ -55,12 +75,14 @@ export const PersonalPaymentDialog = ({ status, refresh, onClose }: PersonalPaym
       const result = await createPersonalPayment(token, {
         line1: String(values.get("line1")).trim(), city: String(values.get("city")).trim(),
         state: String(values.get("state")), postalCode: String(values.get("postalCode")).trim(),
+        // Stripe Checkout returns here after payment; the API accepts only portal origins.
+        returnOrigin: window.location.origin,
       });
       if (result.paymentUrl) {
         const url = new URL(result.paymentUrl);
-        if (url.protocol !== "https:" || url.hostname !== "invoice.stripe.com")
+        if (url.protocol !== "https:" || !stripePaymentHosts.includes(url.hostname))
           throw new Error("The payment link could not be verified. Please contact support.");
-        // Same tab: a new tab opened after this await is blocked once Stripe takes more than a few seconds.
+        // Same tab: Stripe Checkout sends the user back to the portal once they have paid.
         redirecting = true;
         window.location.assign(url.href);
         return;
@@ -95,7 +117,7 @@ export const PersonalPaymentDialog = ({ status, refresh, onClose }: PersonalPaym
         {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
         <Button type="submit" disabled={busy}>{busy ? "Opening secure Stripe payment…" : `Confirm ${audMoney(status.monthlyCents)} ex GST and pay`}</Button>
         <div className="flex items-center justify-between">
-          <Button type="button" onClick={() => void refresh()} disabled={busy}>I’ve paid — check status</Button>
+          <Button type="button" onClick={() => void checkPayment()} disabled={busy}>I’ve paid — check status</Button>
           <LogoutButton className="flex items-center gap-2 text-sm text-bodyGray" />
         </div>
         <Link href="/settings/billing" className="text-center text-sm text-primary underline" onClick={onClose}>View billing and invoices</Link>

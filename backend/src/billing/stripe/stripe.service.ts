@@ -36,6 +36,16 @@ export interface CreateInvoiceInput {
   daysUntilDue: number;
 }
 
+export interface CreateCheckoutInput {
+  customerId: string;
+  currency: string;
+  amountCents: number;
+  description: string;
+  fieldInvoiceId: string;
+  successUrl: string;
+  cancelUrl: string;
+}
+
 export interface CreateInvoiceItemInput {
   customerId: string;
   stripeInvoiceId: string;
@@ -161,6 +171,57 @@ export class StripeService {
   getInvoicePdfUrl = async (stripeInvoiceId: string): Promise<string | null> =>
     (await this.require().invoices.retrieve(stripeInvoiceId)).invoice_pdf ??
     null;
+
+  // A Checkout page for one FIELD invoice. Stripe sends the payer back to
+  // successUrl afterwards and creates a paid invoice tagged with
+  // fieldInvoiceId, which the invoice webhooks then match to ours.
+  createCheckoutSession = (
+    input: CreateCheckoutInput,
+    idempotencyKey: string,
+  ) =>
+    this.require().checkout.sessions.create(
+      {
+        mode: 'payment',
+        customer: input.customerId,
+        line_items: [
+          {
+            quantity: 1,
+            price_data: {
+              currency: input.currency.toLowerCase(),
+              unit_amount: input.amountCents,
+              tax_behavior: 'exclusive',
+              product_data: { name: input.description },
+            },
+          },
+        ],
+        automatic_tax: { enabled: this.settings.isTaxEnabled },
+        invoice_creation: {
+          enabled: true,
+          invoice_data: { metadata: { fieldInvoiceId: input.fieldInvoiceId } },
+        },
+        metadata: { fieldInvoiceId: input.fieldInvoiceId },
+        success_url: input.successUrl,
+        cancel_url: input.cancelUrl,
+      },
+      { idempotencyKey },
+    );
+
+  // The customer's recent Checkout sessions for one FIELD invoice, newest
+  // first, so an open one is reused and a completed one is never paid twice.
+  listCheckoutSessions = async (customerId: string, fieldInvoiceId: string) =>
+    (
+      await this.require().checkout.sessions.list({
+        customer: customerId,
+        limit: 20,
+      })
+    ).data.filter(
+      (session) => session.metadata?.fieldInvoiceId === fieldInvoiceId,
+    );
+
+  // Stripe's current copy of an invoice, for confirming a payment whose
+  // webhook never arrived.
+  retrieveInvoice = (stripeInvoiceId: string) =>
+    this.require().invoices.retrieve(stripeInvoiceId);
 
   // A Charge no longer names its invoice (API 2025+); the invoice payment
   // for its PaymentIntent does.

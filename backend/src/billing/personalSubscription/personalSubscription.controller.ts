@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwtAuthGuard';
 import { AuthenticatedUser } from '../../auth/types/authenticatedUser';
 import { PersonalSubscriptionService } from './personalSubscription.service';
 import { PersonalInvoiceService } from './personalInvoice.service';
+import { PersonalPaymentCheckService } from './personalPaymentCheck.service';
 import { PersonalPaymentDto } from './personalPaymentDto';
 
 @Controller('me/billing')
@@ -12,6 +13,7 @@ export class PersonalSubscriptionController {
   constructor(
     private readonly subscriptions: PersonalSubscriptionService,
     private readonly invoices: PersonalInvoiceService,
+    private readonly paymentCheck: PersonalPaymentCheckService,
   ) {}
 
   @Get()
@@ -30,5 +32,10 @@ export class PersonalSubscriptionController {
     @Body() address: PersonalPaymentDto,
   ) {
     return this.invoices.createPayment(actor, address);
+  }
+
+  @Post('payment/check')
+  checkPayment(@CurrentUser() actor: AuthenticatedUser) {
+    return this.paymentCheck.checkPayment(actor);
   }
 }

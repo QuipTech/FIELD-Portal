@@ -1,4 +1,4 @@
-import { IsIn, IsString, Length, Matches } from 'class-validator';
+import { IsIn, IsOptional, IsString, Length, Matches } from 'class-validator';
 
 export class PersonalPaymentDto {
   @IsString()
@@ -14,4 +14,11 @@ export class PersonalPaymentDto {
 
   @Matches(/^\d{4}$/)
   postalCode: string;
+
+  // The portal origin to come back to after paying; only a configured
+  // PORTAL_ORIGIN is used (see toReturnOrigin).
+  @IsOptional()
+  @IsString()
+  @Length(1, 200)
+  returnOrigin?: string;
 }

@@ -20,6 +20,7 @@ export interface PersonalBillingAddress {
   city: string;
   state: string;
   postalCode: string;
+  returnOrigin?: string;
 }
 
 export interface PersonalInvoice {
