@@ -92,6 +92,30 @@ export const insertSourceReferences = async (
   );
 };
 
+// A usage_event (billing spec section 6), once per idempotency key, for
+// the request's own organisation and user. Event types the database meters
+// itself (storage, ingestion) are refused.
+export const recordUsageEvent = async (
+  client: PoolClient,
+  params: {
+    eventType: 'ai.turn' | 'ai.session';
+    quantity: number;
+    unit: string;
+    subjectId: string | null;
+    attributes: Record<string, unknown>;
+    idempotencyKey: string;
+  },
+): Promise<void> => {
+  await client.query('SELECT record_my_usage_event($1, $2, $3, $4, $5, $6)', [
+    params.eventType,
+    params.quantity,
+    params.unit,
+    params.subjectId,
+    params.attributes,
+    params.idempotencyKey,
+  ]);
+};
+
 export const insertUsageLog = async (
   client: PoolClient,
   params: {

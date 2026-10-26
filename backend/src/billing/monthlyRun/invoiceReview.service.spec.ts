@@ -26,12 +26,10 @@ const setup = () => {
       .mockResolvedValue({ billing_email: 'accounts@acme.au' }),
   };
   const invoices = {
-    getInvoice: jest
-      .fn()
-      .mockImplementation(async (id: string) => ({
-        id,
-        billingAccountId: 'acct-1',
-      })),
+    getInvoice: jest.fn().mockImplementation(async (id: string) => ({
+      id,
+      billingAccountId: 'acct-1',
+    })),
     finaliseInvoice: jest.fn().mockResolvedValue({}),
   };
   const service = new InvoiceReviewService(

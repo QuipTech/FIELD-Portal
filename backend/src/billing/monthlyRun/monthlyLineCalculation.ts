@@ -1,4 +1,7 @@
-import { calculateOverCommitCents } from '../pricing/annualPricing';
+import {
+  calculateAnnualUpFrontCents,
+  calculateOverCommitCents,
+} from '../pricing/annualPricing';
 import {
   calculateFleetPriceCents,
   findBandRateCents,
@@ -61,6 +64,20 @@ export const recalculateLineAmountCents = (
           snapshot.monthsCharged ?? 0,
         )
       );
+    case 'ASSET_PRO_ANNUAL':
+      return calculateAnnualUpFrontCents(
+        snapshot.bands,
+        snapshot.committedQty ?? 0,
+        snapshot.monthsCharged ?? 0,
+      );
+    case 'TECH_ANNUAL':
+      return (
+        (snapshot.committedQty ?? 0) *
+        (snapshot.seatCents ?? 0) *
+        (snapshot.monthsCharged ?? 0)
+      );
+    case 'ONBOARD_ASSISTED':
+      return snapshot.seatCents ?? 0;
   }
 };
 

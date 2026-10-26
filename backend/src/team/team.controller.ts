@@ -21,6 +21,8 @@ import { ChangeUserRoleDto } from '../adminUsers/dto/changeUserRoleDto';
 import { InviteUserDto } from '../adminUsers/dto/inviteUserDto';
 import { ListAdminUsersQueryDto } from '../adminUsers/dto/listAdminUsersQueryDto';
 import { TeamService } from './team.service';
+import { RequireFeature } from '../entitlements/requireFeature.guard';
+import { FEATURE_KEYS } from '../entitlements/featureKeys';
 
 // The caller's own organisation's people and roles (admin.manage_users).
 // A user outside the organisation is 404.
@@ -46,6 +48,7 @@ export class TeamController {
 
   // Emails a temporary password; the account starts 'invited'.
   @Post('invitations')
+  @RequireFeature(FEATURE_KEYS.orgUsersUnlimited)
   invite(@CurrentUser() actor: AuthenticatedUser, @Body() dto: InviteUserDto) {
     return this.team.invite(actor, dto);
   }

@@ -20,6 +20,11 @@ export const invoiceItemCreateKey = (invoiceLineId: string) => invoiceLineId;
 export const invoiceFinalizeKey = (invoiceId: string) =>
   `invoice:${invoiceId}:finalize`;
 
+export const invoicePayKey = (invoiceId: string) => `invoice:${invoiceId}:pay`;
+
+export const creditNoteCreateKey = (creditNoteId: string) =>
+  `credit-note:${creditNoteId}:create`;
+
 // attempt counts the invoice's earlier Checkout sessions, so a retry or a
 // second tab gets the same session and only an expired one is replaced.
 // The origin is part of the request, so it is part of the key too.

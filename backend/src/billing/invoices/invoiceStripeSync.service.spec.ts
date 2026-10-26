@@ -24,10 +24,15 @@ const createFakeStripe = () => {
     }),
     finalizeInvoice: jest.fn().mockResolvedValue({
       id: 'in_test_1',
+      status: 'open',
+      collection_method: 'send_invoice',
+      due_date: 1793491200,
       total: 16500,
       total_excluding_tax: 15000,
       hosted_invoice_url: 'https://invoice.stripe.com/i/test',
     }),
+    hasDefaultPaymentMethod: jest.fn().mockResolvedValue(false),
+    payInvoice: jest.fn().mockResolvedValue({}),
   };
 };
 
@@ -96,5 +101,52 @@ describe('InvoiceStripeSyncService', () => {
     await service.pushInvoice(state.invoices[0]);
     expect(stripe.itemsByKey.size).toBe(3);
     expect(line.stripe_invoice_item_id).toBe('ii_1');
+  });
+
+  it('emails the invoice with payment terms when no card is on file', async () => {
+    await service.pushInvoice(state.invoices[0]);
+    expect(stripe.createInvoice).toHaveBeenCalledWith(
+      expect.objectContaining({ chargeAutomatically: false }),
+      expect.any(String),
+    );
+    expect(stripe.payInvoice).not.toHaveBeenCalled();
+  });
+
+  it('charges the card or direct debit on file straight away (spec section 9)', async () => {
+    stripe.hasDefaultPaymentMethod.mockResolvedValue(true);
+    stripe.finalizeInvoice.mockResolvedValue({
+      id: 'in_test_1',
+      status: 'open',
+      collection_method: 'charge_automatically',
+      total: 16500,
+      total_excluding_tax: 15000,
+      hosted_invoice_url: 'https://invoice.stripe.com/i/test',
+    });
+    await service.pushInvoice(state.invoices[0]);
+    expect(stripe.createInvoice).toHaveBeenCalledWith(
+      expect.objectContaining({ chargeAutomatically: true }),
+      expect.any(String),
+    );
+    expect(stripe.payInvoice).toHaveBeenCalledWith(
+      'in_test_1',
+      `invoice:${state.invoices[0].id}:pay`,
+    );
+  });
+
+  it('leaves a declined automatic charge to the payment_failed webhook', async () => {
+    stripe.hasDefaultPaymentMethod.mockResolvedValue(true);
+    stripe.finalizeInvoice.mockResolvedValue({
+      id: 'in_test_1',
+      status: 'open',
+      collection_method: 'charge_automatically',
+      total: 16500,
+      total_excluding_tax: 15000,
+      hosted_invoice_url: null,
+    });
+    stripe.payInvoice.mockRejectedValue(new Error('card_declined'));
+    await expect(
+      service.pushInvoice(state.invoices[0]),
+    ).resolves.toBeUndefined();
+    expect(state.invoices[0]).toMatchObject({ status: 'synced' });
   });
 });

@@ -19,6 +19,19 @@ export interface OrganisationBilling {
   organisationName: string;
   organisationStatus: string;
   billingAccount: BillingAccount | null;
+  // The account's main live plan (ENTERPRISE, ASSET_PRO, INTERNAL or TECH).
+  plan: {
+    planCode: string;
+    term: string;
+    status: string;
+    cancelAt: string | null;
+    committedQty: number | null;
+  } | null;
+  overdueInvoiceCount: number;
+  // Suspension is allowed 14 days after this.
+  firstOverdueNoticeAt: string | null;
+  // A fair-use allowance reached 100% this month.
+  usageFlagged: boolean;
 }
 
 // POST /admin/billing/accounts

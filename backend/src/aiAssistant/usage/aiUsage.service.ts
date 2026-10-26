@@ -3,10 +3,10 @@ import { DatabaseService } from '../../database/database.service';
 import { AuthenticatedUser } from '../../auth/types/authenticatedUser';
 import { EntitlementsService } from '../../entitlements/entitlements.service';
 import { BillingConfigService } from '../../billing/billingConfig/billingConfig.service';
-import { countAiQueries } from './aiUsage.repository';
+import { countAiQueries, findAiAllowance } from './aiUsage.repository';
 import { AllowanceUsage, toAllowanceUsage, toUtcMonth } from './aiUsagePeriod';
 
-const AI_FEATURE_CODE = 'ai_assistant';
+import { FEATURE_KEYS } from '../../entitlements/featureKeys';
 
 // GET /ai/usage
 export interface AiUsage {
@@ -16,7 +16,9 @@ export interface AiUsage {
   // (billing.config AI_ALLOWANCE_PER_TECH_USER). Seats are pooled, so this
   // is guidance; the organisation's allowance is the real limit.
   personal: AllowanceUsage;
-  // Everyone in the organisation, against the plan's AI entitlement.
+  // Everyone in the organisation, against this month's pooled AI allowance
+  // (billing.allowance_periods, worked out hourly by the billing job; null
+  // until the first run of the month).
   organisation: AllowanceUsage & { isEnabled: boolean };
   // Share of an allowance at which the app should warn (e.g. 0.8).
   warningThreshold: number | null;
@@ -34,7 +36,7 @@ export class AiUsageService {
 
   getUsage = async (actor: AuthenticatedUser): Promise<AiUsage> => {
     const period = toUtcMonth(new Date());
-    const { personalUsed, organisationUsed } =
+    const { personalUsed, organisationUsed, allowance } =
       await this.databaseService.withTenant(actor.tenantId, async (client) => ({
         personalUsed: await countAiQueries(client, {
           tenantId: actor.tenantId,
@@ -45,21 +47,19 @@ export class AiUsageService {
           tenantId: actor.tenantId,
           since: period.start,
         }),
+        allowance: await findAiAllowance(client),
       }));
-    const entitlement = (
-      await this.entitlements.listEntitlements(actor.tenantId)
-    ).find((row) => row.featureCode === AI_FEATURE_CODE);
-    const isEnabled = entitlement?.isActive ?? false;
+    const isEnabled = await this.entitlements.hasFeature(
+      actor.tenantId,
+      FEATURE_KEYS.aiAssistant,
+    );
     const config = await this.loadSeatAllowance();
     return {
       periodStart: period.start.toISOString(),
       periodEnd: period.end.toISOString(),
       personal: toAllowanceUsage(personalUsed, config.seatAllowance),
       organisation: {
-        ...toAllowanceUsage(
-          organisationUsed,
-          isEnabled ? (entitlement?.limit ?? null) : 0,
-        ),
+        ...toAllowanceUsage(organisationUsed, isEnabled ? allowance : 0),
         isEnabled,
       },
       warningThreshold: config.warningThreshold,

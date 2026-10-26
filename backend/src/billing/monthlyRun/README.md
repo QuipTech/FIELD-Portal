@@ -15,7 +15,13 @@ sections 3 and 9). Each hour, per account and in the account's time zone, it:
    `calc_snapshot` (peak, peak day, pinned price book and bands).
 3. **Finalises** drafts after `INVOICE_REVIEW_HOURS` (24) unless a platform
    administrator has held them, then pushes them to Stripe and emails the
-   billing contact.
+   billing contact. A card or direct debit on file is charged at once.
+
+After the drafts, the same hourly job also renews or ends subscriptions
+whose term is over (`subscriptions/subscriptionRenewal.service.ts`; an
+annual term is invoiced up front), retries up-front invoices whose Stripe
+push failed, sends overdue notices (`collections/`) and works out fair-use
+allowances (`allowance/`). Each step runs even if an earlier one fails.
 
 Personal TECH accounts (`/me/billing`) pay up front and are skipped.
 Enterprise and internal plans add no monthly lines. Remote sessions are not

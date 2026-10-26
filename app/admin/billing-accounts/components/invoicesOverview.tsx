@@ -18,6 +18,31 @@ import { getInitials } from "@/lib/format/nameInitials";
 import { audMoney } from "@/lib/format/audMoney";
 import { ADMIN_INVOICE_CATEGORIES, type AdminInvoice, type AdminInvoiceCategory } from "@/lib/types/adminInvoice";
 import { INVOICE_CATEGORY_LABELS } from "../invoiceCategoryLabels";
+import { ActionMenu, type ActionMenuItem } from "@/components/ui/actionMenu";
+import { createCreditNoteRequest, holdInvoiceRequest, releaseInvoiceRequest } from "@/lib/api/adminBillingOperationsApi";
+import { AdminPromptDialog } from "./adminPromptDialog";
+
+type InvoiceAction = { invoice: AdminInvoice; action: "credit" | "hold" };
+
+const CREDITABLE = ["synced", "paid", "payment_failed"];
+
+const actionsFor = (
+  invoice: AdminInvoice,
+  start: (action: InvoiceAction) => void,
+  release: (invoice: AdminInvoice) => void,
+): ActionMenuItem[] => {
+  const items: ActionMenuItem[] = [];
+  const creditable = (invoice.totalCents ?? 0) - invoice.amountCreditedCents;
+  if (invoice.stripeInvoiceId && CREDITABLE.includes(invoice.status) && creditable > 0)
+    items.push({ label: "Issue credit note", icon: "file", onSelect: () => start({ invoice, action: "credit" }) });
+  if (invoice.invoiceKind === "monthly" && invoice.status === "draft")
+    items.push(
+      invoice.heldAt
+        ? { label: "Release for sending", icon: "send", onSelect: () => release(invoice) }
+        : { label: "Hold for review", icon: "clock", onSelect: () => start({ invoice, action: "hold" }) },
+    );
+  return items;
+};
 
 const PAGE_SIZE = 25;
 const SEARCH_DELAY_MS = 300;
@@ -31,7 +56,7 @@ const formatMonth = (periodStart: string | null) =>
 const formatTotal = (invoice: AdminInvoice) =>
   invoice.totalCents === null ? `${audMoney(invoice.totalExGstCents)} + GST` : audMoney(invoice.totalCents);
 
-const InvoiceRow = ({ invoice }: { invoice: AdminInvoice }) => {
+const InvoiceRow = ({ invoice, actions }: { invoice: AdminInvoice; actions: ActionMenuItem[] }) => {
   const category = INVOICE_CATEGORY_LABELS[invoice.category];
   const payer = invoice.kind === "personal" ? invoice.payerName ?? invoice.payerEmail ?? "Unknown user" : invoice.organisationName;
   return (
@@ -47,10 +72,16 @@ const InvoiceRow = ({ invoice }: { invoice: AdminInvoice }) => {
       </TableCell>
       <TableCell flex={1.4} className="truncate text-bodyGray">{invoice.organisationName}</TableCell>
       <TableCell className="text-bodyGray">{formatMonth(invoice.periodStart)}</TableCell>
-      <TableCell className="text-ink">{formatTotal(invoice)}</TableCell>
+      <TableCell className="flex flex-col text-ink">
+        {formatTotal(invoice)}
+        {invoice.amountCreditedCents > 0 && (
+          <span className="text-xs text-mutedGray">{audMoney(invoice.amountCreditedCents)} credited</span>
+        )}
+      </TableCell>
       <TableCell className="text-bodyGray">{audMoney(invoice.amountPaidCents - invoice.amountRefundedCents)}</TableCell>
-      <TableCell>
+      <TableCell className="flex flex-wrap items-center gap-1">
         <span title={category.hint}><Tag tone={category.tone}>{category.label}</Tag></span>
+        {invoice.heldAt && <Tag tone="amber">Held</Tag>}
       </TableCell>
       <TableCell className="text-sm">
         {invoice.hostedInvoiceUrl ? (
@@ -60,6 +91,9 @@ const InvoiceRow = ({ invoice }: { invoice: AdminInvoice }) => {
         ) : (
           <span className="text-mutedGray">—</span>
         )}
+      </TableCell>
+      <TableCell flex={0.4}>
+        {actions.length > 0 && <ActionMenu label={`Actions for invoice ${invoice.id}`} items={actions} />}
       </TableCell>
     </TableRow>
   );
@@ -72,6 +106,9 @@ export const InvoicesOverview = () => {
   const [page, setPage] = useState(1);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
+  const [acting, setActing] = useState<InvoiceAction | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+
 
   useEffect(() => {
     const timer = window.setTimeout(() => { setSearch(searchText.trim()); setPage(1); }, SEARCH_DELAY_MS);
@@ -84,6 +121,16 @@ export const InvoicesOverview = () => {
     "Couldn't load invoices. Please try again.",
   );
   const summary = list.data?.summary;
+  const release = async (invoice: AdminInvoice) => {
+    setActionMessage(null);
+    try {
+      await releaseInvoiceRequest(requireAccessToken(), invoice.id);
+      setActionMessage("Released. It goes to Stripe on the next hourly run.");
+      list.reload();
+    } catch (error) {
+      setActionMessage(toApiErrorMessage(error, "Couldn't release the invoice."));
+    }
+  };
 
   const refreshFromStripe = async () => {
     setRefreshing(true);
@@ -180,16 +227,52 @@ export const InvoicesOverview = () => {
             <TableHeaderCell>Paid</TableHeaderCell>
             <TableHeaderCell>Status</TableHeaderCell>
             <TableHeaderCell>Invoice</TableHeaderCell>
+            <TableHeaderCell flex={0.4}> </TableHeaderCell>
           </TableHeaderRow>
           {list.data.items.length === 0 && (
             <div className="px-4 py-6 text-sm text-mutedGray">
               {category || search ? "No invoices match these filters." : "No invoices yet."}
             </div>
           )}
-          {list.data.items.map((invoice) => <InvoiceRow key={invoice.id} invoice={invoice} />)}
+          {list.data.items.map((invoice) => (
+            <InvoiceRow key={invoice.id} invoice={invoice} actions={actionsFor(invoice, setActing, (item) => void release(item))} />
+          ))}
         </Table>
       )}
       {list.data && <Pagination page={page} pageSize={PAGE_SIZE} total={list.data.total} onPageChange={setPage} />}
+      {actionMessage && <p role="status" className="text-sm text-bodyGray">{actionMessage}</p>}
+      {acting?.action === "credit" && (
+        <AdminPromptDialog
+          title="Issue a credit note"
+          description={`Credits part or all of this invoice on Stripe (GST included): refunded if it was paid, otherwise taken off what is owed. Up to ${audMoney((acting.invoice.totalCents ?? 0) - acting.invoice.amountCreditedCents)} can be credited.`}
+          confirmLabel="Issue credit note"
+          fields={[
+            { name: "amount", label: "Amount (A$, incl. GST)", type: "money" },
+            { name: "reason", label: "Reason (shown on the credit note)" },
+          ]}
+          onConfirm={async ({ amount, reason }) => {
+            await createCreditNoteRequest(requireAccessToken(), acting.invoice.id, { amountCents: Number(amount), reason: String(reason) });
+            setActing(null);
+            setActionMessage("Credit note issued on Stripe.");
+            list.reload();
+          }}
+          onClose={() => setActing(null)}
+        />
+      )}
+      {acting?.action === "hold" && (
+        <AdminPromptDialog
+          title="Hold this invoice"
+          description="It won't be finalised or sent to Stripe until you release it."
+          confirmLabel="Hold invoice"
+          fields={[{ name: "reason", label: "Reason (audit log)" }]}
+          onConfirm={async ({ reason }) => {
+            await holdInvoiceRequest(requireAccessToken(), acting.invoice.id, String(reason));
+            setActing(null);
+            list.reload();
+          }}
+          onClose={() => setActing(null)}
+        />
+      )}
     </div>
   );
 };

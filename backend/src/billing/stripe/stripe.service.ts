@@ -34,6 +34,9 @@ export interface CreateInvoiceInput {
   fieldInvoiceId: string;
   // PAYMENT_TERMS_DAYS from billing config.
   daysUntilDue: number;
+  // The customer has a default card or direct debit: Stripe charges it
+  // (spec section 9). Otherwise Stripe emails the invoice with the terms.
+  chargeAutomatically: boolean;
 }
 
 export interface CreateCheckoutInput {
@@ -128,8 +131,12 @@ export class StripeService {
       {
         customer: input.customerId,
         currency: input.currency.toLowerCase(),
-        collection_method: 'send_invoice',
-        days_until_due: input.daysUntilDue,
+        ...(input.chargeAutomatically
+          ? { collection_method: 'charge_automatically' as const }
+          : {
+              collection_method: 'send_invoice' as const,
+              days_until_due: input.daysUntilDue,
+            }),
         pending_invoice_items_behavior: 'exclude',
         auto_advance: false,
         automatic_tax: { enabled: this.settings.isTaxEnabled },
@@ -156,6 +163,39 @@ export class StripeService {
     this.require().invoices.finalizeInvoice(
       stripeInvoiceId,
       { auto_advance: false },
+      { idempotencyKey },
+    );
+
+  // Charges an automatically collected invoice now. A declined payment
+  // throws; Stripe's invoice.payment_failed webhook records it.
+  payInvoice = (stripeInvoiceId: string, idempotencyKey: string) =>
+    this.require().invoices.pay(stripeInvoiceId, {}, { idempotencyKey });
+
+  // True when the customer saved a card or direct debit for invoices (in
+  // the Customer Portal), so invoices can be charged automatically.
+  hasDefaultPaymentMethod = async (customerId: string): Promise<boolean> => {
+    const customer = await this.require().customers.retrieve(customerId);
+    if ('deleted' in customer && customer.deleted) return false;
+    if (!('invoice_settings' in customer)) return false;
+    return Boolean(
+      customer.invoice_settings?.default_payment_method ??
+      customer.default_source,
+    );
+  };
+
+  // A credit note for part or all of a finalised invoice: amountCents is
+  // the GST-inclusive amount given back (credited to the balance, or
+  // refunded if the invoice was paid).
+  createCreditNote = (
+    input: { stripeInvoiceId: string; amountCents: number; memo: string },
+    idempotencyKey: string,
+  ) =>
+    this.require().creditNotes.create(
+      {
+        invoice: input.stripeInvoiceId,
+        amount: input.amountCents,
+        memo: input.memo,
+      },
       { idempotencyKey },
     );
 

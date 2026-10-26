@@ -20,3 +20,20 @@ export const listBillingConfigRows = async (
   );
   return result.rows;
 };
+
+// One value, already validated against its key's kind by the caller.
+// Returns the previous value, or undefined when the key doesn't exist.
+export const updateBillingConfigValue = async (
+  client: Pick<ServiceDatabaseService, 'query'>,
+  key: string,
+  value: unknown,
+): Promise<{ previous: unknown } | undefined> => {
+  const result = await client.query<{ previous: unknown }>(
+    `UPDATE billing.config c SET value = $2::jsonb, updated_at = now()
+     FROM (SELECT key, value AS previous FROM billing.config WHERE key = $1 FOR UPDATE) old
+     WHERE c.key = old.key AND c.deleted_at IS NULL
+     RETURNING old.previous`,
+    [key, JSON.stringify(value)],
+  );
+  return result.rows[0];
+};

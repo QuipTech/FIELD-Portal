@@ -20,6 +20,7 @@ const SEEDED_VALUES: Record<string, unknown> = {
   DEFAULT_BILLING_TIMEZONE: 'Australia/Brisbane',
   CANCEL_EXPORT_DAYS: 30,
   CANCEL_DELETE_DAYS: 90,
+  SUSPENSION_NOTICE_DAYS: 14,
 };
 
 const seededRows = () =>

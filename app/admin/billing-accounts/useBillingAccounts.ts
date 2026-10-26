@@ -23,5 +23,6 @@ export const useBillingAccounts = () => {
     isLoading: list.isLoading,
     loadError: list.error,
     createAccount,
+    reload: list.reload,
   };
 };

@@ -78,6 +78,54 @@ line its `calcSnapshot` (peak, peak day, pinned price book and bands).
 - POST /machine-transfers/:transferId/reject
 - POST /machine-transfers/:transferId/cancel
 
+## Organisation billing (billing.manage: Owner, Organisation Admin)
+
+- GET /organisation/billing: account (suspension, Stripe customer), the main
+  live plan (term, period, next term, pinned price book and bands), this
+  month (active machines today, peak so far, rate, charge so far ex GST,
+  invoice date), overdue invoices and when suspension becomes possible, and
+  this month's fair-use rows.
+- GET /organisation/billing/annual-quote?committedQty=Q: price(Q) × 10 up front.
+- PUT /organisation/billing/next-term, body `{ term: 'annual', committedQty }`
+  or `{ term: 'monthly' }`: takes effect at the next renewal (monthly plans
+  renew on the 1st). The annual term is invoiced up front then.
+- POST /organisation/billing/cancel, body `{ reason }`: ends at the end of
+  the current term; DELETE /organisation/billing/cancel keeps the plan.
+- GET /organisation/billing/invoices, GET …/invoices/:id/pdf, POST
+  /organisation/billing/portal-session (now billing.manage, was
+  admin.manage_settings): a card or direct debit saved there is charged
+  automatically for new invoices.
+
+## Billing operations (platform.manage)
+
+- POST /admin/billing/accounts/:id/suspend and /unsuspend, body `{ reason }`.
+  Suspension needs an unpaid invoice whose first overdue notice is at least
+  `SUSPENSION_NOTICE_DAYS` (14) old; it refuses new activations and new AI
+  sessions only (403 `account_suspended`).
+- POST /admin/billing/accounts/:id/enterprise, body
+  `{ annualQuoteCents, committedMachines, reason }` (T8a minimum enforced).
+- GET/POST /admin/billing/invoices/:id/credit-notes, body
+  `{ amountCents, reason }` (GST included, at most the uncredited total);
+  POST /admin/billing/credit-notes/:id/retry after a Stripe failure.
+- GET /admin/billing/onboarding, POST /admin/billing/onboarding
+  `{ billingAccountId, siteName }`, POST …/:id/complete (invoices
+  ONBOARD_ASSISTED once), POST …/:id/waive `{ reason }`.
+- GET/POST /admin/billing/price-books (a new version from a future or today's
+  date; ASSET_PRO bands must cover 1 upward with no gap).
+- GET /admin/billing/config, PUT /admin/billing/config/:key `{ value }`.
+- GET /admin/billing/review-tasks?status=open|closed, PATCH …/:id
+  `{ status, notes? }`.
+- GET /admin/billing/overview/invoices, POST …/refresh-from-stripe.
+
+## Feature keys
+
+GET /organisation/entitlements now lists the spec's feature keys from the
+organisation's live plans. Routes check them with `@RequireFeature`
+(403 `feature_not_in_plan`): registering machines (`fleet.register`),
+inviting team members (`org.users.unlimited`), organisation branding
+(`whitelabel`), new AI threads (`ai.assistant`) and full machine access
+(`asset.history`, so an active machine on an ended plan is limited).
+
 ## Webhook
 
 POST /webhooks/stripe requires a verified Stripe-Signature, not a FIELD token.
@@ -86,8 +134,10 @@ It does not mutate organisation entitlements or subscriptions.
 
 ## Not yet implemented
 
-Organisation billing overview/usage, payment method setup, partner APIs,
-review queues, config/price-book editor APIs, remote-session APIs (for live video
-integration), REMOTE_SESSION invoice lines (no session metering yet) and a
-portal screen for the review queue (use the admin APIs above).
-The portal must not call speculative endpoints for those features.
+Remote sessions (live video, `remote.session` metering, REMOTE_SESSION
+invoice lines) and partner billing (partners, agreements, margins,
+statements). Their prices are already in the price book (REMOTE_SESSION
+A$35 per block) and billing.config (PARTNER_DEFAULT_MARGIN_BPS), editable
+under Admin → Billing → Prices & settings. Fleet import (Excel/CSV) has no
+endpoint yet; `fleet.import` is ready for it. The portal must not call
+speculative endpoints for those features.

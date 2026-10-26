@@ -15,3 +15,18 @@ export const countAiQueries = async (
   );
   return Number(result.rows[0].count);
 };
+
+// This month's pooled AI allowance for the organisation's billing account
+// (RLS: own account), or null before the billing job's first run of the
+// month.
+export const findAiAllowance = async (
+  client: PoolClient,
+): Promise<number | null> => {
+  const result = await client.query<{ allowance: string }>(
+    `SELECT allowance FROM billing.allowance_periods
+     WHERE billing_account_id = current_billing_account_id() AND metric = 'ai_turns'
+       AND deleted_at IS NULL
+     ORDER BY period_start DESC LIMIT 1`,
+  );
+  return result.rows[0] ? Number(result.rows[0].allowance) : null;
+};

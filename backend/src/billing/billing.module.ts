@@ -37,6 +37,19 @@ import { AdminInvoicesService } from './adminInvoices/adminInvoices.service';
 // FIELD-calculated invoicing: FIELD owns every amount, Stripe presents the
 // invoice, adds GST and collects payment. The only module that talks to
 // Stripe; webhooks update invoice status and totals, never access.
+import { OrganisationPlanController } from './customerBilling/organisationPlan.controller';
+import { OrganisationPlanService } from './customerBilling/organisationPlan.service';
+import { AdminBillingOperationsController } from './billingOperations/adminBillingOperations.controller';
+import { AccountSuspensionService } from './collections/accountSuspension.service';
+import { CreditNotesService } from './collections/creditNotes.service';
+import { OverdueService } from './collections/overdue.service';
+import { OnboardingService } from './onboarding/onboarding.service';
+import { BillingSettingsService } from './billingSettings/billingSettings.service';
+import { BillingNotifier } from './billingNotices/billingNotifier.service';
+import { AllowanceService } from './allowance/allowance.service';
+import { UpFrontInvoiceService } from './invoices/upFrontInvoice.service';
+import { SubscriptionRenewalService } from './subscriptions/subscriptionRenewal.service';
+
 @Module({
   imports: [StripeModule, EmailModule],
   controllers: [
@@ -48,6 +61,8 @@ import { AdminInvoicesService } from './adminInvoices/adminInvoices.service';
     StripeWebhookController,
     CustomerBillingController,
     PlanOptionsController,
+    OrganisationPlanController,
+    AdminBillingOperationsController,
   ],
   providers: [
     PersonalSubscriptionService,
@@ -74,6 +89,16 @@ import { AdminInvoicesService } from './adminInvoices/adminInvoices.service';
     ReviewTasksService,
     CustomerBillingService,
     PlanOptionsService,
+    OrganisationPlanService,
+    AccountSuspensionService,
+    CreditNotesService,
+    OverdueService,
+    OnboardingService,
+    BillingSettingsService,
+    BillingNotifier,
+    AllowanceService,
+    UpFrontInvoiceService,
+    SubscriptionRenewalService,
   ],
   exports: [
     BillingConfigService,

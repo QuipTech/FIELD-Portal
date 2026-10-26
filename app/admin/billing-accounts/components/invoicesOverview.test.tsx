@@ -17,10 +17,10 @@ const list: AdminInvoiceList = {
   items: [
     { id: "a", category: "paid", status: "paid", kind: "personal", payerEmail: "farhan@example.com", payerName: "Farhan F", organisationName: "Quiptech",
       periodStart: "2026-10-01", totalExGstCents: 4900, gstCents: 490, totalCents: 5390, amountPaidCents: 5390, amountRefundedCents: 0,
-      stripeInvoiceId: "in_a", hostedInvoiceUrl: "https://invoice.stripe.com/i/a", createdAt: "", updatedAt: "" },
+      stripeInvoiceId: "in_a", hostedInvoiceUrl: "https://invoice.stripe.com/i/a", createdAt: "", updatedAt: "", invoiceKind: "personal", reviewUntil: null, heldAt: null, amountCreditedCents: 0, dueOn: null },
     { id: "b", category: "unpaid", status: "synced", kind: "personal", payerEmail: "uneeb@example.com", payerName: "Uneeb M", organisationName: "Tovo solution",
       periodStart: "2026-10-01", totalExGstCents: 4900, gstCents: null, totalCents: null, amountPaidCents: 0, amountRefundedCents: 0,
-      stripeInvoiceId: "in_b", hostedInvoiceUrl: null, createdAt: "", updatedAt: "" },
+      stripeInvoiceId: "in_b", hostedInvoiceUrl: null, createdAt: "", updatedAt: "", invoiceKind: "personal", reviewUntil: null, heldAt: null, amountCreditedCents: 0, dueOn: null },
   ],
 };
 

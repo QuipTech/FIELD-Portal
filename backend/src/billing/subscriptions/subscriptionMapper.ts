@@ -23,4 +23,6 @@ export const toSubscription = (row: SubscriptionRow): Subscription => ({
   cancelAt: toOptionalDay(row.cancel_at),
   exportUntil: toOptionalDay(row.export_until),
   deleteAfter: toOptionalDay(row.delete_after),
+  nextTerm: row.next_term ?? null,
+  nextCommittedQty: row.next_committed_qty ?? null,
 });

@@ -24,6 +24,18 @@ export interface OrganisationBilling {
   organisationName: string;
   organisationStatus: string;
   billingAccount: BillingAccount | null;
+  // The account's main live plan; null without one.
+  plan: {
+    planCode: string;
+    term: string;
+    status: string;
+    cancelAt: string | null;
+    committedQty: number | null;
+  } | null;
+  overdueInvoiceCount: number;
+  firstOverdueNoticeAt: string | null;
+  // A fair-use allowance reached 100% this month.
+  usageFlagged: boolean;
 }
 
 export const toBillingAccount = (row: BillingAccountRow): BillingAccount => ({
@@ -65,4 +77,16 @@ export const toOrganisationBilling = (
         updated_at: row.account_updated_at as Date,
       })
     : null,
+  plan: row.plan_code
+    ? {
+        planCode: row.plan_code,
+        term: row.plan_term as string,
+        status: row.plan_status as string,
+        cancelAt: row.plan_cancel_at,
+        committedQty: row.plan_committed_qty,
+      }
+    : null,
+  overdueInvoiceCount: Number(row.overdue_count ?? 0),
+  firstOverdueNoticeAt: row.first_overdue_notice_at?.toISOString() ?? null,
+  usageFlagged: row.usage_flagged === true,
 });

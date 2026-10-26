@@ -26,14 +26,20 @@ billing/
 ├── priceBooks/                   ← loads a pinned or in-effect price book with its bands
 ├── billingCalendar/              ← billing days in the account's time zone; month and term arithmetic
 ├── billingAudit/                 ← audit entries (from, to, reason) from the service role, jobs as 'system'
-├── subscriptions/                ← per-account subscriptions: terms, renewal re-pinning, cancellation, Enterprise set-up (T8a, T27)
+├── subscriptions/                ← per-account subscriptions: terms, renewal re-pinning, next term (monthly ↔ annual), cancellation and its end, Enterprise set-up (T8a, T27); the hourly renewal step
 ├── seats/                        ← TECH seats: add, reinstate, remove to month end; seats per day (T14)
 ├── signUp/                       ← new organisation's account + monthly ASSET_PRO (T22); annual up-front quote
-├── invoices/                     ← draft → final → synced pipeline, amounts, statuses, invoice email
+├── invoices/                     ← draft → final → synced pipeline, amounts, statuses, invoice email; up-front invoices (annual term, onboarding); a card on file is charged automatically
 ├── monthlyRun/                   ← daily snapshots, monthly drafts, review window, finalisation (see its README)
 ├── webhooks/                     ← POST /webhooks/stripe: signature check, once-only events, status/totals only
 ├── adminInvoices/                ← admin billing page: every invoice by Paid/Unpaid/Failed/Pending/Refunded/Void; refresh from Stripe
-├── customerBilling/              ← customers' own invoices, Stripe PDF links, Customer Portal sessions (org + personal)
+├── billingOperations/            ← admin routes: suspension, Enterprise contracts, credit notes, onboarding, price books, config, review tasks
+├── collections/                  ← overdue notices (day 1, day 7), suspension after the notice period, credit notes
+├── allowance/                    ← fair use: monthly AI/storage/ingest allowance, 80% notice, 100% flag, plan review after 2 months over
+├── onboarding/                   ← assisted onboarding jobs: invoiced once on completion, or waived with a reason
+├── billingSettings/              ← price book versions, billing.config edits, review task list/updates
+├── billingNotices/               ← in-app (bell, kind "billing") and email notices to billing admins and QuipTech
+├── customerBilling/              ← customers' own invoices, Stripe PDF links, Customer Portal sessions (org + personal); the organisation plan page (summary, annual switch, cancel/keep)
 ├── planOptions/                  ← GET /organisation/subscription/options: plans + add-ons with today's list prices
 └── billingFakeDatabase.ts        ← in-memory service pool for the specs
 ```

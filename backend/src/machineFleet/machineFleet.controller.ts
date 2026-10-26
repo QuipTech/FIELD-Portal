@@ -22,6 +22,8 @@ import { CorrectIdentifiersDto } from './dto/correctIdentifiersDto';
 import { UpdateMachineDto } from './dto/updateMachineDto';
 import { MachineIdentifiersService } from './machineIdentifiers.service';
 import { MachineDetailsService } from './machineDetails.service';
+import { RequireFeature } from '../entitlements/requireFeature.guard';
+import { FEATURE_KEYS } from '../entitlements/featureKeys';
 
 // The Machines list, registration and status changes. One machine's
 // details and history (/machines/:machineId…) live in
@@ -46,6 +48,7 @@ export class MachineFleetController {
 
   @Post('machines')
   @RequirePermissions('machine.create')
+  @RequireFeature(FEATURE_KEYS.fleetRegister)
   register(
     @CurrentUser() actor: AuthenticatedUser,
     @Body() dto: RegisterMachineDto,

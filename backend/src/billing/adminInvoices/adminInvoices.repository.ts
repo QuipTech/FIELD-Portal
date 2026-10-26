@@ -22,21 +22,27 @@ export interface AdminInvoiceRow {
   amount_refunded_cents: string;
   stripe_invoice_id: string | null;
   hosted_invoice_url: string | null;
+  invoice_kind: string;
+  review_until: Date | null;
+  held_at: Date | null;
+  amount_credited_cents: string;
+  due_on: string | null;
   created_at: Date;
   updated_at: Date;
 }
 
+// Payers come from billing.personal_payers() (migration 0109): the
+// service role can't read users directly.
 const FROM = `FROM billing.invoices i
   JOIN billing.billing_accounts a ON a.id = i.billing_account_id
   LEFT JOIN billing.personal_periods p ON p.invoice_id = i.id
-  LEFT JOIN users u ON u.id = p.user_id
-  LEFT JOIN tenants t ON t.id = p.tenant_id`;
+  LEFT JOIN billing.personal_payers() u ON u.user_id = p.user_id`;
 
 // $1 category, $2 search text (payer email or name, organisation, account).
 const WHERE = `WHERE ($1::varchar IS NULL OR ${CATEGORY_SQL} = $1)
   AND ($2::varchar IS NULL
     OR u.email ILIKE $2 OR (u.first_name || ' ' || u.last_name) ILIKE $2
-    OR t.name ILIKE $2 OR a.name ILIKE $2)`;
+    OR u.tenant_name ILIKE $2 OR a.name ILIKE $2)`;
 
 export const listAdminInvoices = async (
   database: Reader,
@@ -56,12 +62,13 @@ export const listAdminInvoices = async (
       `SELECT i.id, ${CATEGORY_SQL} AS category, i.status,
          u.email AS payer_email,
          NULLIF(trim(coalesce(u.first_name, '') || ' ' || coalesce(u.last_name, '')), '') AS payer_name,
-         t.name AS organisation_name, a.name AS billing_account_name,
+         u.tenant_name AS organisation_name, a.name AS billing_account_name,
          CASE WHEN p.id IS NULL THEN 'organisation' ELSE 'personal' END AS kind,
          coalesce(p.period_start, i.period_start)::text AS period_start,
          i.total_ex_gst_cents, i.gst_cents, i.total_cents, i.amount_paid_cents,
          i.amount_refunded_cents, i.stripe_invoice_id, i.hosted_invoice_url,
-         i.created_at, i.updated_at
+         i.kind AS invoice_kind, i.review_until, i.held_at, i.amount_credited_cents,
+         i.due_on::text, i.created_at, i.updated_at
        ${FROM} ${WHERE}
        ORDER BY i.created_at DESC, i.id LIMIT $3 OFFSET $4`,
       [...params, filters.limit, filters.offset],

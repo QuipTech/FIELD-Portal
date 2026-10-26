@@ -30,6 +30,7 @@ export const BILLING_CONFIG_KEYS = {
   DEFAULT_BILLING_TIMEZONE: 'timeZone',
   CANCEL_EXPORT_DAYS: 'positiveInteger',
   CANCEL_DELETE_DAYS: 'positiveInteger',
+  SUSPENSION_NOTICE_DAYS: 'positiveInteger',
 } as const satisfies Record<string, BillingConfigValueKind>;
 
 export type BillingConfigKey = keyof typeof BILLING_CONFIG_KEYS;
