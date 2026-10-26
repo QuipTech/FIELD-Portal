@@ -25,10 +25,27 @@ export const listOrganisationsWithBilling = async (
             a.billing_contact_name AS account_billing_contact_name,
             a.suspended_at AS account_suspended_at,
             a.suspension_reason AS account_suspension_reason,
-            a.created_at AS account_created_at, a.updated_at AS account_updated_at
+            a.created_at AS account_created_at, a.updated_at AS account_updated_at,
+            plan.plan_code, plan.term AS plan_term, plan.status AS plan_status,
+            plan.cancel_at::text AS plan_cancel_at, plan.committed_qty AS plan_committed_qty,
+            (SELECT count(*) FROM billing.invoices i
+             WHERE i.billing_account_id = a.id AND i.status IN ('synced', 'payment_failed')
+               AND i.due_on < (now() AT TIME ZONE a.timezone)::date) AS overdue_count,
+            (SELECT min(i.overdue_notice_1_at) FROM billing.invoices i
+             WHERE i.billing_account_id = a.id AND i.status IN ('synced', 'payment_failed')) AS first_overdue_notice_at,
+            EXISTS (SELECT 1 FROM billing.allowance_periods ap
+                    WHERE ap.billing_account_id = a.id AND ap.threshold_state = 'flagged'
+                      AND ap.closed_at IS NULL) AS usage_flagged
      FROM tenants t
      LEFT JOIN billing.billing_accounts a
        ON a.id = t.billing_account_id AND a.deleted_at IS NULL
+     LEFT JOIN LATERAL (
+       SELECT s.plan_code, s.term, s.status, s.cancel_at, s.committed_qty
+       FROM billing.subscriptions s
+       WHERE s.billing_account_id = a.id AND s.deleted_at IS NULL AND s.status <> 'cancelled'
+       ORDER BY array_position(ARRAY['ENTERPRISE','ASSET_PRO','INTERNAL','TECH'], s.plan_code::text)
+       LIMIT 1
+     ) plan ON true
      WHERE t.deleted_at IS NULL
      ORDER BY t.name`,
   );

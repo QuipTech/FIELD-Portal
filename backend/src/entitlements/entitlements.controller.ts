@@ -5,7 +5,7 @@ import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { EntitlementsService } from './entitlements.service';
 
 // What the signed-in user's organisation may use, so the apps can show or
-// hide features. Read from app.entitlements only.
+// hide features: the spec's feature keys from its billing plans.
 @Controller('organisation/entitlements')
 @UseGuards(JwtAuthGuard)
 export class EntitlementsController {

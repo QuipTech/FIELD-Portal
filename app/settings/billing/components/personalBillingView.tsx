@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePersonalBilling } from "@/lib/hooks/usePersonalBilling";
 import { getPersonalInvoices } from "@/lib/api/personalBillingApi";
@@ -10,9 +9,13 @@ import type { PersonalInvoice } from "@/lib/types/personalBilling";
 import { Button } from "@/components/ui/button";
 import { PersonalPaymentDialog } from "@/components/billing/personalPaymentDialog";
 import { PaymentReturnBanner } from "@/components/billing/paymentReturnBanner";
+import { usePermissions } from "@/lib/auth/usePermissions";
+import { PERMISSIONS } from "@/lib/auth/permissionCodes";
+import { OrganisationBillingView } from "./organisation/organisationBillingView";
 
 export const PersonalBillingView = () => {
   const { status, error, loading, refresh } = usePersonalBilling();
+  const { can } = usePermissions();
   const [showPayment, setShowPayment] = useState(false);
   const [invoices, setInvoices] = useState<PersonalInvoice[] | null>(null);
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
@@ -34,12 +37,13 @@ export const PersonalBillingView = () => {
     <>
       <h1 className="text-[22px] font-medium text-ink">Billing &amp; subscription</h1>
       <PaymentReturnBanner paymentRequired={status?.paymentRequired} refresh={refresh} />
+      {can(PERMISSIONS.manageBilling) && <OrganisationBillingView />}
       {loading && <div role="status" className="h-36 animate-pulse rounded-xl bg-surface">Loading subscription…</div>}
       {error && <div role="alert" className="rounded-xl border border-borderGray bg-surface p-5"><p>{error}</p><Button onClick={() => void refresh()}>Try again</Button></div>}
       {status && (
         <section className="rounded-xl border border-borderGray bg-surface p-5">
           <h2 className="text-lg font-medium text-ink">{status.exempt ? "Owner account" : "FIELD Technician"}</h2>
-          {status.exempt ? <p className="mt-2 text-bodyGray">Owners are exempt from the personal monthly subscription. <Link href="/admin/billing-accounts" className="text-primary underline">View all billing</Link></p> : <>
+          {status.exempt ? <p className="mt-2 text-bodyGray">Owners are exempt from the personal monthly subscription.</p> : <>
             <p className="mt-2 text-2xl font-medium text-ink">{audMoney(status.monthlyCents)} <span className="text-sm font-normal text-bodyGray">per month ex GST</span></p>
             <p className="mt-2 text-sm text-bodyGray">Billing month: {status.periodStart} to the day before {status.periodEnd} · {status.timezone}</p>
             <p className="mt-2 text-sm text-bodyGray">Status: {status.paymentRequired ? "Payment required" : status.coveredByOrganisation ? "Paid by your organisation this month" : "Paid for this month"}</p>

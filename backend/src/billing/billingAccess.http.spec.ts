@@ -15,6 +15,12 @@ import { InvoicesController } from './invoices/invoices.controller';
 import { InvoicesService } from './invoices/invoices.service';
 import { AdminInvoicesController } from './adminInvoices/adminInvoices.controller';
 import { AdminInvoicesService } from './adminInvoices/adminInvoices.service';
+import { AdminBillingOperationsController } from './billingOperations/adminBillingOperations.controller';
+import { AccountSuspensionService } from './collections/accountSuspension.service';
+import { CreditNotesService } from './collections/creditNotes.service';
+import { OnboardingService } from './onboarding/onboarding.service';
+import { BillingSettingsService } from './billingSettings/billingSettings.service';
+import { EnterpriseContractService } from './subscriptions/enterpriseContract.service';
 
 // The real controllers and permission guard; sign-in, the permission
 // lookup and the services are faked. Only platform.manage gets through.
@@ -51,6 +57,7 @@ beforeAll(async () => {
       BillingAccountsController,
       InvoicesController,
       AdminInvoicesController,
+      AdminBillingOperationsController,
     ],
     providers: [
       RequirePermissionsGuard,
@@ -61,6 +68,11 @@ beforeAll(async () => {
       },
       { provide: InvoicesService, useValue: {} },
       { provide: AdminInvoicesService, useValue: {} },
+      { provide: AccountSuspensionService, useValue: {} },
+      { provide: CreditNotesService, useValue: {} },
+      { provide: OnboardingService, useValue: {} },
+      { provide: BillingSettingsService, useValue: {} },
+      { provide: EnterpriseContractService, useValue: {} },
     ],
   })
     .overrideGuard(JwtAuthGuard)
@@ -81,6 +93,46 @@ const ADMIN_ROUTES: [string, string][] = [
   ['get', '/admin/billing/invoices/11111111-1111-4111-8111-111111111111'],
   ['get', '/admin/billing/overview/invoices'],
   ['post', '/admin/billing/overview/refresh-from-stripe'],
+  [
+    'post',
+    '/admin/billing/accounts/11111111-1111-4111-8111-111111111111/suspend',
+  ],
+  [
+    'post',
+    '/admin/billing/accounts/11111111-1111-4111-8111-111111111111/unsuspend',
+  ],
+  [
+    'post',
+    '/admin/billing/accounts/11111111-1111-4111-8111-111111111111/enterprise',
+  ],
+  [
+    'get',
+    '/admin/billing/invoices/11111111-1111-4111-8111-111111111111/credit-notes',
+  ],
+  [
+    'post',
+    '/admin/billing/invoices/11111111-1111-4111-8111-111111111111/credit-notes',
+  ],
+  [
+    'post',
+    '/admin/billing/credit-notes/11111111-1111-4111-8111-111111111111/retry',
+  ],
+  ['get', '/admin/billing/onboarding'],
+  ['post', '/admin/billing/onboarding'],
+  [
+    'post',
+    '/admin/billing/onboarding/11111111-1111-4111-8111-111111111111/complete',
+  ],
+  [
+    'post',
+    '/admin/billing/onboarding/11111111-1111-4111-8111-111111111111/waive',
+  ],
+  ['get', '/admin/billing/price-books'],
+  ['post', '/admin/billing/price-books'],
+  ['get', '/admin/billing/config'],
+  ['put', '/admin/billing/config/PAYMENT_TERMS_DAYS'],
+  ['get', '/admin/billing/review-tasks'],
+  ['patch', '/admin/billing/review-tasks/11111111-1111-4111-8111-111111111111'],
 ];
 
 describe('billing admin routes', () => {
@@ -89,10 +141,15 @@ describe('billing admin routes', () => {
       ['org-owner', 'customer'].map((user) => [user, method, path] as const),
     ),
   )('%s gets 403 on %s %s', async (user, method, path) => {
+    const server = request(app.getHttpServer());
     const call =
       method === 'get'
-        ? request(app.getHttpServer()).get(path)
-        : request(app.getHttpServer()).post(path);
+        ? server.get(path)
+        : method === 'put'
+          ? server.put(path)
+          : method === 'patch'
+            ? server.patch(path)
+            : server.post(path);
     await call.set('X-Test-User', user).send({}).expect(403);
   });
 

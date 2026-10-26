@@ -22,6 +22,8 @@ const subscription = (overrides: Partial<Subscription>): Subscription => ({
   cancelAt: null,
   exportUntil: null,
   deleteAfter: null,
+  nextTerm: null,
+  nextCommittedQty: null,
   ...overrides,
 });
 
@@ -84,6 +86,49 @@ describe('subscription terms', () => {
       committedQty: 22,
       periodStart: '2027-04-16',
       periodEnd: '2028-04-16',
+    });
+  });
+
+  it('switches a monthly customer to the annual term they chose, from the renewal', () => {
+    const monthly = subscription({ nextTerm: 'annual', nextCommittedQty: 18 });
+    expect(
+      planRenewal(monthly, {
+        priceBookInEffectId: 'book-v1',
+        currentCount: 12,
+        requestedQty: null,
+        monthsCharged: 10,
+      }),
+    ).toEqual({
+      term: 'annual',
+      priceBookId: 'book-v1',
+      periodStart: '2026-05-01',
+      periodEnd: '2027-05-01',
+      committedQty: 18,
+      annualMonthsCharged: 10,
+    });
+  });
+
+  it('goes back to monthly at the end of an annual term when chosen', () => {
+    const annual = subscription({
+      term: 'annual',
+      committedQty: 15,
+      annualMonthsCharged: 10,
+      currentPeriodStart: '2026-04-16',
+      currentPeriodEnd: '2027-04-16',
+      nextTerm: 'monthly',
+    });
+    expect(
+      planRenewal(annual, {
+        priceBookInEffectId: 'book-v2',
+        currentCount: 22,
+        requestedQty: null,
+        monthsCharged: 10,
+      }),
+    ).toMatchObject({
+      term: 'monthly',
+      committedQty: null,
+      periodStart: '2027-04-01',
+      periodEnd: '2027-05-01',
     });
   });
 

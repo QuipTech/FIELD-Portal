@@ -25,13 +25,23 @@ export interface RunSubscription {
 }
 
 export type LineFormula =
-  'ASSET_PRO' | 'ASSET_PRO_OVER_COMMIT' | 'TECH' | 'TECH_EXTRA_SEATS';
+  | 'ASSET_PRO'
+  | 'ASSET_PRO_OVER_COMMIT'
+  | 'TECH'
+  | 'TECH_EXTRA_SEATS'
+  // Up front for an annual term: price(Q) × months charged, or seats ×
+  // seat price × months charged (spec section 3).
+  | 'ASSET_PRO_ANNUAL'
+  | 'TECH_ANNUAL'
+  // Assisted onboarding, one site at the price book's flat price.
+  | 'ONBOARD_ASSISTED';
 
 // Everything a line's amount depends on, stored with the line so it can be
 // recalculated to the cent without reading anything else (T31).
 export interface LineCalcSnapshot {
   formula: LineFormula;
-  subscriptionId: string;
+  // null for one-off lines (assisted onboarding).
+  subscriptionId: string | null;
   periodStart: string;
   periodEnd: string;
   peak: number;

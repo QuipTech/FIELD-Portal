@@ -18,6 +18,8 @@ export interface SubscriptionRow {
   cancel_at: Date | null;
   export_until: Date | null;
   delete_after: Date | null;
+  next_term: SubscriptionTerm | null;
+  next_committed_qty: number | null;
 }
 
 export interface Subscription {
@@ -36,6 +38,9 @@ export interface Subscription {
   cancelAt: string | null;
   exportUntil: string | null;
   deleteAfter: string | null;
+  // The customer's choice for the next term; null = same as now.
+  nextTerm: SubscriptionTerm | null;
+  nextCommittedQty: number | null;
 }
 
 // A term to write: the period, the pinned price book and, for annual

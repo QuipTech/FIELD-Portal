@@ -44,33 +44,39 @@ export const hasRunInvoice = async (
   const result = await client.query<{ found: boolean }>(
     `SELECT EXISTS (SELECT 1 FROM billing.invoices
        WHERE billing_account_id = $1 AND period_start = $2::date
-         AND status <> 'void') AS found`,
+         AND kind = 'monthly' AND status <> 'void') AS found`,
     [billingAccountId, periodStart],
   );
   return result.rows[0]?.found === true;
 };
 
+// kind 'monthly' (the run, in arrears, waits for review), 'annual' (a
+// term's up-front invoice) or 'onboarding' (assisted onboarding on
+// completion); the last two are finalised straight away.
 export const insertRunInvoice = async (
   client: PoolClient,
   params: {
     billingAccountId: string;
-    periodStart: string;
-    periodEnd: string;
-    reviewUntil: Date;
+    kind?: 'monthly' | 'annual' | 'onboarding';
+    periodStart: string | null;
+    periodEnd: string | null;
+    reviewUntil: Date | null;
     totalExGstCents: number;
     lines: CalculatedLine[];
   },
 ): Promise<string> => {
   const invoice = await client.query<{ id: string }>(
     `INSERT INTO billing.invoices
-       (billing_account_id, currency, total_ex_gst_cents, period_start, period_end, review_until)
-     VALUES ($1, 'AUD', $2, $3, $4, $5) RETURNING id`,
+       (billing_account_id, currency, total_ex_gst_cents, period_start, period_end,
+        review_until, kind)
+     VALUES ($1, 'AUD', $2, $3, $4, $5, $6) RETURNING id`,
     [
       params.billingAccountId,
       params.totalExGstCents,
       params.periodStart,
       params.periodEnd,
       params.reviewUntil,
+      params.kind ?? 'monthly',
     ],
   );
   const invoiceId = invoice.rows[0].id;
@@ -102,9 +108,12 @@ export const listInvoicesDueForFinalisation = async (
 ): Promise<{ id: string }[]> => {
   const result = await client.query<{ id: string }>(
     `SELECT id FROM billing.invoices
-     WHERE status = 'draft' AND period_start IS NOT NULL AND held_at IS NULL
-       AND review_until <= $1
-     ORDER BY review_until, id`,
+     WHERE (status = 'draft' AND kind = 'monthly' AND held_at IS NULL
+            AND review_until <= $1)
+        -- Up-front invoices whose Stripe push failed: retried.
+        OR (status IN ('draft', 'final') AND kind IN ('annual', 'onboarding')
+            AND created_at <= $1::timestamptz - interval '10 minutes')
+     ORDER BY coalesce(review_until, created_at), id`,
     [now],
   );
   return result.rows;
@@ -119,7 +128,7 @@ export const holdRunInvoice = async (
   const result = await client.query<{ billing_account_id: string }>(
     `UPDATE billing.invoices
      SET held_at = now(), held_by = $2, hold_reason = $3, updated_at = now()
-     WHERE id = $1 AND status = 'draft' AND period_start IS NOT NULL
+     WHERE id = $1 AND status = 'draft' AND kind = 'monthly'
        AND held_at IS NULL
      RETURNING billing_account_id`,
     [params.invoiceId, params.heldBy, params.reason],

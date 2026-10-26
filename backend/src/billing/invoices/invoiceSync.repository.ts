@@ -45,12 +45,14 @@ export const markInvoiceSynced = async (
   invoiceId: string,
   totals: InvoiceTotals,
   hostedInvoiceUrl: string | null,
+  dueOn: string | null = null,
 ): Promise<void> => {
   await serviceDatabase.query(
     `UPDATE billing.invoices SET
        total_ex_gst_cents = $2, gst_cents = $3, total_cents = $4,
        hosted_invoice_url = COALESCE($5, hosted_invoice_url),
-       status = CASE WHEN status = ANY($6::varchar[]) THEN 'synced' ELSE status END
+       status = CASE WHEN status = ANY($6::varchar[]) THEN 'synced' ELSE status END,
+       due_on = COALESCE($7::date, due_on)
      WHERE id = $1`,
     [
       invoiceId,
@@ -59,6 +61,7 @@ export const markInvoiceSynced = async (
       totals.totalCents,
       hostedInvoiceUrl,
       statusesMovableTo('synced'),
+      dueOn,
     ],
   );
 };

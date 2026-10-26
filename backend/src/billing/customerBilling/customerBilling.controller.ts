@@ -14,11 +14,12 @@ import { RequirePermissions } from '../../auth/decorators/requirePermissions.dec
 import { CurrentUser } from '../../auth/decorators/currentUser.decorator';
 import { AuthenticatedUser } from '../../auth/types/authenticatedUser';
 import { CustomerBillingService } from './customerBilling.service';
+import { BILLING_MANAGE_PERMISSION } from './billingPermissions';
 
-const BILLING_ADMIN_PERMISSION = 'admin.manage_settings';
+const BILLING_ADMIN_PERMISSION = BILLING_MANAGE_PERMISSION;
 
 // Customer-facing billing: the organisation's (billing admins,
-// admin.manage_settings) and a personal TECH subscriber's own. A portal
+// billing.manage) and a personal TECH subscriber's own. A portal
 // session URL is single-use: open it straight away.
 @Controller()
 @UseGuards(JwtAuthGuard, RequirePermissionsGuard)

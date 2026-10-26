@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { ServiceDatabaseService } from '../../database/serviceDatabase.service';
 import { BillingActor, recordBillingAudit } from '../billingAudit/billingAudit';
@@ -20,6 +24,7 @@ export type TermChoice =
   { term: 'monthly' } | { term: 'annual'; committedQty: number };
 
 const SUBSCRIPTION_NOT_FOUND_MESSAGE = 'Subscription not found.';
+const NOT_CANCELLING_MESSAGE = 'This subscription is not being cancelled.';
 
 @Injectable()
 export class SubscriptionsService {
@@ -165,6 +170,88 @@ export class SubscriptionsService {
       return cancelling;
     });
   };
+
+  // Monthly ↔ annual from the next renewal (spec section 3: annual starts
+  // at sign-up or renewal). Choosing the current term clears the choice.
+  chooseNextTerm = async (
+    actor: BillingActor,
+    subscriptionId: string,
+    choice: TermChoice,
+  ): Promise<Subscription> => {
+    const current = await this.requireSubscription(subscriptionId);
+    const sameTerm =
+      choice.term === current.term &&
+      (choice.term === 'monthly' ||
+        choice.committedQty === current.committedQty);
+    const next = sameTerm
+      ? { term: null, committedQty: null }
+      : {
+          term: choice.term,
+          committedQty: choice.term === 'annual' ? choice.committedQty : null,
+        };
+    return this.serviceDatabase.transaction(async (client) => {
+      const saved = toSubscription(
+        await subscriptionsRepository.saveNextTerm(client, current.id, next),
+      );
+      await recordBillingAudit(client, actor, {
+        action: 'update',
+        entityType: 'billing_subscription',
+        entityId: current.id,
+        billingAccountId: current.billingAccountId,
+        from: {
+          nextTerm: current.nextTerm,
+          nextCommittedQty: current.nextCommittedQty,
+        },
+        to: {
+          nextTerm: saved.nextTerm,
+          nextCommittedQty: saved.nextCommittedQty,
+        },
+        reason: 'next term chosen',
+      });
+      return saved;
+    });
+  };
+
+  // Keeps a subscription whose cancellation hasn't taken effect.
+  undoCancellation = async (
+    actor: BillingActor,
+    subscriptionId: string,
+  ): Promise<Subscription> => {
+    const current = await this.requireSubscription(subscriptionId);
+    return this.serviceDatabase.transaction(async (client) => {
+      const row = await subscriptionsRepository.undoCancelling(
+        client,
+        current.id,
+      );
+      if (!row) throw new ConflictException(NOT_CANCELLING_MESSAGE);
+      const kept = toSubscription(row);
+      await recordBillingAudit(client, actor, {
+        action: 'update',
+        entityType: 'billing_subscription',
+        entityId: current.id,
+        billingAccountId: current.billingAccountId,
+        from: this.describe(current),
+        to: this.describe(kept),
+        reason: 'cancellation withdrawn',
+      });
+      return kept;
+    });
+  };
+
+  // cancel_at has arrived: the subscription ends (scheduled job).
+  completeCancellation = async (subscription: Subscription): Promise<void> =>
+    this.serviceDatabase.transaction(async (client) => {
+      await subscriptionsRepository.markCancelled(client, subscription.id);
+      await recordBillingAudit(client, null, {
+        action: 'update',
+        entityType: 'billing_subscription',
+        entityId: subscription.id,
+        billingAccountId: subscription.billingAccountId,
+        from: { status: 'cancelling' },
+        to: { status: 'cancelled', endedOn: subscription.cancelAt },
+        reason: 'cancellation took effect',
+      });
+    });
 
   requireSubscription = async (subscriptionId: string) => {
     const row = await subscriptionsRepository.findSubscriptionById(

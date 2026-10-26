@@ -20,7 +20,8 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:db": "jest --config ./test/jest-db.json --runInBand",
     "test:knowledge": "NODE_OPTIONS=--experimental-vm-modules jest --config ./test/jest-knowledge.json --runInBand",
-    "test:passkeys": "NODE_OPTIONS=--experimental-vm-modules jest --config ./test/jest-passkeys.json --runInBand"
+    "test:passkeys": "NODE_OPTIONS=--experimental-vm-modules jest --config ./test/jest-passkeys.json --runInBand",
+    "test:billing": "NODE_OPTIONS=--experimental-vm-modules jest --config ./test/jest-billing.json --runInBand"
   },
   "dependencies": {
     "@anthropic-ai/bedrock-sdk": "^0.33.8",

@@ -58,21 +58,26 @@ export interface RenewalInputs {
   monthsCharged: number;
 }
 
-// The next term re-pins the price book in effect at renewal (T27). Annual
-// Q resets to the current count unless the customer chose another; a
-// count of 0 still commits to 1, since a term needs a commitment.
+// The next term re-pins the price book in effect at renewal (T27). It is
+// the term the customer chose for next time (monthly ↔ annual), else the
+// same term again. Annual Q is the customer's choice, else it resets to
+// the current count; a count of 0 still commits to 1, since a term needs a
+// commitment.
 export const planRenewal = (
   subscription: Subscription,
   inputs: RenewalInputs,
 ): SubscriptionTermPlan => {
   const nextStart = subscription.currentPeriodEnd;
-  if (subscription.term === 'monthly') {
+  const nextTerm = subscription.nextTerm ?? subscription.term;
+  if (nextTerm === 'monthly') {
     return planMonthlyTerm(nextStart, inputs.priceBookInEffectId);
   }
   return planAnnualTerm(
     nextStart,
     inputs.priceBookInEffectId,
-    inputs.requestedQty ?? Math.max(inputs.currentCount, 1),
+    inputs.requestedQty ??
+      subscription.nextCommittedQty ??
+      Math.max(inputs.currentCount, 1),
     inputs.monthsCharged,
   );
 };

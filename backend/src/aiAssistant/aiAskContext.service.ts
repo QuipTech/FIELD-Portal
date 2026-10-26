@@ -18,6 +18,7 @@ import { formatMachineContext } from './formatMachineContext';
 import { AskAssistantDto } from './dto/askAssistantDto';
 import { AiRetrievalService, hasAskScope } from './aiRetrieval.service';
 import { assertFullMachineAccess } from '../machineLifecycle/activeMachine/activeMachine.repository';
+import { assertNewSessionAllowed } from './aiSessionAccess';
 
 // Earlier messages resent with each question (5 exchanges).
 const HISTORY_MESSAGE_LIMIT = 10;
@@ -118,10 +119,14 @@ export class AiAskContextService {
         })
       : [];
     const machineId = conversation ? conversation.machine_id : dto.machineId;
-    // AI context needs an active machine; checked when a thread starts
-    // only, so a thread already under way is never cut off.
-    if (!conversation && machineId) {
-      await assertFullMachineAccess(client, actor.tenantId, machineId);
+    // Checked when a thread starts only, so a thread already under way is
+    // never cut off (spec: suspension and limits never stop work in
+    // progress): the plan includes the assistant, the account isn't
+    // suspended for non-payment, and machine context needs an active machine.
+    if (!conversation) {
+      await assertNewSessionAllowed(client);
+      if (machineId)
+        await assertFullMachineAccess(client, actor.tenantId, machineId);
     }
     const machine = machineId
       ? await this.loadMachine(client, actor.tenantId, machineId)

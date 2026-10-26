@@ -76,8 +76,8 @@ export const createPersonalInvoiceDraft = async (
   { accountId, priceBookId, unitCents, status }: PersonalInvoiceDraft,
 ): Promise<string> => {
   const invoice = await client.query<{ id: string }>(
-    `INSERT INTO billing.invoices (billing_account_id, currency, total_ex_gst_cents)
-     VALUES ($1, 'AUD', $2) RETURNING id`,
+    `INSERT INTO billing.invoices (billing_account_id, currency, total_ex_gst_cents, kind)
+     VALUES ($1, 'AUD', $2, 'personal') RETURNING id`,
     [accountId, unitCents],
   );
   const invoiceId = invoice.rows[0].id;

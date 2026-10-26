@@ -39,6 +39,13 @@ const toAdminInvoice = (row: AdminInvoiceRow) => ({
   amountRefundedCents: Number(row.amount_refunded_cents),
   stripeInvoiceId: row.stripe_invoice_id,
   hostedInvoiceUrl: row.hosted_invoice_url,
+  // monthly (in arrears, reviewed before it goes out), annual, onboarding,
+  // personal or manual.
+  invoiceKind: row.invoice_kind,
+  reviewUntil: row.review_until,
+  heldAt: row.held_at,
+  amountCreditedCents: Number(row.amount_credited_cents),
+  dueOn: row.due_on,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
