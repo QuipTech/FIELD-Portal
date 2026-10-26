@@ -14,10 +14,20 @@ import { PasswordResetService } from './passwordReset/passwordReset.service';
 import { PasskeysController } from './passkeys/passkeys.controller';
 import { PasskeyRegistrationService } from './passkeys/passkeyRegistration.service';
 import { PasskeySignInService } from './passkeys/passkeySignIn.service';
+import { BiometricKeysController } from './biometricKeys/biometricKeys.controller';
+import { BiometricSignInController } from './biometricKeys/biometricSignIn.controller';
+import { BiometricKeyRegistrationService } from './biometricKeys/biometricKeyRegistration.service';
+import { BiometricSignInService } from './biometricKeys/biometricSignIn.service';
 
 @Module({
   imports: [PassportModule, JwtModule.register({}), UsersModule],
-  controllers: [AuthController, CognitoAuthController, PasskeysController],
+  controllers: [
+    AuthController,
+    CognitoAuthController,
+    PasskeysController,
+    BiometricKeysController,
+    BiometricSignInController,
+  ],
   providers: [
     AuthService,
     AuthTokenService,
@@ -28,6 +38,8 @@ import { PasskeySignInService } from './passkeys/passkeySignIn.service';
     CognitoAuthGuard,
     PasskeyRegistrationService,
     PasskeySignInService,
+    BiometricKeyRegistrationService,
+    BiometricSignInService,
   ],
 })
 export class AuthModule {}

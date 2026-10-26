@@ -1,17 +1,15 @@
 import { Module } from '@nestjs/common';
-import { ThrottlerModule } from '@nestjs/throttler';
 import { EmailModule } from '../email/email.module';
 import { PublicDemoRequestsController } from './publicDemoRequests.controller';
 import { AdminDemoRequestsController } from './adminDemoRequests.controller';
 import { DemoRequestsService } from './demoRequests.service';
 import { DemoRequestEmailsService } from './demoRequestEmails.service';
 import { DemoRequestsConfig } from './demoRequestsConfig';
-import { DEMO_REQUEST_THROTTLER } from './demoRequestsThrottle';
 
-// ThrottlerGuard is applied only on the public controller (not as a
-// global guard), so no other route is rate limited by this.
+// Its rate limit is registered in AppModule (ThrottlerModule is global)
+// and applied only on the public controller's ThrottlerGuard.
 @Module({
-  imports: [EmailModule, ThrottlerModule.forRoot([DEMO_REQUEST_THROTTLER])],
+  imports: [EmailModule],
   controllers: [PublicDemoRequestsController, AdminDemoRequestsController],
   providers: [
     DemoRequestsConfig,

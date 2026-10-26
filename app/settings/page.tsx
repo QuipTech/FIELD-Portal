@@ -6,6 +6,7 @@ import { DeleteAccountButton } from "@/components/settings/deleteAccountButton";
 import { ProfileHeaderCard } from "./components/profileHeaderCard";
 import { SecuritySettingsSection } from "./components/securitySettingsSection";
 import { PasskeySettingsSection } from "@/components/settings/passkeySettingsSection";
+import { BiometricPhonesSection } from "@/components/settings/biometricPhonesSection";
 
 const SettingsPage = () => {
   return (
@@ -22,6 +23,7 @@ const SettingsPage = () => {
 
         <SecuritySettingsSection />
         <PasskeySettingsSection />
+        <BiometricPhonesSection />
 
         <h2 className="text-base font-medium text-ink">My data</h2>
         <div className="flex flex-col rounded-xl border border-borderGray bg-surface">
