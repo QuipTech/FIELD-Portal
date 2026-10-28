@@ -9,12 +9,15 @@ export interface StripeSettings {
   mode: StripeMode;
 }
 
-const LIVE_KEY_PREFIX = 'sk_live_';
+// Secret (sk_) and restricted (rk_) keys both charge real cards in live mode.
+const LIVE_KEY_PREFIXES = ['sk_live_', 'rk_live_'];
 const PRODUCTION_ENVIRONMENT = 'production';
 
 export const stripeModeOf = (secretKey: string | undefined): StripeMode => {
   if (!secretKey) return 'not_configured';
-  return secretKey.startsWith(LIVE_KEY_PREFIX) ? 'live' : 'test';
+  return LIVE_KEY_PREFIXES.some((prefix) => secretKey.startsWith(prefix))
+    ? 'live'
+    : 'test';
 };
 
 // A live key outside production would charge real cards from a dev or
@@ -28,7 +31,7 @@ export const assertStripeKeyAllowed = (
     nodeEnv !== PRODUCTION_ENVIRONMENT
   ) {
     throw new Error(
-      `Refusing to start: a live Stripe key (sk_live_) is set but NODE_ENV is "${nodeEnv ?? 'unset'}". Live keys are allowed only in production.`,
+      `Refusing to start: a live Stripe key (sk_live_ / rk_live_) is set but NODE_ENV is "${nodeEnv ?? 'unset'}". Live keys are allowed only in production.`,
     );
   }
 };
