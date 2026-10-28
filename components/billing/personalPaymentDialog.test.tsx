@@ -56,12 +56,17 @@ describe("personal payment confirmation", () => {
     expect(vi.mocked(createPersonalPayment).mock.calls[0][1].returnOrigin).toBe(window.location.origin);
   });
 
-  it("asks Stripe for the payment when the user says they have paid", async () => {
+  it("asks Stripe for a payment started earlier as soon as it opens", async () => {
     const refresh = vi.fn().mockResolvedValue(undefined);
-    render(<PersonalPaymentDialog status={status} refresh={refresh} />);
-    fireEvent.click(screen.getByRole("button", { name: "I’ve paid — check status" }));
+    render(<PersonalPaymentDialog status={{ ...status, hostedInvoiceUrl: "https://invoice.stripe.com/i/test" }} refresh={refresh} />);
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(checkPersonalPayment).toHaveBeenCalledWith("test-token");
+  });
+
+  it("does not ask Stripe when no payment has been started", () => {
+    render(<PersonalPaymentDialog status={status} refresh={vi.fn()} />);
+    expect(checkPersonalPayment).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /check status/i })).toBeNull();
   });
 
   it("shows a retryable error and does not open an untrusted payment URL", async () => {
