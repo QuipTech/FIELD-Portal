@@ -116,8 +116,7 @@ export const PersonalPaymentDialog = ({ status, refresh, onClose }: PersonalPaym
         <p className="text-xs text-bodyGray">GST is added by Stripe. Card details stay with Stripe. This payment does not enable automatic monthly charges.</p>
         {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
         <Button type="submit" disabled={busy}>{busy ? "Opening secure Stripe payment…" : `Confirm ${audMoney(status.monthlyCents)} ex GST and pay`}</Button>
-        <div className="flex items-center justify-between">
-          <Button type="button" onClick={() => void checkPayment()} disabled={busy}>I’ve paid — check status</Button>
+        <div className="flex items-center justify-end">
           <LogoutButton className="flex items-center gap-2 text-sm text-bodyGray" />
         </div>
         <Link href="/settings/billing" className="text-center text-sm text-primary underline" onClick={onClose}>View billing and invoices</Link>
