@@ -115,6 +115,7 @@ export class AdminSupportCasesService {
   listMessages = async (
     actor: AuthenticatedUser,
     caseNumber: number,
+    since?: Date,
   ): Promise<CaseMessage[]> => {
     const { caseTenantId, supportCase } =
       await this.caseAccessService.requireStaffAccess(actor, caseNumber);
@@ -123,6 +124,7 @@ export class AdminSupportCasesService {
         tenantId: caseTenantId,
         caseId: supportCase.id,
         includeInternal: true,
+        since,
       });
       return this.caseAttachmentsService.toMessages(client, caseTenantId, rows);
     });
@@ -131,11 +133,12 @@ export class AdminSupportCasesService {
   listEvents = async (
     actor: AuthenticatedUser,
     caseNumber: number,
+    since?: Date,
   ): Promise<CaseEvent[]> => {
     const { caseTenantId, supportCase } =
       await this.caseAccessService.requireStaffAccess(actor, caseNumber);
     return this.databaseService.withTenant(caseTenantId, async (client) =>
-      (await listCaseEvents(client, caseTenantId, supportCase.id)).map(
+      (await listCaseEvents(client, caseTenantId, supportCase.id, since)).map(
         toCaseEvent,
       ),
     );

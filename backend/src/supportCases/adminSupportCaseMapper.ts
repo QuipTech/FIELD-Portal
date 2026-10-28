@@ -1,3 +1,4 @@
+import { toCaseSla } from './caseSla';
 import { toPerson, toPersonName } from './supportCaseMapper';
 import {
   AdminCaseStats,
@@ -32,6 +33,7 @@ export const toAdminCaseListItem = (
   updatedAt: row.updated_at.toISOString(),
   slaDueAt: row.sla_due_at?.toISOString() ?? null,
   slaPausedAt: row.sla_paused_at?.toISOString() ?? null,
+  sla: toCaseSla(row),
   isUnread: row.is_unread,
 });
 

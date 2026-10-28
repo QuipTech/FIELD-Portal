@@ -16,6 +16,10 @@ import { chunkBlocks } from './chunking/chunkDocument';
 import { buildDocumentSections } from './sections/buildDocumentSections';
 import { replaceDocumentSections } from './sections/documentSections.repository';
 import {
+  buildDocumentPages,
+  replaceDocumentPages,
+} from './pages/documentPages';
+import {
   BedrockEmbedderService,
   toVectorLiteral,
 } from './embedding/bedrockEmbedder.service';
@@ -114,7 +118,8 @@ export class IndexingPipelineService {
       );
     }
 
-    // The Knowledge article page reads these, not the chunks.
+    // The Knowledge article page and the app's page reader read these,
+    // not the chunks.
     await replaceDocumentSections(
       this.databaseService,
       job.version_id,
@@ -122,6 +127,11 @@ export class IndexingPipelineService {
         title: job.title,
         fileName: null,
       }),
+    );
+    await replaceDocumentPages(
+      this.databaseService,
+      job.version_id,
+      buildDocumentPages(extracted.blocks),
     );
 
     const fullText = extracted.blocks.map((block) => block.text).join('\n');

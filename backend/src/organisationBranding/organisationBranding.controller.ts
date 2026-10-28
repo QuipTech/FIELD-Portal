@@ -20,6 +20,8 @@ import { LOGO_RULE } from '../storage/storageFileRules';
 import { IncomingFile } from '../storage/types/storedFile';
 import { BrandingService } from './branding.service';
 import { UpdateBrandingDto } from './dto/updateBrandingDto';
+import { RequireFeature } from '../entitlements/requireFeature.guard';
+import { FEATURE_KEYS } from '../entitlements/featureKeys';
 
 // The signed-in user's own organisation's branding. Anyone in the
 // organisation can read it (the app themes itself from it); only its
@@ -37,6 +39,7 @@ export class OrganisationBrandingController {
 
   @Put()
   @RequireRoles(OWNER_ROLE_NAME)
+  @RequireFeature(FEATURE_KEYS.whitelabel)
   update(
     @CurrentUser() actor: AuthenticatedUser,
     @Body() dto: UpdateBrandingDto,
@@ -47,6 +50,7 @@ export class OrganisationBrandingController {
   // multipart/form-data: `file` (PNG, JPG or script-free SVG, ≤ 2 MB).
   @Post('logo')
   @RequireRoles(OWNER_ROLE_NAME)
+  @RequireFeature(FEATURE_KEYS.whitelabel)
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: LOGO_RULE.maxBytes, files: 1 },

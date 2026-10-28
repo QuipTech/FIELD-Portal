@@ -11,7 +11,8 @@ export interface AssistantConversation {
 }
 
 // One retrieved excerpt behind an answer. `index` is its [n] in the
-// answer text; the document opens via GET /documents/:documentId/download.
+// answer text. documentId is the knowledge item: open it with
+// GET /knowledge/documents/:documentId/pages/:page and jump to sectionId.
 export interface AssistantSource {
   index: number;
   chunkId: string;
@@ -20,6 +21,8 @@ export interface AssistantSource {
   title: string;
   page: number | null;
   heading: string | null;
+  // "4.3", or `s{ordinal}` for an unnumbered heading; null when unknown.
+  sectionId: string | null;
 }
 
 export interface AssistantMessage {

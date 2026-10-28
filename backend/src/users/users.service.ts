@@ -1,4 +1,10 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  Optional,
+} from '@nestjs/common';
+import { BillingSignUpService } from '../billing/signUp/billingSignUp.service';
 import { DatabaseService } from '../database/database.service';
 import * as authRepository from '../auth/auth.repository';
 import { UserRow } from '../auth/types/authRows';
@@ -73,7 +79,12 @@ const toUserRow = (
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  private readonly logger = new Logger(UsersService.name);
+
+  constructor(
+    private readonly databaseService: DatabaseService,
+    @Optional() private readonly billingSignUp?: BillingSignUpService,
+  ) {}
 
   // Login and signup are the same call: an existing account (by Cognito sub,
   // then by email) is signed in; otherwise a new one is created — but only
@@ -99,7 +110,41 @@ export class UsersService {
       identity,
       signupProfile,
     );
+    await this.startBilling(
+      createdUser,
+      identity.email,
+      signupProfile.companyName,
+    );
     return { status: 'resolved', user: createdUser };
+  };
+
+  // Billing spec T22: a new organisation starts on monthly ASSET_PRO
+  // straight away (no trial), billed to the person who signed up. Nothing is
+  // charged until a machine is activated. Best effort: the first activation
+  // sets billing up anyway, so a failure here never blocks sign-up.
+  private startBilling = async (
+    user: UserRow,
+    email: string,
+    companyName: string,
+  ): Promise<void> => {
+    if (!this.billingSignUp) return;
+    try {
+      await this.billingSignUp.signUp(
+        { userId: user.id, tenantId: user.tenant_id },
+        {
+          organisationId: user.tenant_id,
+          name: companyName,
+          abn: null,
+          billingEmail: email,
+          timezone: null,
+          choice: { term: 'monthly' },
+        },
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Billing set-up for new organisation ${user.tenant_id} failed: ${String(error)}`,
+      );
+    }
   };
 
   private findExistingUser = async (

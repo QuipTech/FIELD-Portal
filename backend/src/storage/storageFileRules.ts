@@ -89,6 +89,20 @@ const hasMatchingSignature = (extension: string, buffer: Buffer): boolean => {
   }
 };
 
+const SNIFFABLE_IMAGE_EXTENSIONS = ['jpg', 'png', 'heic'];
+
+// Phones often upload photos named without an extension ("photo"), or keep
+// ".HEIC" on a file the app re-encoded as JPEG. For images the bytes, which
+// are checked either way, decide the type rather than the name.
+const detectImageExtension = (
+  rule: FileRule,
+  buffer: Buffer,
+): string | undefined =>
+  SNIFFABLE_IMAGE_EXTENSIONS.find(
+    (extension) =>
+      rule.contentTypes[extension] && hasMatchingSignature(extension, buffer),
+  );
+
 export const fileExtension = (fileName: string): string =>
   fileName.includes('.') ? (fileName.split('.').pop() ?? '').toLowerCase() : '';
 
@@ -105,10 +119,13 @@ export const validateIncomingFile = (
       `Files can be at most ${rule.maxBytes / MB} MB.`,
     );
   }
-  const extension = fileExtension(file.originalname);
-  const contentType = rule.contentTypes[extension];
-  if (!contentType || !hasMatchingSignature(extension, file.buffer)) {
+  const named = fileExtension(file.originalname);
+  const extension =
+    rule.contentTypes[named] && hasMatchingSignature(named, file.buffer)
+      ? named
+      : detectImageExtension(rule, file.buffer);
+  if (!extension) {
     throw new BadRequestException(`Only ${rule.label} can be uploaded.`);
   }
-  return { extension, contentType };
+  return { extension, contentType: rule.contentTypes[extension] };
 };

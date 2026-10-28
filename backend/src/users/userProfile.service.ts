@@ -18,6 +18,9 @@ export interface UserProfile {
   avatarUrl: string | null;
   // E.164, used for SMS alerts.
   phoneNumber: string | null;
+  site: string | null;
+  // BCP 47, e.g. "en-AU".
+  language: string;
 }
 
 @Injectable()
@@ -116,5 +119,7 @@ export class UserProfileService {
     lastName: row.last_name,
     avatarUrl: await resolveAvatarUrl(this.storageService, row),
     phoneNumber: row.phone_number,
+    site: row.site,
+    language: row.language,
   });
 }

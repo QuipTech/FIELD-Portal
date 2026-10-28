@@ -10,9 +10,21 @@ export interface ComponentRow {
   name: string;
   serial_number: string | null;
   firmware_version: string | null;
+  part_number: string | null;
+  manufacturer: string | null;
+  condition_note: string | null;
+  condition_severity: string | null;
+  installed_at: Date | null;
+  hours_at_install: number | null;
+  next_service_due_hours: number | null;
+  notes: string | null;
+  // The machine's current hour-meter reading.
+  machine_operating_hours: number | null;
   // The component's most recent history entry, if any.
   last_entry_type: string | null;
   last_entry_at: Date | null;
+  // Its most recent service or repair entry.
+  last_serviced_at: Date | null;
 }
 
 export interface SnapshotRow {

@@ -5,6 +5,7 @@ import { RequirePermissionsGuard } from '../auth/guards/requirePermissions.guard
 import { RequirePermissions } from '../auth/decorators/requirePermissions.decorator';
 import { CurrentUser } from '../auth/decorators/currentUser.decorator';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
+import { RequireActiveMachineGuard } from '../machineLifecycle/activeMachine/requireActiveMachine.guard';
 import { PHOTO_RULE } from '../storage/storageFileRules';
 import { IncomingFile } from '../storage/types/storedFile';
 import { MachineGalleryService } from './machineGallery.service';
@@ -12,7 +13,7 @@ import { UploadGalleryPhotoDto } from './dto/uploadGalleryPhotoDto';
 
 // The photo gallery on a machine's detail screen.
 @Controller('machines/:machineId/photos')
-@UseGuards(JwtAuthGuard, RequirePermissionsGuard)
+@UseGuards(JwtAuthGuard, RequirePermissionsGuard, RequireActiveMachineGuard)
 export class MachineGalleryController {
   constructor(private readonly machineGalleryService: MachineGalleryService) {}
 

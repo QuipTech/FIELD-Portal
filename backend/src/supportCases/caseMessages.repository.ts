@@ -10,17 +10,29 @@ const MESSAGE_SELECT = `
   LEFT JOIN LATERAL support_case_person(u.created_by) a ON true`;
 
 // includeInternal is false for every customer request: internal notes are
-// filtered out here, in the query, not by the caller.
+// filtered out here, in the query, not by the caller. `since` keeps only
+// messages added or edited after it (polling).
 export const listCaseMessages = async (
   client: PoolClient,
-  params: { tenantId: string; caseId: string; includeInternal: boolean },
+  params: {
+    tenantId: string;
+    caseId: string;
+    includeInternal: boolean;
+    since?: Date;
+  },
 ): Promise<CaseMessageRow[]> => {
   const result = await client.query<CaseMessageRow>(
     `${MESSAGE_SELECT}
      WHERE u.tenant_id = $1 AND u.support_case_id = $2 AND u.deleted_at IS NULL
        AND ($3::boolean OR NOT u.is_internal)
+       AND ($4::timestamptz IS NULL OR GREATEST(u.created_at, u.edited_at) > $4)
      ORDER BY u.created_at, u.id`,
-    [params.tenantId, params.caseId, params.includeInternal],
+    [
+      params.tenantId,
+      params.caseId,
+      params.includeInternal,
+      params.since ?? null,
+    ],
   );
   return result.rows;
 };

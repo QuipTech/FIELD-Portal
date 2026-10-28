@@ -9,18 +9,30 @@ import { SavedToast } from "@/components/ui/savedToast";
 import { MachineTabs, type MachineTab } from "@/components/machines/machineTabs";
 import { machineDetailService as service } from "@/lib/api/machineDetail/machineDetailService";
 import { useCachedResource } from "@/lib/machineDetail/useCachedResource";
-import { machineCacheKeys } from "@/lib/machineDetail/machineDetailCacheKeys";
+import { machineCacheKeys, machineKeyPrefix } from "@/lib/machineDetail/machineDetailCacheKeys";
+import { invalidateCached } from "@/lib/machineDetail/resourceCache";
 import type { OperatingStatus } from "@/lib/types/machineFleet";
+import type { LifecycleChangeResult } from "@/lib/types/machineLifecycle";
 import { MachineDetailProvider } from "../machineDetailContext";
 import { useOfflineHistorySync } from "../useOfflineHistorySync";
 import { prefetchMachineDetail } from "../prefetchMachineDetail";
 import { MachineHeaderBar } from "./machineHeaderBar";
+import { MachineActivationBanner } from "./machineActivationBanner";
+import { MachineLifecycleCard } from "@/components/machines/lifecycle/machineLifecycleCard";
 import { MachinePhotoGallery } from "./machinePhotoGallery";
 import { MachineSpecList } from "./machineSpecList";
 import { SystemsTabs } from "./systemsTabs";
 import { AppShell } from "@/components/shell/appShell";
 
 const ROUTED_TABS: MachineTab[] = ["history", "config-history", "manuals", "cases"];
+
+const LIFECYCLE_NOTICES: Record<LifecycleChangeResult["action"], string> = {
+  activate: "Machine activated.",
+  reactivate: "Machine reactivated.",
+  deactivate: "Machine deactivated. It stops counting toward billing from the 1st of next month.",
+  archive: "Machine archived. It stops counting toward billing from the 1st of next month.",
+  sell: "Machine transferred.",
+};
 
 const toActiveTab = (pathname: string, machineId: string): MachineTab => {
   const section = pathname.slice(`/machines/${machineId}`.length).split("/")[1];
@@ -35,6 +47,8 @@ export const MachineDetailShell = ({ machineId, children }: { machineId: string;
   const machine = useCachedResource(machineCacheKeys.machine(machineId), () => service.getMachine(machineId), "Couldn't load this machine.");
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Bumped on activation: remounts the content so every tab loads afresh.
+  const [contentVersion, setContentVersion] = useState(0);
   const activeTab = toActiveTab(usePathname(), machineId);
   const notify = useCallback((message: string) => setSuccessMessage(message), []);
   const notifyError = useCallback((message: string) => setErrorMessage(message), []);
@@ -62,14 +76,31 @@ export const MachineDetailShell = ({ machineId, children }: { machineId: string;
     if (machine.data) machine.setData({ ...machine.data, status: saved });
   };
 
+  // What the machine refused (403) or allowed is cached; drop it all.
+  const handleLifecycleChange = (result: LifecycleChangeResult) => {
+    invalidateCached(machineKeyPrefix(machineId));
+    if (machine.data) machine.setData({ ...machine.data, lifecycleState: result.lifecycleState });
+    setContentVersion((version) => version + 1);
+    notify(LIFECYCLE_NOTICES[result.action]);
+  };
+
   return (
     <MachineDetailProvider value={contextValue}>
       <AppShell topBar={<MachineHeaderBar machine={machine.data} onStatusChange={changeStatus} />}>
-        <main className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
+        <main key={contentVersion} className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
+          {machine.data && <MachineActivationBanner machine={machine.data} onActivated={handleLifecycleChange} />}
           <div className="flex flex-wrap gap-4">
             <MachinePhotoGallery />
             <MachineSpecList />
           </div>
+          {machine.data && (
+            <MachineLifecycleCard
+              machineId={machineId}
+              machineLabel={machine.data.assetId}
+              lifecycleState={machine.data.lifecycleState}
+              onChanged={handleLifecycleChange}
+            />
+          )}
           <MachineTabs machineId={machineId} active={activeTab} openCaseCount={machine.data?.openCaseCount ?? null} />
           {activeTab === "components" && <SystemsTabs />}
           {children}

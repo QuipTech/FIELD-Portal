@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Icon } from "@/components/icons/icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
+import { FormField } from "@/components/ui/formField";
 import { useApiResource } from "@/lib/hooks/useApiResource";
 import { requireAccessToken } from "@/lib/api/requireAccessToken";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
@@ -18,13 +19,6 @@ interface AddMachineModalProps {
 }
 
 const selectClasses = "h-10 w-full rounded-lg border border-borderGrayStrong bg-surface px-3 text-[15px] text-ink disabled:bg-fillGray";
-
-const Field = ({ label, children }: { label: string; children: ReactNode }) => (
-  <label className="flex flex-1 flex-col gap-1.5">
-    <span className="text-xs font-medium uppercase tracking-wide text-mutedGray">{label}</span>
-    {children}
-  </label>
-);
 
 // Registers a machine against a model from the Machine library (curated
 // by QuipTech admins), so it inherits the model's systems and components.
@@ -75,7 +69,7 @@ export const AddMachineModal = ({ onClose, onRegistered }: AddMachineModalProps)
         )}
         {catalog.error && <p className="text-sm text-danger">{catalog.error}</p>}
         <div className="flex gap-2.5">
-          <Field label="Make">
+          <FormField className="flex-1" label="Make">
             <select
               className={selectClasses}
               value={makeId}
@@ -92,8 +86,8 @@ export const AddMachineModal = ({ onClose, onRegistered }: AddMachineModalProps)
                 </option>
               ))}
             </select>
-          </Field>
-          <Field label="Model">
+          </FormField>
+          <FormField className="flex-1" label="Model">
             <select
               className={selectClasses}
               value={modelId}
@@ -107,29 +101,29 @@ export const AddMachineModal = ({ onClose, onRegistered }: AddMachineModalProps)
                 </option>
               ))}
             </select>
-          </Field>
+          </FormField>
         </div>
         <div className="flex gap-2.5">
-          <Field label="Serial number">
+          <FormField className="flex-1" label="Serial number">
             <Input value={serialNumber} onChange={(event) => setSerialNumber(event.target.value)} maxLength={100} />
-          </Field>
-          <Field label="Plant ID / Asset number">
+          </FormField>
+          <FormField className="flex-1" label="Plant ID / Asset number">
             <Input
               value={assetNumber}
               onChange={(event) => setAssetNumber(event.target.value)}
               placeholder="e.g. HT-2201"
               maxLength={100}
             />
-          </Field>
+          </FormField>
         </div>
         <div className="flex gap-2.5">
-          <Field label="Site">
+          <FormField className="flex-1" label="Site">
             <Input value={site} onChange={(event) => setSite(event.target.value)} placeholder="e.g. Pit 4" maxLength={100} />
-          </Field>
-          <Field label="Hours">
+          </FormField>
+          <FormField className="flex-1" label="Hours">
             <Input value={hours} onChange={(event) => setHours(event.target.value)} inputMode="numeric" placeholder="0" />
-          </Field>
-          <Field label="Status">
+          </FormField>
+          <FormField className="flex-1" label="Status">
             <select className={selectClasses} value={status} onChange={(event) => setStatus(event.target.value as OperatingStatus)}>
               {OPERATING_STATUS_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -137,7 +131,7 @@ export const AddMachineModal = ({ onClose, onRegistered }: AddMachineModalProps)
                 </option>
               ))}
             </select>
-          </Field>
+          </FormField>
         </div>
         {!isHoursValid && <span className="text-xs text-danger">Hours must be a whole number.</span>}
         {saveError && <span className="text-xs text-danger">{saveError}</span>}

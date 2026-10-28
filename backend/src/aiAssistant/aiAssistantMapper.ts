@@ -1,4 +1,5 @@
 import { RetrievedChunk } from '../bedrock/types/technicalResponse';
+import { toSectionId } from '../knowledge/sectionId';
 import { findCitedIndexes } from './findCitedIndexes';
 import {
   AssistantConversation,
@@ -44,6 +45,7 @@ export const chunksToSources = (chunks: RetrievedChunk[]): AssistantSource[] =>
     title: chunk.title,
     page: chunk.page,
     heading: chunk.heading,
+    sectionId: chunk.sectionId,
   }));
 
 const rowsToSources = (rows: MessageSourceRow[]): AssistantSource[] =>
@@ -54,6 +56,10 @@ const rowsToSources = (rows: MessageSourceRow[]): AssistantSource[] =>
     title: row.title ?? DELETED_DOCUMENT_TITLE,
     page: row.page_number,
     heading: row.section_heading,
+    sectionId:
+      row.section_ordinal === null
+        ? null
+        : toSectionId(row.section_ordinal, row.section_title),
   }));
 
 export const toAssistantMessages = (

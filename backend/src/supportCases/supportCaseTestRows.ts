@@ -24,6 +24,7 @@ export const buildCaseRow = (
   closed_at: null,
   sla_due_at: new Date('2026-09-29T12:00:00Z'),
   sla_paused_at: null,
+  first_response_at: null,
   machine_id: 'machine-1',
   machine_label: 'HT-2201',
   machine_model_name: 'CAT 793F',

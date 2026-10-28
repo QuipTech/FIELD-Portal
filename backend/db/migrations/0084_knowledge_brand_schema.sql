@@ -1,4 +1,15 @@
 BEGIN;
+-- A database that ran the first draft of 0102 has a manufacturer-keyed
+-- knowledge_categories that would stop the table below being created. Its
+-- categories are replaced by brand categories; 0107 removes the rest.
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns
+             WHERE table_schema = 'public' AND table_name = 'knowledge_categories'
+               AND column_name = 'manufacturer_id') THEN
+    ALTER TABLE knowledge_items DROP COLUMN IF EXISTS category_id;
+    DROP TABLE knowledge_categories;
+  END IF;
+END $$;
 CREATE TABLE IF NOT EXISTS knowledge_brands (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), name varchar(150) NOT NULL,
   slug varchar(150) NOT NULL UNIQUE, logo_file_id uuid, logo_storage_key varchar,

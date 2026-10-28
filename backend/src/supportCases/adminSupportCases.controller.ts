@@ -23,6 +23,7 @@ import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { PLATFORM_PERMISSION_CODE } from '../auth/systemRoleNames';
 import { CASE_ATTACHMENT_RULE } from '../storage/storageFileRules';
 import { IncomingFile } from '../storage/types/storedFile';
+import { IdempotencyInterceptor } from '../idempotency/idempotency.interceptor';
 import {
   CurrentSupportStaff,
   SupportStaffContext,
@@ -35,6 +36,7 @@ import { ListAdminSupportCasesQueryDto } from './dto/listAdminSupportCasesQueryD
 import { UpdateSupportCaseDto } from './dto/updateSupportCaseDto';
 import { PostStaffCaseMessageDto } from './dto/postStaffCaseMessageDto';
 import { UpdateCaseNoteDto } from './dto/updateCaseNoteDto';
+import { ThreadSinceQueryDto } from './dto/threadSinceQueryDto';
 
 // The support queue and case screens for QuipTech staff, across every
 // organisation. The admin (platform.manage) works every case; a Support
@@ -110,20 +112,31 @@ export class AdminSupportCasesController {
   listMessages(
     @CurrentUser() actor: AuthenticatedUser,
     @Param('caseNumber', ParseIntPipe) caseNumber: number,
+    @Query() query: ThreadSinceQueryDto,
   ) {
-    return this.adminSupportCasesService.listMessages(actor, caseNumber);
+    return this.adminSupportCasesService.listMessages(
+      actor,
+      caseNumber,
+      query.since,
+    );
   }
 
   @Get('cases/:caseNumber/events')
   listEvents(
     @CurrentUser() actor: AuthenticatedUser,
     @Param('caseNumber', ParseIntPipe) caseNumber: number,
+    @Query() query: ThreadSinceQueryDto,
   ) {
-    return this.adminSupportCasesService.listEvents(actor, caseNumber);
+    return this.adminSupportCasesService.listEvents(
+      actor,
+      caseNumber,
+      query.since,
+    );
   }
 
-  // { body, isInternal, attachmentIds }
+  // { body, isInternal, attachmentIds }; Idempotency-Key makes a resend safe.
   @Post('cases/:caseNumber/messages')
+  @UseInterceptors(IdempotencyInterceptor)
   postMessage(
     @CurrentUser() actor: AuthenticatedUser,
     @Param('caseNumber', ParseIntPipe) caseNumber: number,

@@ -1,3 +1,6 @@
+import { LifecycleState } from '../../machineLifecycle/lifecycleTransitions';
+import { AssignedTechnician } from '../../machineAssignments/assignedTechnicianMapper';
+
 export interface MachineSummary {
   id: string;
   serialNumber: string;
@@ -17,10 +20,16 @@ export interface MachineDetail extends MachineSummary {
   // The customer's Plant ID / asset number, exactly as entered.
   plantId: string | null;
   hoursReadAt: string | null;
+  // registered / active / archived / sold. Anything but active shows
+  // identity and summary only.
+  lifecycleState: LifecycleState;
   // Whoever registered the machine.
   owner: { id: string; name: string; avatarUrl: string | null } | null;
   // Open or in-progress support cases about the machine.
   openCaseCount: number;
+  // Signed for 15 minutes: the cover photo, else the newest gallery photo.
+  photoUrl: string | null;
+  assignedTechnicians: AssignedTechnician[];
 }
 
 export interface MachinePhoto {

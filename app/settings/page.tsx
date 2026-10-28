@@ -1,12 +1,12 @@
 import { AppShell } from "@/components/shell/appShell";
 import { TopBar } from "@/components/shell/topBar";
 import { SettingsRow } from "@/components/settings/settingsRow";
-import { SubscriptionSummaryCard } from "@/components/settings/subscriptionSummaryCard";
 import { ExportDataButton } from "@/components/settings/exportDataButton";
 import { DeleteAccountButton } from "@/components/settings/deleteAccountButton";
 import { ProfileHeaderCard } from "./components/profileHeaderCard";
 import { SecuritySettingsSection } from "./components/securitySettingsSection";
 import { PasskeySettingsSection } from "@/components/settings/passkeySettingsSection";
+import { BiometricPhonesSection } from "@/components/settings/biometricPhonesSection";
 
 const SettingsPage = () => {
   return (
@@ -21,11 +21,9 @@ const SettingsPage = () => {
         <h1 className="text-[22px] font-medium text-ink">Profile &amp; settings</h1>
         <ProfileHeaderCard />
 
-        <h2 className="text-base font-medium text-ink">Subscription</h2>
-        <SubscriptionSummaryCard showBillingLink />
-
         <SecuritySettingsSection />
         <PasskeySettingsSection />
+        <BiometricPhonesSection />
 
         <h2 className="text-base font-medium text-ink">My data</h2>
         <div className="flex flex-col rounded-xl border border-borderGray bg-surface">

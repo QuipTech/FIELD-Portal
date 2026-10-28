@@ -1,4 +1,5 @@
 import type { OperatingStatus } from "./machineFleet";
+import type { LifecycleState } from "./machineLifecycle";
 
 export type MachineStatus = "running" | "down" | "serviceDue";
 
@@ -28,6 +29,8 @@ export interface Machine {
   owner: MachinePerson | null;
   // Open or in-progress support cases about the machine.
   openCaseCount: number;
+  // Anything but active shows identity and summary only.
+  lifecycleState: LifecycleState;
 }
 
 export interface MachineGalleryPhoto {

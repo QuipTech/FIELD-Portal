@@ -157,6 +157,10 @@ export class AiAskService {
         ),
       });
       const citedIndexes = findCitedIndexes(answerText, prepared.chunks.length);
+      await this.meterTurn(client, prepared, response, {
+        assistantMessageId,
+        citationsCount: citedIndexes.length,
+      });
       const flaggedReviewItemId = citedIndexes.length
         ? null
         : await aiAnswerRepository.insertReviewItem(client, {
@@ -170,4 +174,53 @@ export class AiAskService {
         flaggedReviewItemId,
       };
     });
+
+  // Metering (spec section 6): one ai.session when a thread starts and one
+  // ai.turn per answer, keyed by their own ids so a retried save is stored
+  // once. Recorded on every plan; nothing here is billed.
+  private meterTurn = async (
+    client: Parameters<typeof aiAnswerRepository.recordUsageEvent>[0],
+    prepared: PreparedQuestion,
+    response: TechnicalResponse,
+    saved: { assistantMessageId: string; citationsCount: number },
+  ): Promise<void> => {
+    if (prepared.isNewConversation)
+      await aiAnswerRepository.recordUsageEvent(client, {
+        eventType: 'ai.session',
+        quantity: 1,
+        unit: 'sessions',
+        subjectId: prepared.conversationId,
+        attributes: {
+          startedAt: new Date().toISOString(),
+          machineId: prepared.machineId,
+        },
+        idempotencyKey: `ai.session:${prepared.conversationId}`,
+      });
+    await aiAnswerRepository.recordUsageEvent(client, {
+      eventType: 'ai.turn',
+      quantity: 1,
+      unit: 'turns',
+      subjectId: saved.assistantMessageId,
+      attributes: {
+        modelId: response.modelId,
+        inferenceProfile: response.modelId,
+        inputTokens: response.inputTokens,
+        outputTokens: response.outputTokens,
+        // USD micro-cents (millionths of a cent), as the spec records cost.
+        estimatedCostUsdMicroCents: Math.round(
+          estimateBedrockCost(
+            response.modelId,
+            response.inputTokens,
+            response.outputTokens,
+          ) *
+            100 *
+            1_000_000,
+        ),
+        sessionId: prepared.conversationId,
+        assetId: prepared.machineId,
+        citationsCount: saved.citationsCount,
+      },
+      idempotencyKey: `ai.turn:${saved.assistantMessageId}`,
+    });
+  };
 }

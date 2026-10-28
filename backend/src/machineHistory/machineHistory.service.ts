@@ -8,6 +8,9 @@ import { componentBelongsToMachine } from '../machineConfiguration/machineCompon
 import { captureSnapshot } from '../machineConfiguration/snapshots.repository';
 import * as machineHistoryRepository from './machineHistory.repository';
 import * as historyEntriesRepository from './historyEntries.repository';
+import { signMachinePhoto } from '../machineFleet/machinePhotoUrl';
+import { listAssignedTechnicians } from '../machineAssignments/machineAssignments.repository';
+import { toAssignedTechnician } from '../machineAssignments/assignedTechnicianMapper';
 import { toHistoryEntry, toMachineDetail, toPersonName } from './machineHistoryMapper';
 import { CreateHistoryEntryDto } from './dto/createHistoryEntryDto';
 import { ListHistoryQueryDto } from './dto/listHistoryQueryDto';
@@ -39,7 +42,12 @@ export class MachineHistoryService {
     this.databaseService.withTenant(actor.tenantId, async (client) => {
       const row = await machineHistoryRepository.findMachineDetail(client, actor.tenantId, machineId);
       if (!row) throw new NotFoundException(MACHINE_NOT_FOUND_MESSAGE);
-      return toMachineDetail(row);
+      const technicians = await listAssignedTechnicians(client, actor.tenantId, machineId);
+      return {
+        ...toMachineDetail(row),
+        photoUrl: await signMachinePhoto(this.storageService, row.photo_storage_key),
+        assignedTechnicians: technicians.map(toAssignedTechnician),
+      };
     });
 
   listHistory = async (

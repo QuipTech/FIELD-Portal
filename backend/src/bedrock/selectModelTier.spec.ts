@@ -15,6 +15,7 @@ const chunk = (text: string) => ({
   title: 'Manual',
   page: 1,
   heading: null,
+  sectionId: null,
   text,
 });
 

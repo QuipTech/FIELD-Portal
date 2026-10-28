@@ -24,7 +24,7 @@ export interface DiffExportFile {
   fileName: string;
 }
 
-const requireSnapshot = async (
+export const requireSnapshot = async (
   client: PoolClient,
   params: { tenantId: string; machineId: string; snapshotId: string },
 ) => {

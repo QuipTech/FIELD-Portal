@@ -26,17 +26,27 @@ export const listSystems = async (
   return result.rows;
 };
 
-// systemId null = every system's components.
+// systemId / componentId null = no filter on it.
 export const listComponents = async (
   client: PoolClient,
-  params: { tenantId: string; machineId: string; systemId: string | null },
+  params: { tenantId: string; machineId: string; systemId: string | null; componentId?: string },
 ): Promise<ComponentRow[]> => {
   const result = await client.query<ComponentRow>(
     `SELECT c.id, s.id AS system_id, s.name AS system_name, c.name,
-            c.serial_number, c.firmware_version,
-            last_entry.entry_type AS last_entry_type, last_entry.created_at AS last_entry_at
+            c.serial_number, c.firmware_version, c.part_number, c.manufacturer,
+            c.condition_note, c.condition_severity, c.installed_at, c.hours_at_install,
+            c.next_service_due_hours, c.notes, m.operating_hours AS machine_operating_hours,
+            last_entry.entry_type AS last_entry_type, last_entry.created_at AS last_entry_at,
+            last_service.created_at AS last_serviced_at
      FROM installed_components c
      JOIN installed_systems s ON s.id = c.installed_system_id
+     JOIN machines m ON m.id = s.machine_id
+     LEFT JOIN LATERAL (
+       SELECT max(e.created_at) AS created_at
+       FROM technical_history_entries e
+       WHERE e.installed_component_id = c.id AND e.tenant_id = $2 AND e.deleted_at IS NULL
+         AND e.entry_type IN ('service', 'repair')
+     ) last_service ON true
      LEFT JOIN LATERAL (
        SELECT e.entry_type, e.created_at
        FROM technical_history_entries e
@@ -47,8 +57,9 @@ export const listComponents = async (
      WHERE s.machine_id = $1 AND s.tenant_id = $2
        AND s.deleted_at IS NULL AND c.deleted_at IS NULL
        AND ($3::uuid IS NULL OR s.id = $3::uuid)
+       AND ($4::uuid IS NULL OR c.id = $4::uuid)
      ORDER BY s.sort_order, s.name, c.sort_order, c.name`,
-    [params.machineId, params.tenantId, params.systemId],
+    [params.machineId, params.tenantId, params.systemId, params.componentId ?? null],
   );
   return result.rows;
 };

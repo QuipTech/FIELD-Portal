@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { DatabaseService } from '../database/database.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
-import { toFleetMachine } from '../machineFleet/machineFleetMapper';
+import { StorageService } from '../storage/storage.service';
+import { toFleetMachineWithPhoto } from '../machineFleet/machinePhotoUrl';
 import { DashboardConfig } from './dashboardConfig';
 import * as countsRepository from './dashboardCounts.repository';
 import * as uptimeRepository from './fleetUptime.repository';
@@ -30,6 +31,7 @@ export class DashboardService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly dashboardConfig: DashboardConfig,
+    private readonly storageService: StorageService,
   ) {}
 
   getSummary = async (actor: AuthenticatedUser): Promise<DashboardSummary> => {
@@ -70,7 +72,11 @@ export class DashboardService {
           ],
           activityRepository.ACTIVITY_LIMIT,
         ),
-        myMachines: myMachines.map(toFleetMachine),
+        myMachines: await Promise.all(
+          myMachines.map((row) =>
+            toFleetMachineWithPhoto(this.storageService, row),
+          ),
+        ),
       };
     });
   };

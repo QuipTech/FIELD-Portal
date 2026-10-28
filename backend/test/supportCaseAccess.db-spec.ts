@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { Client, PoolClient } from 'pg';
 import { buildPoolConfig } from '../src/database/buildPoolConfig';
 import {

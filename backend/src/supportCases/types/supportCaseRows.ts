@@ -16,6 +16,7 @@ export interface SupportCaseRow {
   closed_at: Date | null;
   sla_due_at: Date | null;
   sla_paused_at: Date | null;
+  first_response_at: Date | null;
   machine_id: string | null;
   machine_label: string | null;
   machine_model_name: string | null;
@@ -84,8 +85,10 @@ export interface AdminCaseListRow {
   priority: string;
   created_at: Date;
   updated_at: Date;
+  resolved_at: Date | null;
   sla_due_at: Date | null;
   sla_paused_at: Date | null;
+  first_response_at: Date | null;
   reporter_first_name: string | null;
   reporter_last_name: string | null;
   assignee_id: string | null;

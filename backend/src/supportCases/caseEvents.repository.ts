@@ -23,12 +23,15 @@ export const listCaseEvents = async (
   client: PoolClient,
   tenantId: string,
   caseId: string,
+  // Only events after this (polling).
+  since?: Date,
 ): Promise<CaseEventRow[]> => {
   const result = await client.query<CaseEventRow>(
     `${EVENT_SELECT}
      WHERE e.tenant_id = $1 AND e.support_case_id = $2
+       AND ($3::timestamptz IS NULL OR e.created_at > $3)
      ORDER BY e.created_at, e.id`,
-    [tenantId, caseId],
+    [tenantId, caseId, since ?? null],
   );
   return result.rows;
 };

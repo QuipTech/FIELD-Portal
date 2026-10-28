@@ -1,6 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { KnowledgeBrandsModule } from './knowledgeBrands/knowledgeBrands.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -31,13 +32,19 @@ import { MyDataModule } from './myData/myData.module';
 import { OrganisationSubscriptionModule } from './organisationSubscription/organisationSubscription.module';
 import { SupportCasesModule } from './supportCases/supportCases.module';
 import { MachineFleetModule } from './machineFleet/machineFleet.module';
+import { MachineLifecycleModule } from './machineLifecycle/machineLifecycle.module';
+import { MachineAssignmentsModule } from './machineAssignments/machineAssignments.module';
+import { TeamModule } from './team/team.module';
 import { KnowledgeLibraryModule } from './knowledgeLibrary/knowledgeLibrary.module';
 import { KnowledgeArticleModule } from './knowledgeArticle/knowledgeArticle.module';
+import { KnowledgeCatalogModule } from './knowledgeCatalog/knowledgeCatalog.module';
 import { AiAssistantModule } from './aiAssistant/aiAssistant.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AdminOverviewModule } from './adminOverview/adminOverview.module';
 import { DemoRequestsModule } from './demoRequests/demoRequests.module';
+import { DEMO_REQUEST_THROTTLER } from './demoRequests/demoRequestsThrottle';
+import { BIOMETRIC_SIGN_IN_THROTTLER } from './auth/biometricKeys/biometricSignInThrottle';
 import { RequestSourceMiddleware } from './common/requestSource/requestSource.middleware';
 
 @Module({
@@ -47,6 +54,12 @@ import { RequestSourceMiddleware } from './common/requestSource/requestSource.mi
       envFilePath: `.env.${process.env.NODE_ENV ?? 'development'}`,
     }),
     ScheduleModule.forRoot(),
+    // Named limits, applied only where a controller uses ThrottlerGuard;
+    // each controller skips the other's.
+    ThrottlerModule.forRoot([
+      DEMO_REQUEST_THROTTLER,
+      BIOMETRIC_SIGN_IN_THROTTLER,
+    ]),
     DatabaseModule,
     StorageModule,
     KnowledgeIndexingModule,
@@ -74,9 +87,13 @@ import { RequestSourceMiddleware } from './common/requestSource/requestSource.mi
     OrganisationSubscriptionModule,
     SupportCasesModule,
     MachineFleetModule,
+    MachineLifecycleModule,
+    MachineAssignmentsModule,
+    TeamModule,
     KnowledgeLibraryModule,
     KnowledgeBrandsModule,
     KnowledgeArticleModule,
+    KnowledgeCatalogModule,
     AiAssistantModule,
     DashboardModule,
     NotificationsModule,

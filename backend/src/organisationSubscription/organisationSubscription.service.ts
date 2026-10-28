@@ -6,8 +6,8 @@ import { toOrganisationSubscription } from './organisationSubscriptionRules';
 import { OrganisationSubscription } from './types/organisationSubscriptionResponse';
 
 // The signed-in user's own organisation plan, read through the tenant role
-// (RLS limits app.subscriptions to the tenant's row). Never Stripe — the
-// billing module keeps app.subscriptions in sync.
+// from its billing account's subscriptions (RLS: own account only). Never
+// Stripe: FIELD's billing tables are the source of truth.
 @Injectable()
 export class OrganisationSubscriptionService {
   constructor(private readonly databaseService: DatabaseService) {}
