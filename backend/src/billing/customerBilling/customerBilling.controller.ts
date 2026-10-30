@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   HttpCode,
@@ -15,6 +16,7 @@ import { CurrentUser } from '../../auth/decorators/currentUser.decorator';
 import { AuthenticatedUser } from '../../auth/types/authenticatedUser';
 import { CustomerBillingService } from './customerBilling.service';
 import { BILLING_MANAGE_PERMISSION } from './billingPermissions';
+import { PortalSessionDto } from './portalSessionDto';
 
 const BILLING_ADMIN_PERMISSION = BILLING_MANAGE_PERMISSION;
 
@@ -44,8 +46,15 @@ export class CustomerBillingController {
   @Post('organisation/billing/portal-session')
   @HttpCode(HttpStatus.OK)
   @RequirePermissions(BILLING_ADMIN_PERMISSION)
-  createOrganisationPortalSession(@CurrentUser() actor: AuthenticatedUser) {
-    return this.billing.createPortalSession(actor, 'organisation');
+  createOrganisationPortalSession(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: PortalSessionDto,
+  ) {
+    return this.billing.createPortalSession(
+      actor,
+      'organisation',
+      dto.returnTo,
+    );
   }
 
   @Get('me/billing/invoices/:invoiceId/pdf')
@@ -58,7 +67,10 @@ export class CustomerBillingController {
 
   @Post('me/billing/portal-session')
   @HttpCode(HttpStatus.OK)
-  createPersonalPortalSession(@CurrentUser() actor: AuthenticatedUser) {
-    return this.billing.createPortalSession(actor, 'personal');
+  createPersonalPortalSession(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Body() dto: PortalSessionDto,
+  ) {
+    return this.billing.createPortalSession(actor, 'personal', dto.returnTo);
   }
 }

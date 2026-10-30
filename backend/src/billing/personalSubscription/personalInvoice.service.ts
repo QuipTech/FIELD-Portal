@@ -78,6 +78,7 @@ export class PersonalInvoiceService {
         invoice,
         account.stripe_customer_id!,
         toReturnOrigin(address.returnOrigin),
+        address.returnTo ?? 'portal',
       );
     } catch (error) {
       throw toStripeGatewayError(error);
