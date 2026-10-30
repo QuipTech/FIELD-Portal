@@ -8,6 +8,7 @@ import { StripeService } from '../stripe/stripe.service';
 import { checkoutCreateKey } from '../stripe/stripeIdempotencyKeys';
 import { toInvoiceEventUpdate } from '../webhooks/stripeInvoiceEvents';
 import { applyInvoiceEventUpdate } from '../webhooks/stripeWebhookEvents.repository';
+import { ReturnTo, returnPagePath } from '../appReturn';
 
 // The page Stripe returns the payer to. Only a configured portal origin is
 // used, so the payment can't be pointed at someone else's site.
@@ -34,7 +35,10 @@ export class PersonalCheckoutService {
     invoice: InvoiceRow,
     customerId: string,
     returnOrigin: string,
+    returnTo: ReturnTo = 'portal',
   ): Promise<string | null> => {
+    const returnPage = `${returnOrigin}${returnPagePath(returnTo)}`;
+    const successUrl = `${returnPage}?payment=complete`;
     const sessions = await this.stripe.listCheckoutSessions(
       customerId,
       invoice.id,
@@ -44,10 +48,11 @@ export class PersonalCheckoutService {
       await this.recordPayment(paid);
       return null;
     }
+    // Only a session that returns to the same place: a portal session would
+    // strand an app payer on the website, and the other way round.
     const open = sessions.find(
       (session) =>
-        session.status === 'open' &&
-        session.success_url?.startsWith(`${returnOrigin}/`),
+        session.status === 'open' && session.success_url === successUrl,
     );
     if (open?.url) return open.url;
     const lines = await listInvoiceLines(this.database, invoice.id);
@@ -61,10 +66,14 @@ export class PersonalCheckoutService {
         ),
         description: lines[0]?.description ?? 'FIELD Technician subscription',
         fieldInvoiceId: invoice.id,
-        successUrl: `${returnOrigin}/settings/billing?payment=complete`,
-        cancelUrl: `${returnOrigin}/settings/billing?payment=cancelled`,
+        successUrl,
+        cancelUrl: `${returnPage}?payment=cancelled`,
       },
-      checkoutCreateKey(invoice.id, sessions.length, returnOrigin),
+      checkoutCreateKey(
+        invoice.id,
+        sessions.length,
+        returnTo === 'app' ? `${returnOrigin}:app` : returnOrigin,
+      ),
     );
     return created.url;
   };
