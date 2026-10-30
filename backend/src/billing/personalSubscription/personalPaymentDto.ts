@@ -21,4 +21,10 @@ export class PersonalPaymentDto {
   @IsString()
   @Length(1, 200)
   returnOrigin?: string;
+
+  // 'app' when paying from the mobile app: Stripe then returns to a portal
+  // page that hands back to the app instead of the billing settings page.
+  @IsOptional()
+  @IsIn(['portal', 'app'])
+  returnTo?: 'portal' | 'app';
 }

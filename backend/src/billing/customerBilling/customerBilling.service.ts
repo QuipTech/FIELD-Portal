@@ -7,6 +7,7 @@ import { StripeService } from '../stripe/stripe.service';
 import * as customerBillingRepository from './customerBilling.repository';
 import { BillingAccountRef } from './customerBilling.repository';
 import { CustomerInvoice, toCustomerInvoice } from './customerInvoiceMapper';
+import { ReturnTo, returnPagePath } from '../appReturn';
 
 const NO_ACCOUNT_MESSAGE = "There's no billing account set up yet.";
 const NO_STRIPE_CUSTOMER_MESSAGE =
@@ -63,6 +64,7 @@ export class CustomerBillingService {
   createPortalSession = async (
     actor: AuthenticatedUser,
     owner: BillingOwner,
+    returnTo: ReturnTo = 'portal',
   ): Promise<{ url: string }> => {
     const account = await this.requireAccount(actor, owner);
     if (!account.stripe_customer_id) {
@@ -70,7 +72,7 @@ export class CustomerBillingService {
     }
     const session = await this.stripe.createPortalSession(
       account.stripe_customer_id,
-      this.portalReturnUrl(),
+      this.portalReturnUrl(returnTo),
     );
     return { url: session.url };
   };
@@ -98,9 +100,12 @@ export class CustomerBillingService {
     return account;
   };
 
-  // Where Stripe sends the customer back: BILLING_PORTAL_RETURN_URL (e.g.
-  // the app's deep link), else the portal's billing settings.
-  private portalReturnUrl = (): string =>
-    this.configService.get<string>('BILLING_PORTAL_RETURN_URL') ??
-    `${getPortalOrigins()[0]}/settings/billing`;
+  // Where Stripe sends the customer back: the mobile app (through the
+  // portal's hand-back page), else BILLING_PORTAL_RETURN_URL or the portal's
+  // billing settings.
+  private portalReturnUrl = (returnTo: ReturnTo): string =>
+    returnTo === 'app'
+      ? `${getPortalOrigins()[0]}${returnPagePath('app')}`
+      : (this.configService.get<string>('BILLING_PORTAL_RETURN_URL') ??
+        `${getPortalOrigins()[0]}/settings/billing`);
 }
