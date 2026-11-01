@@ -1,29 +1,41 @@
 import { PoolClient } from 'pg';
 import { OperatingStatus } from './types/machineFleetResponse';
 import { CatalogModelRow } from './types/machineFleetRows';
+import {
+  MachineScope,
+  machineInScopeSql,
+  toScopeParam,
+} from '../machineGroups/access/machineScope';
 
-// The organisation's own sites, makes and classes, for the filter panel.
-export const listFleetFacets = async (client: PoolClient, tenantId: string) => {
+// The sites, makes and classes of the machines the caller can see, for
+// the filter panel.
+export const listFleetFacets = async (
+  client: PoolClient,
+  tenantId: string,
+  scope: MachineScope,
+) => {
+  const params = [tenantId, toScopeParam(scope)];
+  const visible = `m.tenant_id = $1 AND m.deleted_at IS NULL AND ${machineInScopeSql('m', '$2')}`;
   const sites = await client.query<{ site: string }>(
-    `SELECT DISTINCT site FROM machines
-     WHERE tenant_id = $1 AND deleted_at IS NULL AND site IS NOT NULL AND site <> ''
-     ORDER BY site`,
-    [tenantId],
+    `SELECT DISTINCT m.site FROM machines m
+     WHERE ${visible} AND m.site IS NOT NULL AND m.site <> ''
+     ORDER BY m.site`,
+    params,
   );
   const makes = await client.query<{ id: string; name: string }>(
     `SELECT DISTINCT mf.id, mf.name FROM machines m
      JOIN machine_manufacturers mf ON mf.id = m.manufacturer_id
-     WHERE m.tenant_id = $1 AND m.deleted_at IS NULL
+     WHERE ${visible}
      ORDER BY mf.name`,
-    [tenantId],
+    params,
   );
   const classes = await client.query<{ product_family: string }>(
     `SELECT DISTINCT mm.product_family FROM machines m
      JOIN machine_models mm ON mm.id = m.model_id
-     WHERE m.tenant_id = $1 AND m.deleted_at IS NULL
+     WHERE ${visible}
        AND mm.product_family IS NOT NULL AND mm.product_family <> ''
      ORDER BY mm.product_family`,
-    [tenantId],
+    params,
   );
   return {
     sites: sites.rows.map((row) => row.site),
@@ -78,12 +90,13 @@ export const insertMachine = async (
     site: string | null;
     operatingHours: number | null;
     status: OperatingStatus;
+    groupId: string | null;
   },
 ): Promise<string> => {
   const result = await client.query<{ id: string }>(
     `INSERT INTO machines (tenant_id, created_by, manufacturer_id, model_id, serial_number,
-                           asset_number, site, operating_hours, operating_hours_read_at, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::integer, CASE WHEN $8::integer IS NULL THEN NULL ELSE now() END, $9)
+                           asset_number, site, operating_hours, operating_hours_read_at, status, group_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::integer, CASE WHEN $8::integer IS NULL THEN NULL ELSE now() END, $9, $10)
      RETURNING id`,
     [
       params.tenantId,
@@ -95,6 +108,7 @@ export const insertMachine = async (
       params.site,
       params.operatingHours,
       params.status,
+      params.groupId,
     ],
   );
   return result.rows[0].id;

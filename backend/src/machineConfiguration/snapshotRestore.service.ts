@@ -3,7 +3,7 @@ import { PoolClient } from 'pg';
 import { DatabaseService } from '../database/database.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { runAuditedChange } from '../common/audit/runAuditedChange';
-import { assertMachineInTenant } from '../machineHistory/machineHistory.service';
+import { assertMachineAccessible } from '../machineHistory/machineHistory.service';
 import * as snapshotsRepository from './snapshots.repository';
 import { toSnapshot } from './machineConfigurationMapper';
 import { requireSnapshot } from './snapshotDiff.service';
@@ -24,7 +24,7 @@ export class SnapshotRestoreService {
     target: { machineId: string; snapshotId: string },
   ): Promise<SnapshotRestore> =>
     runAuditedChange(this.databaseService, actor, '', async (client) => {
-      await assertMachineInTenant(client, actor.tenantId, target.machineId);
+      await assertMachineAccessible(client, actor, target.machineId);
       const scope = { tenantId: actor.tenantId, ...target };
       const source = await requireSnapshot(client, scope);
       const before = await this.capture(

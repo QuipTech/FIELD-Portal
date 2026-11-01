@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
+import { getAccessibleMachineScope } from '../machineGroups/access/getAccessibleMachineScope';
 import * as notificationsRepository from './notifications.repository';
 import { ListNotificationsQueryDto } from './dto/listNotificationsQueryDto';
 import { NotificationRow } from './types/notificationRows';
@@ -32,7 +33,11 @@ export class NotificationsService {
     query: ListNotificationsQueryDto,
   ): Promise<NotificationList> =>
     this.databaseService.withTenant(actor.tenantId, async (client) => {
-      const owner = { tenantId: actor.tenantId, userId: actor.userId };
+      const owner = {
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        scope: await getAccessibleMachineScope(client, actor),
+      };
       // One extra row tells us whether another page exists.
       const rows = await notificationsRepository.listNotifications(client, {
         ...owner,
@@ -54,11 +59,14 @@ export class NotificationsService {
   countUnread = async (
     actor: AuthenticatedUser,
   ): Promise<{ count: number }> => ({
-    count: await this.databaseService.withTenant(actor.tenantId, (client) =>
-      notificationsRepository.countUnread(client, {
-        tenantId: actor.tenantId,
-        userId: actor.userId,
-      }),
+    count: await this.databaseService.withTenant(
+      actor.tenantId,
+      async (client) =>
+        notificationsRepository.countUnread(client, {
+          tenantId: actor.tenantId,
+          userId: actor.userId,
+          scope: await getAccessibleMachineScope(client, actor),
+        }),
     ),
   });
 

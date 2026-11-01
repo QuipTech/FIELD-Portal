@@ -22,6 +22,9 @@ export interface MachineDetailRow extends MachineRow {
   owner_avatar_url: string | null;
   photo_storage_key: string | null;
   open_case_count: number;
+  group_id: string | null;
+  group_name: string | null;
+  group_colour: string | null;
 }
 
 export interface PhotoRow {

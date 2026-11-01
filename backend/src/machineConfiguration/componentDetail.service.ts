@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { StorageService } from '../storage/storage.service';
-import { assertMachineInTenant } from '../machineHistory/machineHistory.service';
+import { assertMachineAccessible } from '../machineHistory/machineHistory.service';
 import { listHistoryEntries } from '../machineHistory/historyEntries.repository';
 import { toHistoryEntry } from '../machineHistory/machineHistoryMapper';
 import * as machineComponentsRepository from './machineComponents.repository';
@@ -25,7 +25,7 @@ export class ComponentDetailService {
     target: { machineId: string; componentId: string },
   ): Promise<MachineComponentDetail> => {
     const { row, historyRows } = await this.databaseService.withTenant(actor.tenantId, async (client) => {
-      await assertMachineInTenant(client, actor.tenantId, target.machineId);
+      await assertMachineAccessible(client, actor, target.machineId);
       const [componentRow] = await machineComponentsRepository.listComponents(client, {
         tenantId: actor.tenantId,
         machineId: target.machineId,

@@ -61,4 +61,17 @@ export class ListMachinesQueryDto extends PaginationQueryDto {
   @IsString()
   @MaxLength(200)
   machineClass?: string;
+
+  // One customer group's machines (GET /machine-groups).
+  @IsOptional()
+  @Transform(trimToUndefined)
+  @IsUUID()
+  groupId?: string;
+
+  // Only machines in no group. Never matches for someone limited to
+  // selected groups (they can't see ungrouped machines).
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true')
+  @IsBoolean()
+  ungrouped?: boolean;
 }

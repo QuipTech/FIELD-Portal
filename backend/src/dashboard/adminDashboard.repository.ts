@@ -1,4 +1,9 @@
 import { PoolClient } from 'pg';
+import {
+  MachineScope,
+  linkedMachineInScopeSql,
+  toScopeParam,
+} from '../machineGroups/access/machineScope';
 import { DUE_SOON_SHARE } from '../supportCases/caseSla';
 
 const LISTED_CASES = 5;
@@ -21,6 +26,7 @@ export interface NearBreachCaseRow {
 export const listCasesNearSlaBreach = async (
   client: PoolClient,
   tenantId: string,
+  scope: MachineScope,
 ): Promise<NearBreachCaseRow[]> => {
   const result = await client.query<NearBreachCaseRow>(
     `SELECT c.case_number, c.subject, c.priority, c.sla_due_at,
@@ -32,9 +38,10 @@ export const listCasesNearSlaBreach = async (
        AND c.status IN ('new', 'open') AND NOT c.sla_paused AND c.sla_due_at IS NOT NULL
        AND (c.sla_due_at < now()
             OR c.sla_due_at - now() <= (c.sla_due_at - c.created_at) * $2::float)
+       AND ${linkedMachineInScopeSql('c.machine_id', 'c.tenant_id', '$3')}
      ORDER BY c.sla_due_at
      LIMIT ${LISTED_CASES}`,
-    [tenantId, DUE_SOON_SHARE],
+    [tenantId, DUE_SOON_SHARE, toScopeParam(scope)],
   );
   return result.rows;
 };

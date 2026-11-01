@@ -1,9 +1,23 @@
 import { PoolClient } from 'pg';
 import { NotificationRow } from './types/notificationRows';
+import {
+  MachineScope,
+  toScopeParam,
+} from '../machineGroups/access/machineScope';
 
 // A user only ever sees their own notifications. Every query filters on
 // tenant_id as well as relying on RLS, since the backend's database role
 // may bypass RLS. Rows are written by triggers (migration 0054).
+
+// Alerts about a machine (entity_key 'machine:<id>', 0065) outside the
+// person's machine scope are hidden, e.g. after a group was taken away.
+const inScopeSql = (param: string) => `(
+  ${param}::uuid[] IS NULL OR entity_key IS NULL OR entity_key NOT LIKE 'machine:%'
+  OR EXISTS (
+    SELECT 1 FROM machines scope_m
+    WHERE scope_m.id::text = substring(notifications.entity_key from 9)
+      AND scope_m.tenant_id = notifications.tenant_id
+      AND scope_m.group_id = ANY(${param}::uuid[])))`;
 
 export const listNotifications = async (
   client: PoolClient,
@@ -14,6 +28,7 @@ export const listNotifications = async (
     limit: number;
     // Paging: rows created before this time.
     before: Date | null;
+    scope: MachineScope;
   },
 ): Promise<NotificationRow[]> => {
   const result = await client.query<NotificationRow>(
@@ -22,6 +37,7 @@ export const listNotifications = async (
      WHERE tenant_id = $1 AND user_id = $2
        AND ($3::boolean IS FALSE OR read_at IS NULL)
        AND ($5::timestamptz IS NULL OR created_at < $5)
+       AND ${inScopeSql('$6')}
      ORDER BY created_at DESC
      LIMIT $4`,
     [
@@ -30,6 +46,7 @@ export const listNotifications = async (
       params.unreadOnly,
       params.limit,
       params.before,
+      toScopeParam(params.scope),
     ],
   );
   return result.rows;
@@ -37,12 +54,13 @@ export const listNotifications = async (
 
 export const countUnread = async (
   client: PoolClient,
-  params: { tenantId: string; userId: string },
+  params: { tenantId: string; userId: string; scope: MachineScope },
 ): Promise<number> => {
   const result = await client.query<{ count: string }>(
     `SELECT count(*) FROM notifications
-     WHERE tenant_id = $1 AND user_id = $2 AND read_at IS NULL`,
-    [params.tenantId, params.userId],
+     WHERE tenant_id = $1 AND user_id = $2 AND read_at IS NULL
+       AND ${inScopeSql('$3')}`,
+    [params.tenantId, params.userId, toScopeParam(params.scope)],
   );
   return Number(result.rows[0].count);
 };

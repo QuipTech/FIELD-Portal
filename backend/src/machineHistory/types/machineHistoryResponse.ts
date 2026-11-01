@@ -27,6 +27,8 @@ export interface MachineDetail extends MachineSummary {
   owner: { id: string; name: string; avatarUrl: string | null } | null;
   // Open or in-progress support cases about the machine.
   openCaseCount: number;
+  // The customer group it belongs to; null when ungrouped.
+  group: { id: string; name: string; colour: string | null } | null;
   // Signed for 15 minutes: the cover photo, else the newest gallery photo.
   photoUrl: string | null;
   assignedTechnicians: AssignedTechnician[];

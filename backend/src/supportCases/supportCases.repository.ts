@@ -1,10 +1,11 @@
 import { PoolClient } from 'pg';
-import { escapeLikePattern } from '../common/utils/escapeLikePattern';
+import { toLimitOffset } from '../common/dto/paginationQueryDto';
 import {
-  PaginationQueryDto,
-  toLimitOffset,
-} from '../common/dto/paginationQueryDto';
-import { CaseStatusFilter } from './dto/listSupportCasesQueryDto';
+  MachineScope,
+  linkedMachineInScopeSql,
+  toScopeParam,
+} from '../machineGroups/access/machineScope';
+import { buildCaseFilter, CaseListFilters } from './caseFilter';
 import {
   CaseCategory,
   CasePriority,
@@ -13,7 +14,8 @@ import {
 import { StatusCountRow, SupportCaseRow } from './types/supportCaseRows';
 
 // Every query filters on tenant_id itself: the backend's database role may
-// bypass RLS. The assignee is QuipTech support staff from another
+// bypass RLS. For customers, a case about a machine outside their machine
+// scope (machineGroups/access) doesn't exist; staff pass ALL_MACHINES. The assignee is QuipTech support staff from another
 // organisation, which RLS hides, so people come from support_case_person
 // (0070) rather than a join on users.
 const CASE_SELECT = `
@@ -34,53 +36,13 @@ const CASE_SELECT = `
   LEFT JOIN LATERAL support_case_person(c.assigned_to) a ON true
   LEFT JOIN LATERAL support_case_person(c.created_by) r ON true`;
 
-export interface CaseListFilters extends PaginationQueryDto {
-  status: CaseStatusFilter;
-  priority?: CasePriority;
-  search?: string;
-  machineId?: string;
-}
-
-const STATUS_CONDITIONS: Record<CaseStatusFilter, string | null> = {
-  active: `c.status IN ('new', 'open', 'waiting_on_customer')`,
-  new: `c.status = 'new'`,
-  open: `c.status = 'open'`,
-  waiting_on_customer: `c.status = 'waiting_on_customer'`,
-  resolved: `c.status = 'resolved'`,
-  closed: `c.status = 'closed'`,
-  all: null,
-};
-
-// WHERE clause and its parameters for the list's filters ($1 = tenant).
-const buildCaseFilter = (tenantId: string, filters: CaseListFilters) => {
-  const params: unknown[] = [tenantId];
-  const conditions = ['c.tenant_id = $1', 'c.deleted_at IS NULL'];
-  const statusCondition = STATUS_CONDITIONS[filters.status];
-  if (statusCondition) conditions.push(statusCondition);
-  if (filters.priority) {
-    params.push(filters.priority);
-    conditions.push(`c.priority = $${params.length}`);
-  }
-  if (filters.machineId) {
-    params.push(filters.machineId);
-    conditions.push(`c.machine_id = $${params.length}`);
-  }
-  if (filters.search) {
-    const caseNumber = filters.search.replace(/^#/, '');
-    params.push(`%${escapeLikePattern(filters.search)}%`, caseNumber);
-    conditions.push(
-      `(c.subject ILIKE $${params.length - 1} OR c.case_number::text = $${params.length})`,
-    );
-  }
-  return { where: conditions.join(' AND '), params };
-};
-
 export const listCases = async (
   client: PoolClient,
   tenantId: string,
   filters: CaseListFilters,
+  scope: MachineScope,
 ): Promise<SupportCaseRow[]> => {
-  const { where, params } = buildCaseFilter(tenantId, filters);
+  const { where, params } = buildCaseFilter(tenantId, scope, filters);
   const { limit, offset } = toLimitOffset(filters);
   const result = await client.query<SupportCaseRow>(
     `${CASE_SELECT} WHERE ${where}
@@ -95,8 +57,9 @@ export const countCases = async (
   client: PoolClient,
   tenantId: string,
   filters: CaseListFilters,
+  scope: MachineScope,
 ): Promise<number> => {
-  const { where, params } = buildCaseFilter(tenantId, filters);
+  const { where, params } = buildCaseFilter(tenantId, scope, filters);
   const result = await client.query<{ count: string }>(
     `SELECT count(*) FROM support_cases c WHERE ${where}`,
     params,
@@ -107,11 +70,14 @@ export const countCases = async (
 export const countCasesByStatus = async (
   client: PoolClient,
   tenantId: string,
+  scope: MachineScope,
 ): Promise<StatusCountRow[]> => {
   const result = await client.query<StatusCountRow>(
     `SELECT status, count(*) FROM support_cases
-     WHERE tenant_id = $1 AND deleted_at IS NULL GROUP BY status`,
-    [tenantId],
+     WHERE tenant_id = $1 AND deleted_at IS NULL
+       AND ${linkedMachineInScopeSql('machine_id', 'tenant_id', '$2')}
+     GROUP BY status`,
+    [tenantId, toScopeParam(scope)],
   );
   return result.rows;
 };
@@ -120,11 +86,13 @@ export const findCaseByNumber = async (
   client: PoolClient,
   tenantId: string,
   caseNumber: number,
+  scope: MachineScope,
 ): Promise<SupportCaseRow | null> => {
   const result = await client.query<SupportCaseRow>(
     `${CASE_SELECT}
-     WHERE c.tenant_id = $1 AND c.case_number = $2 AND c.deleted_at IS NULL`,
-    [tenantId, caseNumber],
+     WHERE c.tenant_id = $1 AND c.case_number = $2 AND c.deleted_at IS NULL
+       AND ${linkedMachineInScopeSql('c.machine_id', 'c.tenant_id', '$3')}`,
+    [tenantId, caseNumber, toScopeParam(scope)],
   );
   return result.rows[0] ?? null;
 };

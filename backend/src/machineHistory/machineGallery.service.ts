@@ -5,7 +5,7 @@ import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { StorageService } from '../storage/storage.service';
 import { IncomingFile } from '../storage/types/storedFile';
 import * as machineGalleryRepository from './machineGallery.repository';
-import { assertMachineInTenant } from './machineHistory.service';
+import { assertMachineAccessible } from './machineHistory.service';
 import { GalleryPhotoRow } from './types/machineHistoryRows';
 import { GalleryPhoto } from './types/machineHistoryResponse';
 
@@ -22,7 +22,7 @@ export class MachineGalleryService {
 
   listPhotos = async (actor: AuthenticatedUser, machineId: string): Promise<GalleryPhoto[]> => {
     const rows = await this.databaseService.withTenant(actor.tenantId, async (client) => {
-      await assertMachineInTenant(client, actor.tenantId, machineId);
+      await assertMachineAccessible(client, actor, machineId);
       return machineGalleryRepository.listGalleryPhotos(client, actor.tenantId, machineId);
     });
     return Promise.all(rows.map(this.toGalleryPhoto));
@@ -37,7 +37,7 @@ export class MachineGalleryService {
     caption: string | undefined,
   ): Promise<GalleryPhoto> => {
     await this.databaseService.withTenant(actor.tenantId, (client) =>
-      assertMachineInTenant(client, actor.tenantId, machineId),
+      assertMachineAccessible(client, actor, machineId),
     );
     const stored = await this.storageService.uploadMachinePhoto(file, actor.tenantId, machineId);
     try {

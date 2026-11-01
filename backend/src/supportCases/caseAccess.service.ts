@@ -5,6 +5,8 @@ import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { findCaseTenantId } from './adminSupportCases.repository';
 import { findIsSupportStaff } from './supportStaffStatus';
 import { findCaseByNumber } from './supportCases.repository';
+import { ALL_MACHINES } from '../machineGroups/access/machineScope';
+import { getAccessibleMachineScope } from '../machineGroups/access/getAccessibleMachineScope';
 import { CaseViewerRole, resolveCaseViewerRole } from './caseAccessPolicy';
 import { CaseStaffRole } from './types/adminSupportCaseResponse';
 import { SupportCaseRow } from './types/supportCaseRows';
@@ -51,15 +53,39 @@ export class CaseAccessService {
     if (!caseTenantId) return null;
     const supportCase = await this.databaseService.withTenant(
       caseTenantId,
-      (client) => findCaseByNumber(client, caseTenantId, caseNumber),
+      (client) =>
+        findCaseByNumber(client, caseTenantId, caseNumber, ALL_MACHINES),
     );
     if (!supportCase) return null;
     const role = resolveCaseViewerRole(
       { userId: actor.userId, tenantId: actor.tenantId, permissions, isStaff },
       { tenantId: caseTenantId, assigneeId: supportCase.assignee_id },
     );
+    if (
+      role === 'customer' &&
+      !(await this.canSeeCaseMachine(actor, caseNumber))
+    ) {
+      return null;
+    }
     return role ? { role, caseTenantId, supportCase } : null;
   };
+
+  // A customer only sees cases about machines in their machine scope
+  // (machineGroups/access); cases about no machine stay visible.
+  private canSeeCaseMachine = (
+    actor: AuthenticatedUser,
+    caseNumber: number,
+  ): Promise<boolean> =>
+    this.databaseService.withTenant(actor.tenantId, async (client) =>
+      Boolean(
+        await findCaseByNumber(
+          client,
+          actor.tenantId,
+          caseNumber,
+          await getAccessibleMachineScope(client, actor),
+        ),
+      ),
+    );
 
   // The admin and staff routes: 404 unless the caller is the admin or the
   // case's assignee — a customer of the case gets 404 here too.

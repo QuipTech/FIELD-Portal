@@ -3,6 +3,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
@@ -11,6 +12,7 @@ import { CognitoUserDeletionService } from './cognitoUserDeletion.service';
 import { StorageService } from '../storage/storage.service';
 import { AccountIdentityRow } from './types/userRows';
 import { OWNER_ROLE_NAME } from '../auth/systemRoleNames';
+import { PushDevicesService } from '../notifications/push/pushDevices.service';
 
 export interface AccountDeletionEligibility {
   canDelete: boolean;
@@ -32,6 +34,7 @@ export class AccountDeletionService {
     private readonly databaseService: DatabaseService,
     private readonly cognitoUserDeletionService: CognitoUserDeletionService,
     private readonly storageService: StorageService,
+    @Optional() private readonly pushDevices?: PushDevicesService,
   ) {}
 
   getDeletionEligibility = async (
@@ -69,6 +72,8 @@ export class AccountDeletionService {
     if (!canDelete) throw new ConflictException(blockedReason);
 
     await this.deleteCognitoUsers(userId, account);
+    // Best effort, before the rows that name the endpoints are deleted.
+    await this.pushDevices?.removeAllForUser(userId, tenantId);
 
     const deleted = await usersRepository.deleteUserAccount(
       this.databaseService,

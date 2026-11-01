@@ -6,9 +6,10 @@ import { NotificationsGateway } from './notifications.gateway';
 import { NotificationListenerService } from './notificationListener.service';
 import { NotificationSettingsController } from './notificationSettings.controller';
 import { NotificationSettingsService } from './notificationSettings.service';
+import { PushModule } from './push/push.module';
 
 @Module({
-  imports: [JwtModule.register({})],
+  imports: [JwtModule.register({}), PushModule],
   controllers: [NotificationsController, NotificationSettingsController],
   providers: [
     NotificationsService,

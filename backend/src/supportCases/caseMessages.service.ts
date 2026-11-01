@@ -8,7 +8,8 @@ import {
   countUnreadCasesForCustomer,
   markCaseRead,
 } from './caseReads.repository';
-import { requireSupportCase } from './requireSupportCase';
+import { requireVisibleSupportCase } from './requireSupportCase';
+import { getAccessibleMachineScope } from '../machineGroups/access/getAccessibleMachineScope';
 import { postMessageToCase } from './postMessageToCase';
 import { CaseAttachmentsService } from './caseAttachments.service';
 import { CaseAnnouncer } from './caseAnnouncer.service';
@@ -37,9 +38,9 @@ export class CaseMessagesService {
     since?: Date,
   ): Promise<CaseMessage[]> =>
     this.databaseService.withTenant(actor.tenantId, async (client) => {
-      const supportCase = await requireSupportCase(
+      const supportCase = await requireVisibleSupportCase(
         client,
-        actor.tenantId,
+        actor,
         caseNumber,
       );
       const rows = await listCaseMessages(client, {
@@ -61,9 +62,9 @@ export class CaseMessagesService {
     since?: Date,
   ): Promise<CaseEvent[]> =>
     this.databaseService.withTenant(actor.tenantId, async (client) => {
-      const supportCase = await requireSupportCase(
+      const supportCase = await requireVisibleSupportCase(
         client,
-        actor.tenantId,
+        actor,
         caseNumber,
       );
       const rows = await listCaseEvents(
@@ -83,9 +84,9 @@ export class CaseMessagesService {
     const { posted, message } = await this.databaseService.withActor(
       actor,
       async (client) => {
-        const supportCase = await requireSupportCase(
+        const supportCase = await requireVisibleSupportCase(
           client,
-          actor.tenantId,
+          actor,
           caseNumber,
         );
         const result = await postMessageToCase(client, {
@@ -133,9 +134,9 @@ export class CaseMessagesService {
     caseNumber: number,
   ): Promise<void> =>
     this.databaseService.withTenant(actor.tenantId, async (client) => {
-      const supportCase = await requireSupportCase(
+      const supportCase = await requireVisibleSupportCase(
         client,
-        actor.tenantId,
+        actor,
         caseNumber,
       );
       await markCaseRead(client, {
@@ -151,6 +152,7 @@ export class CaseMessagesService {
         client,
         actor.tenantId,
         actor.userId,
+        await getAccessibleMachineScope(client, actor),
       ),
     }));
 }

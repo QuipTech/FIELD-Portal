@@ -21,6 +21,11 @@ import {
 import * as adminUsersRepository from './adminUsers.repository';
 import * as adminRolesRepository from '../adminRoles/adminRoles.repository';
 import { InviteUserDto } from './dto/inviteUserDto';
+import {
+  MachineAccessService,
+  saveInvitedAccess,
+} from '../machineGroups/machineAccess.service';
+import { isMachineAccessAdmin } from '../machineGroups/access/machineScope';
 
 const ALREADY_USER_MESSAGE =
   'Someone with this email already has a FIELD account.';
@@ -34,7 +39,9 @@ const COGNITO_NOT_SET_UP_MESSAGE =
 const CHECK_VIOLATION = '23514';
 
 // Users → Invite user. Cognito creates the sign-in and emails a temporary
-// password; then the FIELD account is saved as 'invited' with its role.
+// password; then the FIELD account is saved as 'invited' with its role and
+// machine access (all machines, or selected machine groups), which apply
+// from their first sign-in.
 // If saving fails, the Cognito user is removed again so a retry starts
 // clean. The Owner invites into any organisation (default: their own).
 @Injectable()
@@ -45,6 +52,7 @@ export class AdminUserInvitationsService {
     private readonly databaseService: DatabaseService,
     private readonly cognitoDirectory: CognitoUserDirectoryService,
     private readonly cognitoUsers: CognitoUserDeletionService,
+    private readonly machineAccess: MachineAccessService,
   ) {}
 
   inviteUser = async (
@@ -54,7 +62,12 @@ export class AdminUserInvitationsService {
   ): Promise<{ id: string }> => {
     const tenantId = await this.resolveOrganisation(actor, scope, dto);
     // Checked before Cognito, so a bad request never emails anyone.
-    await this.assertRoleAssignable(tenantId, dto.roleId);
+    const role = await this.assertRoleAssignable(tenantId, dto.roleId);
+    const accessChange = await this.machineAccess.checkInviteAccess(
+      tenantId,
+      { mode: dto.machineAccessMode, groupIds: dto.groupIds },
+      isMachineAccessAdmin(role.permission_codes),
+    );
     if (
       await authRepository.findUserByEmailForLogin(
         this.databaseService,
@@ -79,13 +92,25 @@ export class AdminUserInvitationsService {
             cognitoSub: cognitoUser.sub,
             roleId: dto.roleId,
           });
+          await saveInvitedAccess(client, {
+            inviterTenantId: actor.tenantId,
+            tenantId,
+            userId,
+            change: accessChange,
+          });
           return {
             result: userId,
             audit: {
               action: 'create',
               entityType: 'user',
               entityId: userId,
-              metadata: { invited: true, roleId: dto.roleId, tenantId },
+              metadata: {
+                invited: true,
+                roleId: dto.roleId,
+                tenantId,
+                machineAccessMode: accessChange.mode,
+                groupIds: accessChange.groupIds,
+              },
             },
           };
         },
@@ -128,18 +153,14 @@ export class AdminUserInvitationsService {
 
   // A system role or one of that organisation's own;
   // admin_invite_user checks the same again when saving.
-  private assertRoleAssignable = async (
-    tenantId: string,
-    roleId: string,
-  ): Promise<void> => {
+  private assertRoleAssignable = async (tenantId: string, roleId: string) => {
     const [role] = await adminRolesRepository.listRoles(
       this.databaseService,
       { tenantId, isPlatform: false },
       roleId,
     );
-    if (!role) {
-      throw new BadRequestException(ROLE_NOT_ALLOWED_MESSAGE);
-    }
+    if (!role) throw new BadRequestException(ROLE_NOT_ALLOWED_MESSAGE);
+    return role;
   };
 
   // Someone an admin removed keeps a disabled Cognito sign-in (so they're

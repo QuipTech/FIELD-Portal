@@ -32,6 +32,7 @@ import { MyDataModule } from './myData/myData.module';
 import { OrganisationSubscriptionModule } from './organisationSubscription/organisationSubscription.module';
 import { SupportCasesModule } from './supportCases/supportCases.module';
 import { MachineFleetModule } from './machineFleet/machineFleet.module';
+import { MachineGroupsModule } from './machineGroups/machineGroups.module';
 import { MachineLifecycleModule } from './machineLifecycle/machineLifecycle.module';
 import { MachineAssignmentsModule } from './machineAssignments/machineAssignments.module';
 import { TeamModule } from './team/team.module';
@@ -87,6 +88,7 @@ import { RequestSourceMiddleware } from './common/requestSource/requestSource.mi
     OrganisationSubscriptionModule,
     SupportCasesModule,
     MachineFleetModule,
+    MachineGroupsModule,
     MachineLifecycleModule,
     MachineAssignmentsModule,
     TeamModule,

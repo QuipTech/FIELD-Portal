@@ -1,23 +1,19 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-} from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { DashboardConfig } from '../dashboard/dashboardConfig';
 import * as casesRepository from './supportCases.repository';
 import * as optionsRepository from './caseOptions.repository';
-import { requireSupportCase } from './requireSupportCase';
+import { requireVisibleSupportCase } from './requireSupportCase';
+import { getAccessibleMachineScope } from '../machineGroups/access/getAccessibleMachineScope';
 import { postMessageToCase } from './postMessageToCase';
 import { recordCaseChange } from './recordCaseChange';
 import { CaseAnnouncer } from './caseAnnouncer.service';
-import { canReopenCase, resolveReopenedStatus } from './caseAccessPolicy';
+import { reopenSupportCase } from './reopenSupportCase';
 import { toStatusCounts, toSupportCase } from './supportCaseMapper';
 import { ListSupportCasesQueryDto } from './dto/listSupportCasesQueryDto';
 import { CreateSupportCaseDto } from './dto/createSupportCaseDto';
 import {
-  CaseStatus,
   SupportCase,
   SupportCaseList,
   SupportCaseOptions,
@@ -25,11 +21,10 @@ import {
 import { toCaseCategoryFields } from './toCaseCategoryFields';
 
 const UNKNOWN_MACHINE_MESSAGE = 'That machine is not in your organisation.';
-const REOPEN_REFUSED_MESSAGE =
-  'Only a case resolved in the last 7 days can be reopened.';
 
 // The customer side: cases in the caller's own organisation (tenantId
-// from the JWT, every query under its RLS). Customers can't assign or
+// from the JWT, every query under its RLS) that they may see under their
+// machine scope (machineGroups/access). Customers can't assign or
 // change status or priority — that's AdminCaseUpdatesService.
 @Injectable()
 export class SupportCasesService {
@@ -45,19 +40,24 @@ export class SupportCasesService {
   ): Promise<SupportCaseList> =>
     this.databaseService.withTenant(actor.tenantId, async (client) => {
       const filters = { ...query, status: query.status ?? 'active' };
+      const scope = await getAccessibleMachineScope(client, actor);
+      const tenantId = actor.tenantId;
       const rows = await casesRepository.listCases(
         client,
-        actor.tenantId,
+        tenantId,
         filters,
+        scope,
       );
       const total = await casesRepository.countCases(
         client,
-        actor.tenantId,
+        tenantId,
         filters,
+        scope,
       );
       const counts = await casesRepository.countCasesByStatus(
         client,
-        actor.tenantId,
+        tenantId,
+        scope,
       );
       return {
         items: rows.map(toSupportCase),
@@ -73,9 +73,7 @@ export class SupportCasesService {
     caseNumber: number,
   ): Promise<SupportCase> =>
     this.databaseService.withTenant(actor.tenantId, async (client) =>
-      toSupportCase(
-        await requireSupportCase(client, actor.tenantId, caseNumber),
-      ),
+      toSupportCase(await requireVisibleSupportCase(client, actor, caseNumber)),
     );
 
   // Machines for the New case form.
@@ -84,6 +82,7 @@ export class SupportCasesService {
       const machines = await optionsRepository.listMachineOptions(
         client,
         actor.tenantId,
+        await getAccessibleMachineScope(client, actor),
       );
       return {
         machines: machines.map((machine) => ({
@@ -109,6 +108,7 @@ export class SupportCasesService {
             client,
             actor.tenantId,
             dto.machineId,
+            await getAccessibleMachineScope(client, actor),
           ))
         ) {
           throw new BadRequestException(UNKNOWN_MACHINE_MESSAGE);
@@ -134,9 +134,9 @@ export class SupportCasesService {
         });
         return postMessageToCase(client, {
           tenantId: actor.tenantId,
-          supportCase: await requireSupportCase(
+          supportCase: await requireVisibleSupportCase(
             client,
-            actor.tenantId,
+            actor,
             caseNumber,
           ),
           authorId: actor.userId,
@@ -163,46 +163,8 @@ export class SupportCasesService {
     actor: AuthenticatedUser,
     caseNumber: number,
   ): Promise<SupportCase> => {
-    const change = await this.databaseService.withActor(
-      actor,
-      async (client) => {
-        const existing = await requireSupportCase(
-          client,
-          actor.tenantId,
-          caseNumber,
-        );
-        if (
-          !canReopenCase(
-            existing.status as CaseStatus,
-            existing.resolved_at,
-            new Date(),
-          )
-        ) {
-          throw new ConflictException(REOPEN_REFUSED_MESSAGE);
-        }
-        const status = resolveReopenedStatus(existing.assignee_id);
-        await casesRepository.updateCase(client, {
-          tenantId: actor.tenantId,
-          caseId: existing.id,
-          patch: { status },
-        });
-        const events = await recordCaseChange(client, {
-          tenantId: actor.tenantId,
-          caseId: existing.id,
-          caseNumber,
-          actorId: actor.userId,
-          action: 'update',
-          events: [
-            { type: 'reopened', fromValue: existing.status, toValue: status },
-          ],
-        });
-        const row = await requireSupportCase(
-          client,
-          actor.tenantId,
-          caseNumber,
-        );
-        return { row, events };
-      },
+    const change = await this.databaseService.withActor(actor, (client) =>
+      reopenSupportCase(client, actor, caseNumber),
     );
     return this.caseAnnouncer.announceChange(actor.tenantId, {
       ...change,

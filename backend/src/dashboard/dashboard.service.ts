@@ -5,6 +5,8 @@ import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { StorageService } from '../storage/storage.service';
 import { toFleetMachineWithPhoto } from '../machineFleet/machinePhotoUrl';
 import { DashboardConfig } from './dashboardConfig';
+import { getAccessibleMachineScope } from '../machineGroups/access/getAccessibleMachineScope';
+import { MachineScope } from '../machineGroups/access/machineScope';
 import * as countsRepository from './dashboardCounts.repository';
 import * as uptimeRepository from './fleetUptime.repository';
 import * as myMachinesRepository from './myMachines.repository';
@@ -25,7 +27,8 @@ import {
 } from './types/dashboardResponse';
 
 // The Dashboard screen in one request, scoped to the caller's
-// organisation (and, for threads and "my machines", to the caller).
+// organisation and machine scope (machineGroups/access), and for threads
+// and "my machines" to the caller.
 @Injectable()
 export class DashboardService {
   constructor(
@@ -41,10 +44,16 @@ export class DashboardService {
       actor.tenantId,
     );
     return this.databaseService.withTenant(actor.tenantId, async (client) => {
-      const tenantAndUser = { tenantId: actor.tenantId, userId: actor.userId };
+      const scope = await getAccessibleMachineScope(client, actor);
+      const tenantAndUser = {
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        scope,
+      };
       const downRows = await countsRepository.listDownMachines(
         client,
         actor.tenantId,
+        scope,
       );
       const entries = await countsRepository.countEntriesThisWeek(
         client,
@@ -55,7 +64,7 @@ export class DashboardService {
         tenantAndUser,
       );
       return {
-        openCases: await this.loadOpenCases(client, actor.tenantId),
+        openCases: await this.loadOpenCases(client, actor.tenantId, scope),
         machinesDown: {
           total: Number(downRows[0]?.total ?? 0),
           machines: downRows.map((row) => ({ id: row.id, label: row.label })),
@@ -64,10 +73,10 @@ export class DashboardService {
           total: Number(entries.total),
           mine: Number(entries.mine),
         },
-        fleetUptime: await this.loadFleetUptime(client, actor.tenantId, now),
+        fleetUptime: await this.loadFleetUptime(client, tenantAndUser, now),
         recentActivity: mergeActivity(
           [
-            ...(await this.loadTenantActivity(client, actor)),
+            ...(await this.loadTenantActivity(client, tenantAndUser)),
             ...knowledgeRows.map(knowledgeToActivity),
           ],
           activityRepository.ACTIVITY_LIMIT,
@@ -84,11 +93,13 @@ export class DashboardService {
   private loadOpenCases = async (
     client: PoolClient,
     tenantId: string,
+    scope: MachineScope,
   ): Promise<OpenCasesSummary> => {
     const row = await countsRepository.countOpenCases(
       client,
       tenantId,
       this.dashboardConfig.slaHours,
+      scope,
     );
     return {
       total: Number(row.total),
@@ -103,16 +114,16 @@ export class DashboardService {
 
   private loadFleetUptime = async (
     client: PoolClient,
-    tenantId: string,
+    viewer: { tenantId: string; scope: MachineScope },
     now: Date,
   ): Promise<FleetUptime> => {
     const rows = await uptimeRepository.listStatusEvents(client, {
-      tenantId,
+      ...viewer,
       windowStart: uptimeWindowStart(now),
     });
     const trackingSince = await uptimeRepository.findTrackingStart(
       client,
-      tenantId,
+      viewer.tenantId,
     );
     return computeFleetUptime(
       rows.map((row) => ({
@@ -127,20 +138,19 @@ export class DashboardService {
 
   private loadTenantActivity = async (
     client: PoolClient,
-    actor: AuthenticatedUser,
+    viewer: { tenantId: string; userId: string; scope: MachineScope },
   ): Promise<ActivityItem[]> => {
     const cases = await activityRepository.listCaseActivity(
       client,
-      actor.tenantId,
+      viewer.tenantId,
+      viewer.scope,
     );
     const entries = await activityRepository.listEntryActivity(
       client,
-      actor.tenantId,
+      viewer.tenantId,
+      viewer.scope,
     );
-    const threads = await activityRepository.listThreadActivity(client, {
-      tenantId: actor.tenantId,
-      userId: actor.userId,
-    });
+    const threads = await activityRepository.listThreadActivity(client, viewer);
     return [
       ...cases.map(caseToActivity),
       ...entries.map(entryToActivity),

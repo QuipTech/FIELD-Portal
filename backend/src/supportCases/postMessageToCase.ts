@@ -9,6 +9,7 @@ import { linkAttachmentsToMessage } from './caseAttachments.repository';
 import { touchCase, updateCase } from './supportCases.repository';
 import { recordCaseChange } from './recordCaseChange';
 import { requireSupportCase } from './requireSupportCase';
+import { ALL_MACHINES } from '../machineGroups/access/machineScope';
 import { CaseAuthorRole, CaseStatus } from './types/supportCaseResponse';
 import {
   CaseEventRow,
@@ -96,10 +97,12 @@ export const postMessageToCase = async (
   } else {
     await touchCase(client, input.tenantId, caseId);
   }
+  // Re-read after the change; the caller has already checked access.
   const supportCase = await requireSupportCase(
     client,
     input.tenantId,
     caseNumber,
+    ALL_MACHINES,
   );
   return { message, events, supportCase };
 };

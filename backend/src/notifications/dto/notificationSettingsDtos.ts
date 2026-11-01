@@ -6,6 +6,7 @@ import {
   IsIn,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   MinLength,
 } from 'class-validator';
@@ -16,6 +17,7 @@ import {
 } from '../types/notificationResponse';
 
 export const PUSH_DEVICE_TYPES = ['ios', 'android', 'web'] as const;
+export const APNS_ENVIRONMENTS = ['sandbox', 'production'] as const;
 export type PushDeviceType = (typeof PUSH_DEVICE_TYPES)[number];
 
 // POST /me/devices — call on every app start and when the token changes.
@@ -35,6 +37,21 @@ export class RegisterPushDeviceDto {
   @IsString()
   @MaxLength(50)
   appVersion?: string;
+
+  // The app build, e.g. au.com.quiptechfield.field.dev. With
+  // apnsEnvironment it picks the SNS platform application; missing means
+  // the production app.
+  @IsOptional()
+  @Transform(trimString)
+  @IsString()
+  @Matches(/^[A-Za-z0-9.-]{1,200}$/)
+  bundleId?: string;
+
+  // iOS: "sandbox" for development builds, "production" for TestFlight and
+  // the App Store. Missing means production.
+  @IsOptional()
+  @IsIn(APNS_ENVIRONMENTS)
+  apnsEnvironment?: (typeof APNS_ENVIRONMENTS)[number];
 }
 
 // PUT /me/notification-preferences — the whole set each time.

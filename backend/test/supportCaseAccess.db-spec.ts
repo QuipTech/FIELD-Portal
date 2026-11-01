@@ -7,6 +7,7 @@ import {
 } from '../src/supportCases/supportCases.repository';
 import { listCaseMessages } from '../src/supportCases/caseMessages.repository';
 import { readDatabaseUrl } from './dbTestConnection';
+import { ALL_MACHINES } from '../src/machineGroups/access/machineScope';
 import {
   asTenantRole,
   insertThreadMessage,
@@ -34,14 +35,19 @@ describe("a customer can't read another company's case", () => {
   it('is invisible to another organisation, even asked for by its own tenant id', async () => {
     await asTenantRole(client, world.tenantB);
     const { tenantA, tenantB, caseNumber } = world;
-    expect(await findCaseByNumber(asPool, tenantB, caseNumber)).toBeNull();
-    expect(await findCaseByNumber(asPool, tenantA, caseNumber)).toBeNull();
     expect(
-      await listCases(asPool, tenantA, {
-        status: 'all',
-        page: 1,
-        pageSize: 25,
-      }),
+      await findCaseByNumber(asPool, tenantB, caseNumber, ALL_MACHINES),
+    ).toBeNull();
+    expect(
+      await findCaseByNumber(asPool, tenantA, caseNumber, ALL_MACHINES),
+    ).toBeNull();
+    expect(
+      await listCases(
+        asPool,
+        tenantA,
+        { status: 'all', page: 1, pageSize: 25 },
+        ALL_MACHINES,
+      ),
     ).toEqual([]);
     const raw = await client.query(
       'SELECT 1 FROM support_cases WHERE id = $1',
@@ -56,6 +62,7 @@ describe("a customer can't read another company's case", () => {
       asPool,
       world.tenantA,
       world.caseNumber,
+      ALL_MACHINES,
     );
     expect(found?.assignee_first_name).toBe('agent');
   });

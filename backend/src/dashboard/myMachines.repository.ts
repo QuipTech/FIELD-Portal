@@ -4,6 +4,11 @@ import {
   FLEET_FROM,
 } from '../machineFleet/machineFleet.repository';
 import { FleetMachineRow } from '../machineFleet/types/machineFleetRows';
+import {
+  MachineScope,
+  machineInScopeSql,
+  toScopeParam,
+} from '../machineGroups/access/machineScope';
 
 const MY_MACHINES_LIMIT = 4;
 
@@ -11,7 +16,7 @@ const MY_MACHINES_LIMIT = 4;
 // asked the assistant about; down and service-due ones first.
 export const listMyMachines = async (
   client: PoolClient,
-  params: { tenantId: string; userId: string },
+  params: { tenantId: string; userId: string; scope: MachineScope },
 ): Promise<FleetMachineRow[]> => {
   const result = await client.query<FleetMachineRow>(
     `WITH touched AS (
@@ -34,10 +39,11 @@ export const listMyMachines = async (
      SELECT ${FLEET_COLUMNS} ${FLEET_FROM}
      JOIN latest l ON l.machine_id = m.id
      WHERE m.tenant_id = $1 AND m.deleted_at IS NULL
+       AND ${machineInScopeSql('m', '$3')}
      ORDER BY CASE m.status WHEN 'down' THEN 0 WHEN 'service_due' THEN 1 ELSE 2 END,
               l.last_worked_at DESC
      LIMIT ${MY_MACHINES_LIMIT}`,
-    [params.tenantId, params.userId],
+    [params.tenantId, params.userId, toScopeParam(params.scope)],
   );
   return result.rows;
 };

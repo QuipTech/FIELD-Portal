@@ -26,6 +26,10 @@ export interface FleetMachine {
   // What the caller may do next (empty without machine.lifecycle).
   availableActions: LifecycleAction[];
   canRequestTransfer: boolean;
+  // The customer group it belongs to; null when ungrouped.
+  groupId: string | null;
+  groupName: string | null;
+  groupColour: string | null;
 }
 
 export interface FeaturedDownMachine {
