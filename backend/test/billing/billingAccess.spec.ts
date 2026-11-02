@@ -3,6 +3,7 @@ import { PoolClient } from 'pg';
 import { assertNewSessionAllowed } from '../../src/aiAssistant/aiSessionAccess';
 import { EntitlementsService } from '../../src/entitlements/entitlements.service';
 import { assertFullMachineAccess } from '../../src/machineLifecycle/activeMachine/activeMachine.repository';
+import { ALL_MACHINES } from '../../src/machineGroups/access/machineScope';
 import { findOrganisationSubscription } from '../../src/organisationSubscription/organisationSubscription.repository';
 import { toOrganisationSubscription } from '../../src/organisationSubscription/organisationSubscriptionRules';
 import {
@@ -71,7 +72,12 @@ describe('access from the billing plan', () => {
     );
     await expect(
       asCustomer((client) =>
-        assertFullMachineAccess(client, fixture.ids.customerTenant, machineId),
+        assertFullMachineAccess(
+          client,
+          fixture.ids.customerTenant,
+          machineId,
+          ALL_MACHINES,
+        ),
       ),
     ).resolves.toBe('allowed');
     await fixture.query(
@@ -81,7 +87,12 @@ describe('access from the billing plan', () => {
     );
     await expect(
       asCustomer((client) =>
-        assertFullMachineAccess(client, fixture.ids.customerTenant, machineId),
+        assertFullMachineAccess(
+          client,
+          fixture.ids.customerTenant,
+          machineId,
+          ALL_MACHINES,
+        ),
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
   });

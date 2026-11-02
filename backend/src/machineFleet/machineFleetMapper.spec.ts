@@ -18,6 +18,9 @@ const machineRow = (
   operating_hours: 14208,
   status: 'down',
   lifecycle_state: 'active',
+  group_id: null,
+  group_name: null,
+  group_colour: null,
   photo_storage_key: null,
   ...overrides,
 });
@@ -38,6 +41,25 @@ describe('toFleetMachine', () => {
       lifecycleState: 'active',
       availableActions: [],
       canRequestTransfer: false,
+      groupId: null,
+      groupName: null,
+      groupColour: null,
+    });
+  });
+
+  it('shows the group a machine is in', () => {
+    expect(
+      toFleetMachine(
+        machineRow({
+          group_id: 'group-1',
+          group_name: 'ABC Earthmoving',
+          group_colour: '#4A34C7',
+        }),
+      ),
+    ).toMatchObject({
+      groupId: 'group-1',
+      groupName: 'ABC Earthmoving',
+      groupColour: '#4A34C7',
     });
   });
 

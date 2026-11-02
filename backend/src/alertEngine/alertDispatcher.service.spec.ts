@@ -6,9 +6,12 @@ import { SmsChannel } from './channels/smsChannel';
 import { PushChannel } from './channels/pushChannel';
 import { buildRule, ORG_A, ORG_B } from './alertTestFixtures';
 import { RecipientCandidateRow } from './types/alertRows';
+import * as machineVisibility from '../machineGroups/access/machineVisibility.repository';
 
 jest.mock('./alertDelivery.repository');
+jest.mock('../machineGroups/access/machineVisibility.repository');
 const repository = jest.mocked(alertDeliveryRepository);
+const visibility = jest.mocked(machineVisibility);
 
 const candidateRow = (
   overrides: Partial<RecipientCandidateRow> = {},
@@ -43,7 +46,10 @@ const smsDeliver = jest
 
 const buildDispatcher = () =>
   new AlertDispatcherService(
-    {} as DatabaseService,
+    {
+      withTenant: (_tenantId: string, work: (client: unknown) => unknown) =>
+        work({}),
+    } as unknown as DatabaseService,
     { channel: 'email', deliver: emailDeliver } as unknown as EmailChannel,
     { channel: 'sms', deliver: smsDeliver } as unknown as SmsChannel,
     new PushChannel(),
@@ -52,6 +58,7 @@ const buildDispatcher = () =>
 describe('AlertDispatcherService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    visibility.findCaseMachineId.mockResolvedValue(null);
     repository.findTenantBranding.mockResolvedValue({
       name: 'TRT',
       branding_color_accent: '#123456',
@@ -123,5 +130,47 @@ describe('AlertDispatcherService', () => {
       onlyUserId: 'admin',
     });
     expect(results.map((r) => r.userId)).toEqual(['admin']);
+  });
+
+  it('skips people who cannot see the machine an alert is about', async () => {
+    repository.listRecipientCandidates.mockResolvedValue([
+      candidateRow({ user_id: 'sees-it' }),
+      candidateRow({ user_id: 'other-group' }),
+    ]);
+    visibility.filterUsersWhoCanSeeMachine.mockResolvedValue(
+      new Set(['sees-it']),
+    );
+    const results = await buildDispatcher().dispatch(buildRule(), {
+      ...MATCH,
+      entityKey: 'machine:m-1',
+      machineId: 'm-1',
+      caseId: null,
+    });
+    expect(results.map((result) => result.userId)).toEqual(['sees-it']);
+    expect(visibility.filterUsersWhoCanSeeMachine).toHaveBeenCalledWith(
+      {},
+      {
+        tenantId: ORG_A,
+        machineId: 'm-1',
+        userIds: ['sees-it', 'other-group'],
+      },
+    );
+  });
+
+  it('skips people who cannot see the machine a case alert is about', async () => {
+    repository.listRecipientCandidates.mockResolvedValue([
+      candidateRow({ user_id: 'sees-it' }),
+      candidateRow({ user_id: 'other-group' }),
+    ]);
+    visibility.findCaseMachineId.mockResolvedValue('m-2');
+    visibility.filterUsersWhoCanSeeMachine.mockResolvedValue(
+      new Set(['sees-it']),
+    );
+    const results = await buildDispatcher().dispatch(buildRule(), MATCH);
+    expect(results.map((result) => result.userId)).toEqual(['sees-it']);
+    expect(visibility.findCaseMachineId).toHaveBeenCalledWith(
+      {},
+      { tenantId: ORG_A, caseId: 'case-1' },
+    );
   });
 });

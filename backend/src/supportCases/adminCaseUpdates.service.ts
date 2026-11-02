@@ -8,6 +8,7 @@ import { listSupportStaff } from './adminSupportCases.repository';
 import { updateCase } from './supportCases.repository';
 import { markCaseRead } from './caseReads.repository';
 import { requireSupportCase } from './requireSupportCase';
+import { ALL_MACHINES } from '../machineGroups/access/machineScope';
 import { recordCaseChange } from './recordCaseChange';
 import { postMessageToCase } from './postMessageToCase';
 import { withStaffCase } from './withStaffCase';
@@ -77,6 +78,7 @@ export class AdminCaseUpdatesService {
           client,
           access.caseTenantId,
           caseNumber,
+          ALL_MACHINES,
         );
         return {
           row,

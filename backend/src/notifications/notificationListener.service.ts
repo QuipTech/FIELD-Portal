@@ -8,12 +8,14 @@ import {
   NOTIFICATION_PG_CHANNEL,
   userRoom,
 } from './notificationEvents';
+import { PushSenderService } from './push/pushSender.service';
 
 const RECONNECT_DELAY_MS = 5000;
 
 // Holds one dedicated database connection that LISTENs for new
 // notifications (migration 0065's trigger, which covers alerts and the
-// 0054 triggers alike) and forwards each to its user's socket room. Starts
+// 0054 triggers alike), forwards each to its user's socket room and hands
+// it to the push sender. Starts
 // once the gateway attaches its namespace; reconnects if the connection
 // drops.
 @Injectable()
@@ -23,7 +25,10 @@ export class NotificationListenerService implements OnModuleDestroy {
   private client: Client | null = null;
   private isStopped = false;
 
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly pushSender: PushSenderService,
+  ) {}
 
   attach = (namespace: Namespace): void => {
     this.namespace = namespace;
@@ -70,6 +75,9 @@ export class NotificationListenerService implements OnModuleDestroy {
       this.namespace
         ?.to(userRoom(userId))
         .emit(NOTIFICATION_EVENTS.created, { notificationId });
+      // Every container hears this; claim_notification_push() lets only
+      // one of them push it. Fire and forget: the sender logs its errors.
+      void this.pushSender.sendForNotification(notificationId);
     } catch (error) {
       this.logger.warn(`Bad notification payload: ${String(error)}`);
     }

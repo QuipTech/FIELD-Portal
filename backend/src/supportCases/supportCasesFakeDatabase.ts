@@ -71,6 +71,10 @@ const MESSAGES = [
 ];
 
 const answer = (state: FakeDatabaseState, sql: string, params: unknown[]) => {
+  // getAccessibleMachineScope: everyone here sees every machine.
+  if (sql.includes('u.machine_access_mode')) {
+    return [{ machine_access_mode: 'all', is_admin: false, group_ids: [] }];
+  }
   if (sql.includes('p.code')) {
     const userId = params[0] as string;
     return (TEST_USERS[userId]?.permissions ?? []).map((code) => ({ code }));

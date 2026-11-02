@@ -10,6 +10,9 @@ export interface FleetMachineRow {
   operating_hours: number | null;
   status: string;
   lifecycle_state: string;
+  group_id: string | null;
+  group_name: string | null;
+  group_colour: string | null;
   photo_storage_key: string | null;
 }
 

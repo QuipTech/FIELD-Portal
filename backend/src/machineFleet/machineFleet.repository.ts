@@ -4,9 +4,15 @@ import { toLimitOffset } from '../common/dto/paginationQueryDto';
 import { ListMachinesQueryDto } from './dto/listMachinesQueryDto';
 import { FeaturedDownRow, FleetMachineRow } from './types/machineFleetRows';
 import { OperatingStatus } from './types/machineFleetResponse';
+import {
+  MachineScope,
+  machineInScopeSql,
+  toScopeParam,
+} from '../machineGroups/access/machineScope';
 
 // Every query filters on tenant_id itself: the backend's database role may
-// bypass RLS.
+// bypass RLS. Reads also filter on the caller's machine scope
+// (machineGroups/access): a machine outside it doesn't exist for them.
 export const MACHINE_LABEL_SQL = `COALESCE(NULLIF(m.asset_number, ''), NULLIF(m.fleet_number, ''), m.serial_number)`;
 
 // The storage key of the machine's photo (alias m): its chosen cover, else
@@ -21,22 +27,31 @@ export const FLEET_COLUMNS = `
   m.id, ${MACHINE_LABEL_SQL} AS label, m.serial_number,
   mf.name AS manufacturer_name, mm.name AS model_name, mm.product_family,
   m.site, m.operating_hours, m.status, m.lifecycle_state,
+  m.group_id, g.name AS group_name, g.colour AS group_colour,
   ${MACHINE_PHOTO_KEY_SQL} AS photo_storage_key`;
 
 export const FLEET_FROM = `
   FROM machines m
   JOIN machine_manufacturers mf ON mf.id = m.manufacturer_id
-  JOIN machine_models mm ON mm.id = m.model_id`;
+  JOIN machine_models mm ON mm.id = m.model_id
+  LEFT JOIN machine_groups g ON g.id = m.group_id AND g.deleted_at IS NULL`;
 
-// WHERE clause and its parameters for the list's filters ($1 = tenant).
-// viewerId is who "assigned to me" means.
-const buildFilter = (
-  tenantId: string,
-  viewerId: string,
-  filters: ListMachinesQueryDto,
-) => {
-  const params: unknown[] = [tenantId];
-  const conditions = ['m.tenant_id = $1', 'm.deleted_at IS NULL'];
+export interface FleetScope {
+  tenantId: string;
+  // Who "assigned to me" means.
+  viewerId: string;
+  machineScope: MachineScope;
+}
+
+// WHERE clause and its parameters for the list's filters ($1 = tenant,
+// $2 = machine scope).
+const buildFilter = (scope: FleetScope, filters: ListMachinesQueryDto) => {
+  const params: unknown[] = [scope.tenantId, toScopeParam(scope.machineScope)];
+  const conditions = [
+    'm.tenant_id = $1',
+    'm.deleted_at IS NULL',
+    machineInScopeSql('m', '$2'),
+  ];
   const addCondition = (value: unknown, toSql: (param: string) => string) => {
     params.push(value);
     conditions.push(toSql(`$${params.length}`));
@@ -53,9 +68,12 @@ const buildFilter = (
       (p) => `lower(mm.product_family) = lower(${p})`,
     );
   }
+  if (filters.groupId)
+    addCondition(filters.groupId, (p) => `m.group_id = ${p}`);
+  if (filters.ungrouped) conditions.push('m.group_id IS NULL');
   if (filters.assignedToMe) {
     addCondition(
-      viewerId,
+      scope.viewerId,
       (p) => `EXISTS (SELECT 1 FROM machine_assignments a
                       WHERE a.machine_id = m.id AND a.tenant_id = m.tenant_id AND a.user_id = ${p})`,
     );
@@ -74,14 +92,10 @@ const buildFilter = (
 
 export const listMachines = async (
   client: PoolClient,
-  scope: { tenantId: string; viewerId: string },
+  scope: FleetScope,
   filters: ListMachinesQueryDto,
 ): Promise<FleetMachineRow[]> => {
-  const { where, params } = buildFilter(
-    scope.tenantId,
-    scope.viewerId,
-    filters,
-  );
+  const { where, params } = buildFilter(scope, filters);
   const { limit, offset } = toLimitOffset(filters);
   const result = await client.query<FleetMachineRow>(
     `SELECT ${FLEET_COLUMNS} ${FLEET_FROM} WHERE ${where}
@@ -93,14 +107,10 @@ export const listMachines = async (
 
 export const countMachines = async (
   client: PoolClient,
-  scope: { tenantId: string; viewerId: string },
+  scope: FleetScope,
   filters: ListMachinesQueryDto,
 ): Promise<number> => {
-  const { where, params } = buildFilter(
-    scope.tenantId,
-    scope.viewerId,
-    filters,
-  );
+  const { where, params } = buildFilter(scope, filters);
   const result = await client.query<{ count: string }>(
     `SELECT count(*) ${FLEET_FROM} WHERE ${where}`,
     params,
@@ -112,11 +122,13 @@ export const findFleetMachine = async (
   client: PoolClient,
   tenantId: string,
   machineId: string,
+  scope: MachineScope,
 ): Promise<FleetMachineRow | null> => {
   const result = await client.query<FleetMachineRow>(
     `SELECT ${FLEET_COLUMNS} ${FLEET_FROM}
-     WHERE m.tenant_id = $1 AND m.id = $2 AND m.deleted_at IS NULL`,
-    [tenantId, machineId],
+     WHERE m.tenant_id = $1 AND m.id = $2 AND m.deleted_at IS NULL
+       AND ${machineInScopeSql('m', '$3')}`,
+    [tenantId, machineId, toScopeParam(scope)],
   );
   return result.rows[0] ?? null;
 };
@@ -126,6 +138,7 @@ export const findFleetMachine = async (
 export const findFeaturedDownMachine = async (
   client: PoolClient,
   tenantId: string,
+  scope: MachineScope,
 ): Promise<FeaturedDownRow | null> => {
   const result = await client.query<FeaturedDownRow>(
     `SELECT ${FLEET_COLUMNS},
@@ -138,25 +151,36 @@ export const findFeaturedDownMachine = async (
        ORDER BY sc.priority, sc.updated_at DESC LIMIT 1
      ) c ON true
      WHERE m.tenant_id = $1 AND m.deleted_at IS NULL AND m.status = 'down'
+       AND ${machineInScopeSql('m', '$2')}
      ORDER BY c.case_number IS NULL, c.priority, m.updated_at DESC
      LIMIT 1`,
-    [tenantId],
+    [tenantId, toScopeParam(scope)],
   );
   return result.rows[0] ?? null;
 };
 
-// The previous status, or null when there's no such machine.
+// The previous status, or null when there's no such machine in scope.
 export const updateMachineStatus = async (
   client: PoolClient,
-  params: { tenantId: string; machineId: string; status: OperatingStatus },
+  params: {
+    tenantId: string;
+    machineId: string;
+    status: OperatingStatus;
+    scope: MachineScope;
+  },
 ): Promise<OperatingStatus | null> => {
   const result = await client.query<{ previous_status: OperatingStatus }>(
     `UPDATE machines m SET status = $3
      FROM machines previous
      WHERE m.id = $1 AND m.tenant_id = $2 AND m.deleted_at IS NULL
-       AND previous.id = m.id
+       AND previous.id = m.id AND ${machineInScopeSql('m', '$4')}
      RETURNING previous.status AS previous_status`,
-    [params.machineId, params.tenantId, params.status],
+    [
+      params.machineId,
+      params.tenantId,
+      params.status,
+      toScopeParam(params.scope),
+    ],
   );
   return result.rows[0]?.previous_status ?? null;
 };

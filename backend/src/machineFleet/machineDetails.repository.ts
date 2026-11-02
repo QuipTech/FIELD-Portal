@@ -1,4 +1,9 @@
 import { PoolClient } from 'pg';
+import {
+  MachineScope,
+  machineInScopeSql,
+  toScopeParam,
+} from '../machineGroups/access/machineScope';
 
 export interface MachineDetailsRow {
   site: string | null;
@@ -15,15 +20,18 @@ export interface MachineDetailsChange {
 // Every query filters on tenant_id itself: the backend's database role may
 // bypass RLS.
 
+// null when there's no such machine in the caller's machine scope.
 export const findMachineDetails = async (
   client: PoolClient,
   tenantId: string,
   machineId: string,
+  scope: MachineScope,
 ): Promise<MachineDetailsRow | null> => {
   const result = await client.query<MachineDetailsRow>(
-    `SELECT site, operating_hours, cover_photo_id FROM machines
-     WHERE id = $1 AND tenant_id = $2 AND deleted_at IS NULL`,
-    [machineId, tenantId],
+    `SELECT m.site, m.operating_hours, m.cover_photo_id FROM machines m
+     WHERE m.id = $1 AND m.tenant_id = $2 AND m.deleted_at IS NULL
+       AND ${machineInScopeSql('m', '$3')}`,
+    [machineId, tenantId, toScopeParam(scope)],
   );
   return result.rows[0] ?? null;
 };

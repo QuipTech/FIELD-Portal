@@ -8,6 +8,8 @@ import { issueSession } from './authSessionIssuer';
 import * as authRepository from './auth.repository';
 import { findUserAccess } from './userAccess.repository';
 import { AuthResponse, MeResponse } from './types/authResponse';
+import { findUsersMachineAccess } from '../machineGroups/machineAccess.repository';
+import { toMachineAccess } from '../machineGroups/machineGroupsMapper';
 import { toMeCapabilities } from './meCapabilities';
 import { RefreshTokenPayload } from './types/jwtPayload';
 
@@ -72,6 +74,13 @@ export class AuthService {
       // Re-read on each call, so role/permission changes reach the
       // portal without signing in again.
       const access = await findUserAccess(client, user.id);
+      const [machineAccessRow] = await findUsersMachineAccess(
+        client,
+        tenantId,
+        [user.id],
+      );
+      if (!machineAccessRow) throw new UnauthorizedException();
+      const machineAccess = toMachineAccess(machineAccessRow);
       return {
         id: user.id,
         email: user.email,
@@ -84,6 +93,8 @@ export class AuthService {
         language: user.language,
         ...access,
         capabilities: toMeCapabilities(access.permissions),
+        machineAccessMode: machineAccess.effectiveMode,
+        accessibleGroups: machineAccess.groups,
         tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug },
       };
     });

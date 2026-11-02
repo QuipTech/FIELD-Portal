@@ -50,4 +50,10 @@ export class RegisterMachineDto {
   @IsOptional()
   @IsIn(OPERATING_STATUSES)
   status?: OperatingStatus;
+
+  // The customer group it goes in. Organisation admins may pick any group;
+  // people limited to groups must pick one of theirs; others can't set it.
+  @IsOptional()
+  @IsUUID()
+  groupId?: string;
 }

@@ -43,6 +43,9 @@ export const toFleetMachine = (
     lifecycleState,
     availableActions: listAvailableActions(lifecycleState, canManageLifecycle),
     canRequestTransfer: canRequestTransfer(lifecycleState, canManageLifecycle),
+    groupId: row.group_id ?? null,
+    groupName: row.group_id ? (row.group_name ?? null) : null,
+    groupColour: row.group_id ? (row.group_colour ?? null) : null,
   };
 };
 

@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import * as authRepository from '../auth/auth.repository';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
-import { assertMachineInTenant } from '../machineHistory/machineHistory.service';
+import { assertMachineAccessible } from '../machineHistory/machineHistory.service';
 import * as machineComponentsRepository from './machineComponents.repository';
 import * as snapshotsRepository from './snapshots.repository';
 import { toMachineComponent, toSnapshot } from './machineConfigurationMapper';
@@ -22,7 +22,7 @@ export class MachineConfigurationService {
 
   listSystems = (actor: AuthenticatedUser, machineId: string): Promise<MachineSystem[]> =>
     this.databaseService.withTenant(actor.tenantId, async (client) => {
-      await assertMachineInTenant(client, actor.tenantId, machineId);
+      await assertMachineAccessible(client, actor, machineId);
       await machineComponentsRepository.seedInstalledConfiguration(client, machineId);
       return machineComponentsRepository.listSystems(client, actor.tenantId, machineId);
     });
@@ -33,7 +33,7 @@ export class MachineConfigurationService {
     systemId: string | null,
   ): Promise<MachineComponent[]> =>
     this.databaseService.withTenant(actor.tenantId, async (client) => {
-      await assertMachineInTenant(client, actor.tenantId, machineId);
+      await assertMachineAccessible(client, actor, machineId);
       await machineComponentsRepository.seedInstalledConfiguration(client, machineId);
       const rows = await machineComponentsRepository.listComponents(client, {
         tenantId: actor.tenantId,
@@ -45,7 +45,7 @@ export class MachineConfigurationService {
 
   listSnapshots = (actor: AuthenticatedUser, machineId: string): Promise<Snapshot[]> =>
     this.databaseService.withTenant(actor.tenantId, async (client) => {
-      await assertMachineInTenant(client, actor.tenantId, machineId);
+      await assertMachineAccessible(client, actor, machineId);
       const rows = await snapshotsRepository.listSnapshots(client, actor.tenantId, machineId);
       return rows.map(toSnapshot);
     });
@@ -53,7 +53,7 @@ export class MachineConfigurationService {
   // A technician's manual snapshot of the current configuration.
   takeSnapshot = (actor: AuthenticatedUser, machineId: string): Promise<Snapshot> =>
     this.databaseService.withTenant(actor.tenantId, async (client) => {
-      await assertMachineInTenant(client, actor.tenantId, machineId);
+      await assertMachineAccessible(client, actor, machineId);
       const snapshotId = await snapshotsRepository.captureSnapshot(client, {
         machineId,
         takenBy: actor.userId,
@@ -77,7 +77,7 @@ export class MachineConfigurationService {
     isKnownGood: boolean,
   ): Promise<Snapshot> =>
     this.databaseService.withTenant(actor.tenantId, async (client) => {
-      await assertMachineInTenant(client, actor.tenantId, target.machineId);
+      await assertMachineAccessible(client, actor, target.machineId);
       const params = { tenantId: actor.tenantId, ...target };
       const isUpdated = await snapshotsRepository.setSnapshotKnownGood(client, { ...params, isKnownGood });
       if (!isUpdated) throw new NotFoundException(SNAPSHOT_NOT_FOUND_MESSAGE);

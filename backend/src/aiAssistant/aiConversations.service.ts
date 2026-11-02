@@ -10,6 +10,7 @@ import {
   AssistantConversation,
   AssistantThread,
 } from './types/aiAssistantResponse';
+import { getAccessibleMachineScope } from '../machineGroups/access/getAccessibleMachineScope';
 
 const CONVERSATION_NOT_FOUND_MESSAGE = 'Thread not found.';
 
@@ -22,10 +23,11 @@ export class AiConversationsService {
   listConversations = async (
     actor: AuthenticatedUser,
   ): Promise<AssistantConversation[]> => {
-    const rows = await this.databaseService.withActor(actor, (client) =>
+    const rows = await this.databaseService.withActor(actor, async (client) =>
       aiConversationsRepository.listConversations(client, {
         tenantId: actor.tenantId,
         userId: actor.userId,
+        scope: await getAccessibleMachineScope(client, actor),
       }),
     );
     return rows.map(toAssistantConversation);
@@ -42,6 +44,7 @@ export class AiConversationsService {
           tenantId: actor.tenantId,
           userId: actor.userId,
           conversationId,
+          scope: await getAccessibleMachineScope(client, actor),
         });
         if (!found) throw new NotFoundException(CONVERSATION_NOT_FOUND_MESSAGE);
         return {

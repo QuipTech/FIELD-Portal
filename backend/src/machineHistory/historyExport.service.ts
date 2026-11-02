@@ -3,7 +3,7 @@ import { DatabaseService } from '../database/database.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import * as authRepository from '../auth/auth.repository';
 import * as historyEntriesRepository from './historyEntries.repository';
-import { assertMachineInTenant } from './machineHistory.service';
+import { assertMachineAccessible } from './machineHistory.service';
 import { toHistoryCsv, toHistoryPdf } from './historyExport';
 import { ExportHistoryQueryDto } from './dto/exportHistoryQueryDto';
 
@@ -25,11 +25,7 @@ export class HistoryExportService {
     query: ExportHistoryQueryDto,
   ): Promise<HistoryExportFile> =>
     this.databaseService.withTenant(actor.tenantId, async (client) => {
-      const machine = await assertMachineInTenant(
-        client,
-        actor.tenantId,
-        machineId,
-      );
+      const machine = await assertMachineAccessible(client, actor, machineId);
       const rows = await historyEntriesRepository.listHistoryEntries(
         client,
         actor.tenantId,

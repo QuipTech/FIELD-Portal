@@ -130,4 +130,55 @@ describe('labelEventType', () => {
     expect(labelEventType('fleet_group', 'create')).toBe('Created fleet group');
     expect(labelEventType('fleet_group', 'delete')).toBe('Deleted fleet group');
   });
+
+  it('describes machine group renames, moves and machine access changes', () => {
+    const base = { target_name: null };
+    expect(
+      describeAuditEvent({
+        ...base,
+        entity_type: 'machine_group',
+        action: 'update',
+        metadata: {
+          renamed: true,
+          before: { name: 'ABC' },
+          after: { name: 'ABC Earthmoving' },
+        },
+      }),
+    ).toEqual({
+      actionLabel: 'Renamed machine group',
+      target: 'ABC → ABC Earthmoving',
+    });
+    expect(
+      describeAuditEvent({
+        ...base,
+        entity_type: 'machine',
+        action: 'update',
+        metadata: {
+          name: 'HT-2201',
+          change: 'group',
+          before: { groupId: null, groupName: null },
+          after: { groupId: 'g1', groupName: 'ABC Earthmoving' },
+        },
+      }).target,
+    ).toBe('HT-2201 · Ungrouped → ABC Earthmoving');
+    expect(
+      describeAuditEvent({
+        ...base,
+        target_name: 'Terry Tech',
+        entity_type: 'user',
+        action: 'update',
+        metadata: {
+          change: 'machine_access',
+          before: { machineAccessMode: 'all', groups: [] },
+          after: {
+            machineAccessMode: 'selected',
+            groups: [{ id: 'g1', name: 'ABC Earthmoving' }],
+          },
+        },
+      }),
+    ).toEqual({
+      actionLabel: 'Changed machine access',
+      target: 'Terry Tech · All machines → ABC Earthmoving',
+    });
+  });
 });

@@ -15,18 +15,22 @@ import { toHistoryEntry, toMachineDetail, toPersonName } from './machineHistoryM
 import { CreateHistoryEntryDto } from './dto/createHistoryEntryDto';
 import { ListHistoryQueryDto } from './dto/listHistoryQueryDto';
 import { MachineRow } from './types/machineHistoryRows';
+import { getAccessibleMachineScope } from '../machineGroups/access/getAccessibleMachineScope';
 import { HistoryEntry, MachineDetail } from './types/machineHistoryResponse';
 
 export const MACHINE_NOT_FOUND_MESSAGE = 'Machine not found.';
 const COMPONENT_NOT_FOUND_MESSAGE = "That component isn't installed on this machine.";
 
-// Throws 404 unless the machine exists in the caller's own organisation.
-export const assertMachineInTenant = async (
+// Throws 404 unless the machine exists in the caller's own organisation
+// and is in their machine scope (machineGroups/access) — a machine in a
+// group they can't see is "not found", never "forbidden".
+export const assertMachineAccessible = async (
   client: PoolClient,
-  tenantId: string,
+  actor: { tenantId: string; userId: string },
   machineId: string,
 ): Promise<MachineRow> => {
-  const machine = await machineHistoryRepository.findMachine(client, tenantId, machineId);
+  const scope = await getAccessibleMachineScope(client, actor);
+  const machine = await machineHistoryRepository.findMachine(client, actor.tenantId, machineId, scope);
   if (!machine) throw new NotFoundException(MACHINE_NOT_FOUND_MESSAGE);
   return machine;
 };
@@ -40,7 +44,8 @@ export class MachineHistoryService {
 
   getMachine = (actor: AuthenticatedUser, machineId: string): Promise<MachineDetail> =>
     this.databaseService.withTenant(actor.tenantId, async (client) => {
-      const row = await machineHistoryRepository.findMachineDetail(client, actor.tenantId, machineId);
+      const scope = await getAccessibleMachineScope(client, actor);
+      const row = await machineHistoryRepository.findMachineDetail(client, actor.tenantId, machineId, scope);
       if (!row) throw new NotFoundException(MACHINE_NOT_FOUND_MESSAGE);
       const technicians = await listAssignedTechnicians(client, actor.tenantId, machineId);
       return {
@@ -56,7 +61,7 @@ export class MachineHistoryService {
     query: ListHistoryQueryDto = {},
   ): Promise<HistoryEntry[]> => {
     const rows = await this.databaseService.withTenant(actor.tenantId, async (client) => {
-      await assertMachineInTenant(client, actor.tenantId, machineId);
+      await assertMachineAccessible(client, actor, machineId);
       return historyEntriesRepository.listHistoryEntries(client, actor.tenantId, machineId, {
         entryType: query.type,
         from: query.from,
@@ -71,7 +76,7 @@ export class MachineHistoryService {
 
   listAuthors = (actor: AuthenticatedUser, machineId: string): Promise<{ id: string; name: string }[]> =>
     this.databaseService.withTenant(actor.tenantId, async (client) => {
-      await assertMachineInTenant(client, actor.tenantId, machineId);
+      await assertMachineAccessible(client, actor, machineId);
       const rows = await historyEntriesRepository.listHistoryAuthors(client, actor.tenantId, machineId);
       return rows.map((row) => ({ id: row.id, name: toPersonName(row.first_name, row.last_name) }));
     });
@@ -80,7 +85,7 @@ export class MachineHistoryService {
   // "component_replaced" snapshot for a repair that swapped a component.
   createEntry = async (actor: AuthenticatedUser, machineId: string, dto: CreateHistoryEntryDto): Promise<HistoryEntry> => {
     const row = await this.databaseService.withTenant(actor.tenantId, async (client) => {
-      await assertMachineInTenant(client, actor.tenantId, machineId);
+      await assertMachineAccessible(client, actor, machineId);
       await this.assertComponentOnMachine(client, actor.tenantId, machineId, dto.componentId);
       const entryId = await historyEntriesRepository.insertHistoryEntry(client, {
         tenantId: actor.tenantId,

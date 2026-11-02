@@ -1,4 +1,6 @@
 import { MeCapabilities } from '../meCapabilities';
+import { MachineAccessMode } from '../../machineGroups/access/machineScope';
+import { MachineGroupRef } from '../../machineGroups/types/machineGroupTypes';
 
 // GET /auth/me — the signed-in user, re-read on every call.
 export interface MeResponse {
@@ -20,6 +22,12 @@ export interface MeResponse {
   permissions: string[];
   // Branch on these rather than role names.
   capabilities: MeCapabilities;
+  // Which machines they see: 'all' (always for organisation admins), or
+  // 'selected' — only machines in accessibleGroups (ungrouped ones are
+  // hidden). Hide group management and "Move to group" for 'selected'.
+  machineAccessMode: MachineAccessMode;
+  // Their groups when 'selected' (for the group filter); [] for 'all'.
+  accessibleGroups: MachineGroupRef[];
   tenant: { id: string; name: string; slug: string };
 }
 

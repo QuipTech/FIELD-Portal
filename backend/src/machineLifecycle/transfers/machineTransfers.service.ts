@@ -8,9 +8,11 @@ import { AuthenticatedUser } from '../../auth/types/authenticatedUser';
 import { recordBillingAudit } from '../../billing/billingAudit/billingAudit';
 import { DatabaseService } from '../../database/database.service';
 import { ServiceDatabaseService } from '../../database/serviceDatabase.service';
-import { findFleetMachine } from '../../machineFleet/machineFleet.repository';
 import { toLifecycleState } from '../lifecycleTransitions';
-import { findLifecycleMachine } from '../machineLifecycle.repository';
+import {
+  findTransferMachine,
+  findVisibleLifecycleMachine,
+} from '../visibleMachine';
 import * as transfersRepository from './machineTransfers.repository';
 import { MachineTransfer, toMachineTransfer } from './machineTransferMapper';
 import {
@@ -45,10 +47,7 @@ export class MachineTransfersService {
   ): Promise<MachineTransfer> => {
     const { machine, fleetMachine } = await this.databaseService.withTenant(
       actor.tenantId,
-      async (client) => ({
-        machine: await findLifecycleMachine(client, actor.tenantId, machineId),
-        fleetMachine: await findFleetMachine(client, actor.tenantId, machineId),
-      }),
+      (client) => findTransferMachine(client, actor, machineId),
     );
     if (!machine || !fleetMachine)
       throw new NotFoundException(MACHINE_NOT_FOUND_MESSAGE);
@@ -119,7 +118,7 @@ export class MachineTransfersService {
   ): Promise<MachineTransfer[]> => {
     const machine = await this.databaseService.withTenant(
       actor.tenantId,
-      (client) => findLifecycleMachine(client, actor.tenantId, machineId),
+      (client) => findVisibleLifecycleMachine(client, actor, machineId),
     );
     if (!machine) throw new NotFoundException(MACHINE_NOT_FOUND_MESSAGE);
     return (

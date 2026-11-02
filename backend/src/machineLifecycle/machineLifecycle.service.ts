@@ -24,6 +24,7 @@ import {
 } from './lifecycleTransitions';
 import { applyMachineTransition } from './machineActivations.repository';
 import * as lifecycleRepository from './machineLifecycle.repository';
+import { findVisibleLifecycleMachine } from './visibleMachine';
 import {
   BulkLifecycleResult,
   LifecycleChangeResult,
@@ -56,9 +57,9 @@ export class MachineLifecycleService {
     machineId: string,
   ): Promise<MachineLifecycle> =>
     this.databaseService.withTenant(actor.tenantId, async (client) => {
-      const machine = await lifecycleRepository.findLifecycleMachine(
+      const machine = await findVisibleLifecycleMachine(
         client,
-        actor.tenantId,
+        actor,
         machineId,
       );
       if (!machine) throw new NotFoundException(MACHINE_NOT_FOUND_MESSAGE);
@@ -100,12 +101,7 @@ export class MachineLifecycleService {
       await this.organisationBillingAccountService.ensureForActivation(actor);
     const machine = await this.databaseService.withTenant(
       actor.tenantId,
-      (client) =>
-        lifecycleRepository.findLifecycleMachine(
-          client,
-          actor.tenantId,
-          machineId,
-        ),
+      (client) => findVisibleLifecycleMachine(client, actor, machineId),
     );
     if (!machine) throw new NotFoundException(MACHINE_NOT_FOUND_MESSAGE);
     if (!machine.billing_account_id || !machine.timezone)

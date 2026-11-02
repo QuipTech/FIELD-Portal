@@ -21,7 +21,9 @@
     "test:db": "jest --config ./test/jest-db.json --runInBand",
     "test:knowledge": "NODE_OPTIONS=--experimental-vm-modules jest --config ./test/jest-knowledge.json --runInBand",
     "test:passkeys": "NODE_OPTIONS=--experimental-vm-modules jest --config ./test/jest-passkeys.json --runInBand",
-    "test:billing": "NODE_OPTIONS=--experimental-vm-modules jest --config ./test/jest-billing.json --runInBand"
+    "test:billing": "NODE_OPTIONS=--experimental-vm-modules jest --config ./test/jest-billing.json --runInBand",
+    "test:push": "NODE_OPTIONS=--experimental-vm-modules jest --config ./test/jest-push.json --runInBand",
+    "test:machine-groups": "NODE_OPTIONS=--experimental-vm-modules jest --config ./test/jest-machine-groups.json --runInBand"
   },
   "dependencies": {
     "@anthropic-ai/bedrock-sdk": "^0.33.8",
