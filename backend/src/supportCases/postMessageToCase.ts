@@ -9,7 +9,7 @@ import { linkAttachmentsToMessage } from './caseAttachments.repository';
 import { touchCase, updateCase } from './supportCases.repository';
 import { recordCaseChange } from './recordCaseChange';
 import { requireSupportCase } from './requireSupportCase';
-import { ALL_MACHINES } from '../machineGroups/access/machineScope';
+import { ALL_MACHINES } from '../machineSharing/access/machineScope';
 import { CaseAuthorRole, CaseStatus } from './types/supportCaseResponse';
 import {
   CaseEventRow,
@@ -25,6 +25,9 @@ const UNKNOWN_ATTACHMENT_MESSAGE =
 export interface NewThreadMessage {
   // The case's organisation (staff work under it too).
   tenantId: string;
+  // The author's own organisation when it isn't the case's (a case on a
+  // machine shared with them): their uploads and audit entries are there.
+  authorTenantId?: string;
   supportCase: SupportCaseRow;
   authorId: string;
   authorRole: CaseAuthorRole;
@@ -62,7 +65,7 @@ export const postMessageToCase = async (
   });
   if (input.attachmentIds.length) {
     const linked = await linkAttachmentsToMessage(client, {
-      tenantId: input.tenantId,
+      tenantId: input.authorTenantId ?? input.tenantId,
       caseId,
       messageId: message.id,
       uploaderId: input.authorId,
@@ -86,6 +89,7 @@ export const postMessageToCase = async (
     });
     events = await recordCaseChange(client, {
       tenantId: input.tenantId,
+      auditTenantId: input.authorTenantId,
       caseId,
       caseNumber,
       actorId: input.authorId,

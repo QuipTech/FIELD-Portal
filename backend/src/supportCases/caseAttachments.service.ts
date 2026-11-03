@@ -52,12 +52,12 @@ export class CaseAttachmentsService {
   // Messages with their attachments, in one query for the whole thread.
   toMessages = async (
     client: PoolClient,
-    tenantId: string,
+    caseId: string,
     rows: CaseMessageRow[],
   ): Promise<CaseMessage[]> => {
     const attachments = await listMessageAttachments(
       client,
-      tenantId,
+      caseId,
       rows.map((row) => row.id),
     );
     const signed = await Promise.all(

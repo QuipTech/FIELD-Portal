@@ -56,7 +56,7 @@ export class MachineLifecycleService {
     actor: AuthenticatedUser,
     machineId: string,
   ): Promise<MachineLifecycle> =>
-    this.databaseService.withTenant(actor.tenantId, async (client) => {
+    this.databaseService.withActor(actor, async (client) => {
       const machine = await findVisibleLifecycleMachine(
         client,
         actor,
@@ -99,9 +99,8 @@ export class MachineLifecycleService {
   ): Promise<LifecycleChangeResult> => {
     if (BECOMES_ACTIVE.includes(action))
       await this.organisationBillingAccountService.ensureForActivation(actor);
-    const machine = await this.databaseService.withTenant(
-      actor.tenantId,
-      (client) => findVisibleLifecycleMachine(client, actor, machineId),
+    const machine = await this.databaseService.withActor(actor, (client) =>
+      findVisibleLifecycleMachine(client, actor, machineId),
     );
     if (!machine) throw new NotFoundException(MACHINE_NOT_FOUND_MESSAGE);
     if (!machine.billing_account_id || !machine.timezone)

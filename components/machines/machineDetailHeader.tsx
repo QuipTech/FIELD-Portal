@@ -28,7 +28,8 @@ export const MachineDetailHeader = ({ machine, onStatusChange }: MachineDetailHe
         {machine.manufacturer} {machine.model} · {machine.assetId}
       </span>
       <div className="ml-auto flex flex-none items-center gap-2.5">
-        <MachineStatusSelect status={machine.status} onChange={onStatusChange} />
+        {/* A shared machine's status is its owner's to set. */}
+        {!machine.isShared && <MachineStatusSelect status={machine.status} onChange={onStatusChange} />}
         <PermissionButton
           permission={PERMISSIONS.useAiAssistant}
           variant="primary"

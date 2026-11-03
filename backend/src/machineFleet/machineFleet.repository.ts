@@ -6,13 +6,14 @@ import { FeaturedDownRow, FleetMachineRow } from './types/machineFleetRows';
 import { OperatingStatus } from './types/machineFleetResponse';
 import {
   MachineScope,
-  machineInScopeSql,
-  toScopeParam,
-} from '../machineGroups/access/machineScope';
+  ownMachineSql,
+  visibleMachineSql,
+} from '../machineSharing/access/machineScope';
+import { MACHINE_GROUPS_SQL } from '../machineSharing/access/machineGroupsSql';
 
-// Every query filters on tenant_id itself: the backend's database role may
-// bypass RLS. Reads also filter on the caller's machine scope
-// (machineGroups/access): a machine outside it doesn't exist for them.
+// Reads go through the caller's machine scope (machineSharing/access): their
+// own organisation's machines they may see plus machines shared with them;
+// anything else doesn't exist for them. Changes are own-organisation only.
 export const MACHINE_LABEL_SQL = `COALESCE(NULLIF(m.asset_number, ''), NULLIF(m.fleet_number, ''), m.serial_number)`;
 
 // The storage key of the machine's photo (alias m): its chosen cover, else
@@ -27,14 +28,20 @@ export const FLEET_COLUMNS = `
   m.id, ${MACHINE_LABEL_SQL} AS label, m.serial_number,
   mf.name AS manufacturer_name, mm.name AS model_name, mm.product_family,
   m.site, m.operating_hours, m.status, m.lifecycle_state,
-  m.group_id, g.name AS group_name, g.colour AS group_colour,
+  t.name AS owning_organisation_name,
+  COALESCE(am.access_level, 'owner') AS access_level,
+  COALESCE(am.is_shared, false) AS is_shared,
+  ${MACHINE_GROUPS_SQL} AS groups,
   ${MACHINE_PHOTO_KEY_SQL} AS photo_storage_key`;
 
+// accessible_machines() gives the caller's level; staff and jobs reading one
+// organisation ('all' scope) have none, and count as the owner.
 export const FLEET_FROM = `
   FROM machines m
   JOIN machine_manufacturers mf ON mf.id = m.manufacturer_id
   JOIN machine_models mm ON mm.id = m.model_id
-  LEFT JOIN machine_groups g ON g.id = m.group_id AND g.deleted_at IS NULL`;
+  JOIN tenants t ON t.id = m.tenant_id
+  LEFT JOIN accessible_machines() am ON am.machine_id = m.id`;
 
 export interface FleetScope {
   tenantId: string;
@@ -43,15 +50,16 @@ export interface FleetScope {
   machineScope: MachineScope;
 }
 
-// WHERE clause and its parameters for the list's filters ($1 = tenant,
-// $2 = machine scope).
+// WHERE clause and its parameters for the list's filters ($1 = the
+// caller's organisation).
 const buildFilter = (scope: FleetScope, filters: ListMachinesQueryDto) => {
-  const params: unknown[] = [scope.tenantId, toScopeParam(scope.machineScope)];
+  const params: unknown[] = [scope.tenantId];
   const conditions = [
-    'm.tenant_id = $1',
     'm.deleted_at IS NULL',
-    machineInScopeSql('m', '$2'),
+    visibleMachineSql('m', '$1', scope.machineScope),
   ];
+  if (filters.source === 'own') conditions.push('m.tenant_id = $1');
+  if (filters.source === 'shared') conditions.push('m.tenant_id <> $1');
   const addCondition = (value: unknown, toSql: (param: string) => string) => {
     params.push(value);
     conditions.push(toSql(`$${params.length}`));
@@ -68,9 +76,13 @@ const buildFilter = (scope: FleetScope, filters: ListMachinesQueryDto) => {
       (p) => `lower(mm.product_family) = lower(${p})`,
     );
   }
-  if (filters.groupId)
-    addCondition(filters.groupId, (p) => `m.group_id = ${p}`);
-  if (filters.ungrouped) conditions.push('m.group_id IS NULL');
+  if (filters.groupId) {
+    addCondition(
+      filters.groupId,
+      (p) => `EXISTS (SELECT 1 FROM machine_group_machines gm
+                      WHERE gm.machine_id = m.id AND gm.group_id = ${p})`,
+    );
+  }
   if (filters.assignedToMe) {
     addCondition(
       scope.viewerId,
@@ -126,9 +138,9 @@ export const findFleetMachine = async (
 ): Promise<FleetMachineRow | null> => {
   const result = await client.query<FleetMachineRow>(
     `SELECT ${FLEET_COLUMNS} ${FLEET_FROM}
-     WHERE m.tenant_id = $1 AND m.id = $2 AND m.deleted_at IS NULL
-       AND ${machineInScopeSql('m', '$3')}`,
-    [tenantId, machineId, toScopeParam(scope)],
+     WHERE m.id = $2 AND m.deleted_at IS NULL
+       AND ${visibleMachineSql('m', '$1', scope)}`,
+    [tenantId, machineId],
   );
   return result.rows[0] ?? null;
 };
@@ -146,20 +158,21 @@ export const findFeaturedDownMachine = async (
      ${FLEET_FROM}
      LEFT JOIN LATERAL (
        SELECT sc.case_number, sc.subject, sc.priority FROM support_cases sc
-       WHERE sc.tenant_id = $1 AND sc.machine_id = m.id AND sc.deleted_at IS NULL
+       WHERE sc.tenant_id = m.tenant_id AND sc.machine_id = m.id AND sc.deleted_at IS NULL
          AND sc.status IN ('new', 'open', 'waiting_on_customer')
        ORDER BY sc.priority, sc.updated_at DESC LIMIT 1
      ) c ON true
-     WHERE m.tenant_id = $1 AND m.deleted_at IS NULL AND m.status = 'down'
-       AND ${machineInScopeSql('m', '$2')}
+     WHERE m.deleted_at IS NULL AND m.status = 'down'
+       AND ${visibleMachineSql('m', '$1', scope)}
      ORDER BY c.case_number IS NULL, c.priority, m.updated_at DESC
      LIMIT 1`,
-    [tenantId, toScopeParam(scope)],
+    [tenantId],
   );
   return result.rows[0] ?? null;
 };
 
-// The previous status, or null when there's no such machine in scope.
+// The previous status, or null when there's no such machine of the
+// organisation in scope (a shared machine's status is its owner's to set).
 export const updateMachineStatus = async (
   client: PoolClient,
   params: {
@@ -172,15 +185,10 @@ export const updateMachineStatus = async (
   const result = await client.query<{ previous_status: OperatingStatus }>(
     `UPDATE machines m SET status = $3
      FROM machines previous
-     WHERE m.id = $1 AND m.tenant_id = $2 AND m.deleted_at IS NULL
-       AND previous.id = m.id AND ${machineInScopeSql('m', '$4')}
+     WHERE m.id = $1 AND m.deleted_at IS NULL AND previous.id = m.id
+       AND ${ownMachineSql('m', '$2', params.scope)}
      RETURNING previous.status AS previous_status`,
-    [
-      params.machineId,
-      params.tenantId,
-      params.status,
-      toScopeParam(params.scope),
-    ],
+    [params.machineId, params.tenantId, params.status],
   );
   return result.rows[0]?.previous_status ?? null;
 };

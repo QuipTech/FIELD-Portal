@@ -9,7 +9,8 @@ interface GalleryThumbnailStripProps {
   photos: MachineGalleryPhoto[];
   activeIndex: number;
   onSelect: (index: number) => void;
-  onAddPhoto: () => void;
+  // Omitted where the caller can't add to this machine (a view-only share).
+  onAddPhoto?: () => void;
   isUploading: boolean;
 }
 
@@ -39,6 +40,7 @@ export const GalleryThumbnailStrip = ({ photos, activeIndex, onSelect, onAddPhot
           </button>
         ))}
       </div>
+      {onAddPhoto && (
       <button
         type="button"
         onClick={onAddPhoto}
@@ -49,6 +51,7 @@ export const GalleryThumbnailStrip = ({ photos, activeIndex, onSelect, onAddPhot
         {isLoaded && !canAddPhoto && <Icon name="lock" className="h-3 w-3" />}
         {isUploading ? "Uploading…" : "Add photo"}
       </button>
+      )}
     </div>
   );
 };

@@ -1,7 +1,9 @@
 import { NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
-import { getAccessibleMachineScope } from '../machineGroups/access/getAccessibleMachineScope';
-import { MachineScope } from '../machineGroups/access/machineScope';
+import {
+  ACCESSIBLE_MACHINES,
+  MachineScope,
+} from '../machineSharing/access/machineScope';
 import { findCaseByNumber } from './supportCases.repository';
 import { SupportCaseRow } from './types/supportCaseRows';
 
@@ -9,7 +11,7 @@ const CASE_NOT_FOUND_MESSAGE = 'Support case not found.';
 
 // A case number from another organisation, or about a machine outside the
 // given machine scope, is "not found", never "forbidden". Staff paths pass
-// ALL_MACHINES.
+// ALL_MACHINES with the case's organisation.
 export const requireSupportCase = async (
   client: PoolClient,
   tenantId: string,
@@ -21,16 +23,13 @@ export const requireSupportCase = async (
   return row;
 };
 
-// The customer side: a case in the caller's own organisation that they
-// may see under their machine scope (machineGroups/access).
-export const requireVisibleSupportCase = async (
+// The customer side: a case they may see under their machine scope
+// (machineSharing/access): their organisation's, or one their organisation
+// raised on a machine shared with them (row.tenant_id is then the
+// machine's owning organisation). Runs under withActor.
+export const requireVisibleSupportCase = (
   client: PoolClient,
   actor: { tenantId: string; userId: string },
   caseNumber: number,
 ): Promise<SupportCaseRow> =>
-  requireSupportCase(
-    client,
-    actor.tenantId,
-    caseNumber,
-    await getAccessibleMachineScope(client, actor),
-  );
+  requireSupportCase(client, actor.tenantId, caseNumber, ACCESSIBLE_MACHINES);

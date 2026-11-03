@@ -7,9 +7,9 @@ import { PoolClient } from 'pg';
 import { DatabaseService } from '../database/database.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { runAuditedChange } from '../common/audit/runAuditedChange';
-import { assertMachineAccessible } from '../machineHistory/machineHistory.service';
+import { assertMachineAccessible } from '../machineHistory/assertMachineAccessible';
 import * as assignmentsRepository from './machineAssignments.repository';
-import { filterUsersWhoCanSeeMachine } from '../machineGroups/access/machineVisibility.repository';
+import { filterUsersWhoCanSeeMachine } from '../machineSharing/access/machineVisibility.repository';
 import {
   AssignedTechnician,
   toAssignedTechnician,
@@ -31,8 +31,8 @@ export class MachineAssignmentsService {
     actor: AuthenticatedUser,
     machineId: string,
   ): Promise<AssignedTechnician[]> =>
-    this.databaseService.withTenant(actor.tenantId, async (client) => {
-      await assertMachineAccessible(client, actor, machineId);
+    this.databaseService.withActor(actor, async (client) => {
+      await assertMachineAccessible(client, machineId, 'manage');
       return this.loadTechnicians(client, actor.tenantId, machineId);
     });
 
@@ -42,7 +42,11 @@ export class MachineAssignmentsService {
     userId: string,
   ): Promise<AssignedTechnician[]> =>
     runAuditedChange(this.databaseService, actor, '', async (client) => {
-      const machine = await assertMachineAccessible(client, actor, machineId);
+      const machine = await assertMachineAccessible(
+        client,
+        machineId,
+        'manage',
+      );
       if (
         !(await assignmentsRepository.isOrganisationUser(
           client,
@@ -83,7 +87,11 @@ export class MachineAssignmentsService {
     userId: string,
   ): Promise<void> =>
     runAuditedChange(this.databaseService, actor, '', async (client) => {
-      const machine = await assertMachineAccessible(client, actor, machineId);
+      const machine = await assertMachineAccessible(
+        client,
+        machineId,
+        'manage',
+      );
       const removed = await assignmentsRepository.deleteAssignment(client, {
         tenantId: actor.tenantId,
         machineId,

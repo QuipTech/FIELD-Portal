@@ -9,6 +9,8 @@ interface MachineDetailContextValue {
   // Null while it loads; tabs start their own loads without waiting.
   machine: Machine | null;
   service: MachineDetailService;
+  // Reads the machine again, e.g. after its details are edited.
+  reloadMachine: () => void;
   // Corner confirmations and errors shown by the shell.
   notify: (message: string) => void;
   notifyError: (message: string) => void;

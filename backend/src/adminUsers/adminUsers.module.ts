@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { UsersModule } from '../users/users.module';
-import { MachineGroupsModule } from '../machineGroups/machineGroups.module';
+import { MachineSharingModule } from '../machineSharing/machineSharing.module';
 import { AdminUsersController } from './adminUsers.controller';
 import { AdminOrganisationsController } from './adminOrganisations.controller';
 import { AdminUsersService } from './adminUsers.service';
@@ -9,7 +9,7 @@ import { AdminUserRolesService } from './adminUserRoles.service';
 import { AdminUserRemovalService } from './adminUserRemoval.service';
 
 @Module({
-  imports: [UsersModule, MachineGroupsModule],
+  imports: [UsersModule, MachineSharingModule],
   controllers: [AdminUsersController, AdminOrganisationsController],
   providers: [
     AdminUsersService,

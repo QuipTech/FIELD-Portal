@@ -54,17 +54,3 @@ export const findRegisteredSerials = async (
   );
   return new Set(result.rows.map((row) => row.serial));
 };
-
-// Group id by lowercase name, for the live groups named in the file.
-export const findGroupIdsByName = async (
-  client: PoolClient,
-  tenantId: string,
-  names: string[],
-): Promise<Map<string, string>> => {
-  const result = await client.query<{ name: string; id: string }>(
-    `SELECT lower(name) AS name, id FROM machine_groups
-     WHERE tenant_id = $1 AND deleted_at IS NULL AND lower(name) = ANY($2::text[])`,
-    [tenantId, names.map((name) => name.toLowerCase())],
-  );
-  return new Map(result.rows.map((row) => [row.name, row.id]));
-};

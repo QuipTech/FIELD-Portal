@@ -8,20 +8,32 @@ interface MachinesFilterCardProps {
   filters: MachineFleetFilters;
   facets: MachineFleetList["facets"] | null;
   total: number | null;
+  // The Group filter's choices (the caller's shared groups); null hides it.
+  groupOptions: FilterOption[] | null;
+  // The Source filter (own or shared); null hides it, e.g. for someone who
+  // only sees shared groups.
+  sourceOptions: FilterOption[] | null;
   onChange: (key: keyof MachineFleetFilters, value: string) => void;
   onClear: () => void;
+}
+
+export interface FilterOption {
+  value: string;
+  label: string;
 }
 
 interface FilterGroup {
   key: keyof MachineFleetFilters;
   label: string;
   anyLabel: string;
-  options: { value: string; label: string }[];
+  options: FilterOption[];
 }
 
 // A chosen filter shows as a removable chip; the rest are dropdowns.
-export const MachinesFilterCard = ({ filters, facets, total, onChange, onClear }: MachinesFilterCardProps) => {
+export const MachinesFilterCard = ({ filters, facets, total, groupOptions, sourceOptions, onChange, onClear }: MachinesFilterCardProps) => {
   const groups: FilterGroup[] = [
+    ...(sourceOptions ? [{ key: "source" as const, label: "Source", anyLabel: "All", options: sourceOptions }] : []),
+    ...(groupOptions ? [{ key: "group" as const, label: "Group", anyLabel: "All groups", options: groupOptions }] : []),
     { key: "site", label: "Site", anyLabel: "All sites", options: (facets?.sites ?? []).map((site) => ({ value: site, label: site })) },
     { key: "make", label: "Make", anyLabel: "All makes", options: (facets?.makes ?? []).map((make) => ({ value: make.id, label: make.name })) },
     { key: "status", label: "Status", anyLabel: "Any status", options: OPERATING_STATUS_OPTIONS },

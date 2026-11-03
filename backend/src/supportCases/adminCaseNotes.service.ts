@@ -52,7 +52,7 @@ export class AdminCaseNotesService {
         await updateNoteBody(client, { ...key, body });
         const [updated] = await this.caseAttachmentsService.toMessages(
           client,
-          key.tenantId,
+          key.caseId,
           [await findCaseMessage(client, noteId)],
         );
         return updated;

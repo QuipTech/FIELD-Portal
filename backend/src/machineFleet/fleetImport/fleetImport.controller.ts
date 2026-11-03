@@ -28,7 +28,7 @@ import { ImportFleetDto } from './dto/importFleetDto';
 export class FleetImportController {
   constructor(private readonly fleetImport: FleetImportService) {}
 
-  // The sample file, with the optional group column.
+  // The sample file.
   @Get('template')
   @Header('Content-Type', 'text/csv; charset=utf-8')
   @Header(

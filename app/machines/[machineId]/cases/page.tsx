@@ -6,8 +6,10 @@ import { LoadErrorState } from "@/components/ui/loadErrorState";
 import { Pagination } from "@/components/ui/pagination";
 import { CaseListSkeleton } from "@/components/supportCases/caseListSkeleton";
 import { CasesTable } from "@/components/supportCases/casesTable";
+import { NewCaseButton } from "@/components/supportCases/newCaseButton";
 import type { CaseStatusFilter } from "@/lib/types/supportCase";
 import { useMachineDetail } from "../machineDetailContext";
+import { canContributeTo } from "@/lib/machineDetail/machineAccessRules";
 import { useMachineCases } from "./useMachineCases";
 
 const STATUS_OPTIONS: { value: CaseStatusFilter; label: string }[] = [
@@ -17,7 +19,7 @@ const STATUS_OPTIONS: { value: CaseStatusFilter; label: string }[] = [
 
 // Open cases tab: this machine's support cases. A row opens the case screen.
 const MachineCasesPage = () => {
-  const { machineId } = useMachineDetail();
+  const { machineId, machine } = useMachineDetail();
   const { status, setStatus, cases, page, setPage } = useMachineCases(machineId);
   const items = cases.data?.items ?? [];
 
@@ -29,6 +31,12 @@ const MachineCasesPage = () => {
       <EmptyState
         icon="life"
         title={status === "active" ? "No open cases for this machine" : "No cases for this machine yet"}
+        description={
+          canContributeTo(machine)
+            ? "Something wrong with this machine? Raise a case and our support team will pick it up."
+            : undefined
+        }
+        actions={canContributeTo(machine) ? <NewCaseButton initialDraft={{ machineId }} isMachineFixed /> : undefined}
       />
     );
   };

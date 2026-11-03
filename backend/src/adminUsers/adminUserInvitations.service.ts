@@ -21,17 +21,17 @@ import {
 import * as adminUsersRepository from './adminUsers.repository';
 import * as adminRolesRepository from '../adminRoles/adminRoles.repository';
 import { InviteUserDto } from './dto/inviteUserDto';
-import {
-  MachineAccessService,
-  saveInvitedAccess,
-} from '../machineGroups/machineAccess.service';
-import { isMachineAccessAdmin } from '../machineGroups/access/machineScope';
+import { isMachineAccessAdmin } from '../machineSharing/access/machineScope';
+import { updateMachineAccessMode } from '../machineSharing/userAccess/userMachineAccess.repository';
+import { runInTenantContext } from '../database/runInTenantContext';
 
 const ALREADY_USER_MESSAGE =
   'Someone with this email already has a FIELD account.';
 const OTHER_ORGANISATION_MESSAGE =
   'You can only invite people to your own organisation.';
 const ORGANISATION_NOT_FOUND_MESSAGE = 'Organisation not found.';
+const ADMIN_ALL_MACHINES_MESSAGE =
+  "Organisation admins always see their organisation's machines, so they can't be limited to shared groups.";
 const ROLE_NOT_ALLOWED_MESSAGE =
   "That role can't be given to people in this organisation.";
 const COGNITO_NOT_SET_UP_MESSAGE =
@@ -52,7 +52,6 @@ export class AdminUserInvitationsService {
     private readonly databaseService: DatabaseService,
     private readonly cognitoDirectory: CognitoUserDirectoryService,
     private readonly cognitoUsers: CognitoUserDeletionService,
-    private readonly machineAccess: MachineAccessService,
   ) {}
 
   inviteUser = async (
@@ -63,11 +62,13 @@ export class AdminUserInvitationsService {
     const tenantId = await this.resolveOrganisation(actor, scope, dto);
     // Checked before Cognito, so a bad request never emails anyone.
     const role = await this.assertRoleAssignable(tenantId, dto.roleId);
-    const accessChange = await this.machineAccess.checkInviteAccess(
-      tenantId,
-      { mode: dto.machineAccessMode, groupIds: dto.groupIds },
-      isMachineAccessAdmin(role.permission_codes),
-    );
+    const machineAccessMode = dto.machineAccessMode ?? 'all';
+    if (
+      machineAccessMode === 'groups_only' &&
+      isMachineAccessAdmin(role.permission_codes)
+    ) {
+      throw new BadRequestException(ADMIN_ALL_MACHINES_MESSAGE);
+    }
     if (
       await authRepository.findUserByEmailForLogin(
         this.databaseService,
@@ -92,12 +93,20 @@ export class AdminUserInvitationsService {
             cognitoSub: cognitoUser.sub,
             roleId: dto.roleId,
           });
-          await saveInvitedAccess(client, {
-            inviterTenantId: actor.tenantId,
-            tenantId,
-            userId,
-            change: accessChange,
-          });
+          if (machineAccessMode !== 'all') {
+            // Under the invited organisation's RLS context (the Owner may
+            // invite into any), then back to the inviter's for the audit.
+            await runInTenantContext(
+              client,
+              { tenantId, returnToTenantId: actor.tenantId },
+              () =>
+                updateMachineAccessMode(client, {
+                  tenantId,
+                  userId,
+                  mode: machineAccessMode,
+                }),
+            );
+          }
           return {
             result: userId,
             audit: {
@@ -108,8 +117,7 @@ export class AdminUserInvitationsService {
                 invited: true,
                 roleId: dto.roleId,
                 tenantId,
-                machineAccessMode: accessChange.mode,
-                groupIds: accessChange.groupIds,
+                machineAccessMode,
               },
             },
           };

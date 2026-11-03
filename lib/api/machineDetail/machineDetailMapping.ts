@@ -22,6 +22,10 @@ export const toMachine = (response: MachineDetailResponse): Machine => ({
   owner: response.owner,
   openCaseCount: response.openCaseCount,
   lifecycleState: response.lifecycleState ?? "active",
+  groups: response.groups ?? [],
+  owningOrganisationName: response.owningOrganisationName ?? "",
+  isShared: response.isShared ?? false,
+  accessLevel: response.accessLevel ?? "owner",
 });
 
 export const toGalleryPhoto = (photo: GalleryPhotoResponse): MachineGalleryPhoto => ({

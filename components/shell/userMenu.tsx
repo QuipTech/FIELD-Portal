@@ -5,6 +5,8 @@ import { useState } from "react";
 import { Icon, type IconName } from "../icons/icon";
 import { Avatar } from "../ui/avatar";
 import { useSignedInProfile } from "@/lib/auth/useSignedInProfile";
+import { usePermissions } from "@/lib/auth/usePermissions";
+import { PERMISSIONS } from "@/lib/auth/permissionCodes";
 import { getInitials } from "@/lib/format/nameInitials";
 import { LogoutButton } from "./logoutButton";
 
@@ -20,6 +22,9 @@ const defaultMenuItems: UserMenuItem[] = [
   { icon: "settings", label: "Settings", href: "/settings" },
 ];
 
+// Owners move between portals; the admin top bar links back the other way.
+const adminPortalItem: UserMenuItem = { icon: "shield", label: "Switch to admin portal", href: "/admin/dashboard" };
+
 interface UserMenuProps {
   initials?: string;
   name?: string;
@@ -29,8 +34,11 @@ interface UserMenuProps {
 
 // Explicit props win (e.g. the admin top bar); otherwise the signed-in
 // user is shown, falling back to the demo persona when nobody is.
-export const UserMenu = ({ initials, name, roleLabel, items = defaultMenuItems }: UserMenuProps) => {
+export const UserMenu = ({ initials, name, roleLabel, items }: UserMenuProps) => {
   const [open, setOpen] = useState(false);
+  const { can } = usePermissions();
+  const menuItems =
+    items ?? (can(PERMISSIONS.managePlatform) ? [adminPortalItem, ...defaultMenuItems] : defaultMenuItems);
   const signedInProfile = useSignedInProfile();
   const signedInName = signedInProfile
     ? `${signedInProfile.user.firstName} ${signedInProfile.user.lastName}`.trim()
@@ -57,7 +65,7 @@ export const UserMenu = ({ initials, name, roleLabel, items = defaultMenuItems }
             </div>
           </div>
           <div className="mx-0.5 mb-1 h-px bg-borderGray" />
-          {items.map((item) => (
+          {menuItems.map((item) => (
             <Link
               key={item.label}
               href={item.href}

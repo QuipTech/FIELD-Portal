@@ -21,7 +21,6 @@ import { ChangeUserRoleDto } from '../adminUsers/dto/changeUserRoleDto';
 import { InviteUserDto } from '../adminUsers/dto/inviteUserDto';
 import { ListAdminUsersQueryDto } from '../adminUsers/dto/listAdminUsersQueryDto';
 import { TeamService } from './team.service';
-import { MachineAccessDto } from '../machineGroups/dto/machineAccessDtos';
 import { RequireFeature } from '../entitlements/requireFeature.guard';
 import { FEATURE_KEYS } from '../entitlements/featureKeys';
 
@@ -65,25 +64,15 @@ export class TeamController {
     return this.team.changeRole(actor, userId, dto);
   }
 
-  // All machines or selected machine groups (with their machine counts:
-  // GET /machine-groups), for the Edit user dialog.
+  // Read-only: their mode and the shared groups assigned to them or the
+  // organisation. Only the platform administrator changes machine access
+  // (PATCH /admin/users/:userId/machine-access) and assigns groups.
   @Get(':userId/machine-access')
   getMachineAccess(
     @CurrentUser() actor: AuthenticatedUser,
     @Param('userId', ParseUUIDPipe) userId: string,
   ) {
     return this.team.getMachineAccess(actor, userId);
-  }
-
-  // Applies on the person's next request. Organisation admins always see
-  // every machine, so they can't be set to 'selected'.
-  @Patch(':userId/machine-access')
-  setMachineAccess(
-    @CurrentUser() actor: AuthenticatedUser,
-    @Param('userId', ParseUUIDPipe) userId: string,
-    @Body() dto: MachineAccessDto,
-  ) {
-    return this.team.setMachineAccess(actor, userId, dto);
   }
 
   @Delete(':userId')

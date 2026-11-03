@@ -1,4 +1,5 @@
 import type { Tone } from "@/components/ui/tone";
+import type { MachineAccess, MachineAccessMode } from "./machineGroup";
 
 // users.status as stored by the backend.
 export type AdminUserStatus = "active" | "invited" | "disabled";
@@ -14,6 +15,9 @@ export interface AdminUser {
   organisation: { id: string; name: string };
   lastActiveAt: string | null;
   createdAt: string;
+  // Their mode and the shared groups assigned to them or their
+  // organisation; null only for someone removed while the page loaded.
+  machineAccess?: MachineAccess | null;
 }
 
 export interface AdminUserListResponse {
@@ -44,6 +48,8 @@ export interface InviteUserPayload {
   roleId: string;
   // Defaults to the inviter's own organisation.
   organisationId?: string;
+  // Defaults to "all"; "groups_only" shows only shared groups' machines.
+  machineAccessMode?: MachineAccessMode;
 }
 
 export const adminUserStatusLabel: Record<AdminUserStatus, string> = {

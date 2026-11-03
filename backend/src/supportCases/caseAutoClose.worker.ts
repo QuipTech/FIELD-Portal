@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { DatabaseService } from '../database/database.service';
 import { findCaseByNumber } from './supportCases.repository';
-import { ALL_MACHINES } from '../machineGroups/access/machineScope';
+import { ALL_MACHINES } from '../machineSharing/access/machineScope';
 import { CaseEventsPublisher } from './caseEventsPublisher';
 import { REOPEN_WINDOW_DAYS } from './caseAccessPolicy';
 import { toSupportCase } from './supportCaseMapper';

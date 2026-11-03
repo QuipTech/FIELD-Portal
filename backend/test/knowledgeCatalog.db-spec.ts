@@ -18,7 +18,7 @@ import { listAttentionDocuments } from '../src/knowledgeCatalog/admin/knowledgeA
 import { ListCatalogDocumentsQueryDto } from '../src/knowledgeCatalog/dto/listCatalogDocumentsQueryDto';
 import { SearchCatalogQueryDto } from '../src/knowledgeCatalog/dto/searchCatalogQueryDto';
 import { ForMyMachinesQueryDto } from '../src/knowledgeCatalog/dto/forMyMachinesQueryDto';
-import { ALL_MACHINES } from '../src/machineGroups/access/machineScope';
+import { ALL_MACHINES } from '../src/machineSharing/access/machineScope';
 
 // The catalogue SQL against a real database (npm run test:db), run as the
 // tenant role as user A (seedCatalog), so RLS and knowledge_can_read_document

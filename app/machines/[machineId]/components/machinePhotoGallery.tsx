@@ -12,12 +12,14 @@ import { usePermissions } from "@/lib/auth/usePermissions";
 import { PERMISSIONS } from "@/lib/auth/permissionCodes";
 import { useMachineDetail } from "../machineDetailContext";
 import { GalleryThumbnailStrip } from "./galleryThumbnailStrip";
+import { canContributeTo } from "@/lib/machineDetail/machineAccessRules";
 
 const arrowClasses =
   "absolute top-1/2 flex h-[30px] w-[30px] -translate-y-1/2 items-center justify-center rounded-full border border-borderGrayStrong bg-white/90 shadow-sm";
 
 export const MachinePhotoGallery = () => {
-  const { machineId, service, notify, notifyError } = useMachineDetail();
+  const { machineId, machine, service, notify, notifyError } = useMachineDetail();
+  const canAdd = canContributeTo(machine);
   const photos = useCachedResource(machineCacheKeys.photos(machineId), () => service.listPhotos(machineId), "Couldn't load photos.");
   const [activeIndex, setActiveIndex] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
@@ -59,7 +61,7 @@ export const MachinePhotoGallery = () => {
         <span className={active ? "absolute left-2 top-2 max-w-[90%] truncate rounded bg-inkStatic/60 px-1.5 py-0.5 text-white" : undefined}>
           {active ? `Photo ${activeIndex + 1} of ${list.length} · ${active.caption}` : "No photos yet"}
         </span>
-        {!active && isLoaded && can(PERMISSIONS.manageMachine) && (
+        {!active && canAdd && isLoaded && can(PERMISSIONS.manageMachine) && (
           <button type="button" onClick={picker.open} disabled={isUploading} className="text-xs font-medium text-primary disabled:opacity-50">
             {isUploading ? "Uploading…" : "Add the first photo"}
           </button>
@@ -84,7 +86,7 @@ export const MachinePhotoGallery = () => {
         photos={list}
         activeIndex={activeIndex}
         onSelect={setActiveIndex}
-        onAddPhoto={picker.open}
+        onAddPhoto={canAdd ? picker.open : undefined}
         isUploading={isUploading}
       />
       {picker.input}

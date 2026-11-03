@@ -29,13 +29,17 @@ export const reopenSupportCase = async (
     throw new ConflictException(REOPEN_REFUSED_MESSAGE);
   }
   const status = resolveReopenedStatus(existing.assignee_id);
+  // On a machine shared with them, the case is the owner's; the reopen is
+  // audited in the caller's own organisation.
+  const caseTenantId = existing.tenant_id;
   await casesRepository.updateCase(client, {
-    tenantId: actor.tenantId,
+    tenantId: caseTenantId,
     caseId: existing.id,
     patch: { status },
   });
   const events = await recordCaseChange(client, {
-    tenantId: actor.tenantId,
+    tenantId: caseTenantId,
+    auditTenantId: caseTenantId === actor.tenantId ? undefined : actor.tenantId,
     caseId: existing.id,
     caseNumber,
     actorId: actor.userId,

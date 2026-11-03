@@ -32,13 +32,19 @@ interface NewCaseModalProps {
   onClose: () => void;
   // Prefills the form, e.g. from an AI assistant answer.
   initialDraft?: Partial<NewSupportCase>;
+  // Raised from a machine's own screen, so the machine isn't a choice.
+  isMachineFixed?: boolean;
 }
 
 // Raises a case and opens it, where the chat continues. Photos and files
 // upload as they're picked and go with the description, the first message.
-export const NewCaseModal = ({ onClose, initialDraft }: NewCaseModalProps) => {
+export const NewCaseModal = ({ onClose, initialDraft, isMachineFixed = false }: NewCaseModalProps) => {
   const router = useRouter();
-  const options = useApiResource(getSupportCaseOptionsRequest, [], "Couldn't load your machines.");
+  const options = useApiResource(
+    (accessToken) => (isMachineFixed ? Promise.resolve(null) : getSupportCaseOptionsRequest(accessToken)),
+    [isMachineFixed],
+    "Couldn't load your machines.",
+  );
   const [draft, setDraft] = useState<NewSupportCase>({ ...EMPTY_CASE, ...initialDraft });
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -122,22 +128,25 @@ export const NewCaseModal = ({ onClose, initialDraft }: NewCaseModalProps) => {
             />
           </label>
         )}
-        <label className="flex flex-col gap-1.5">
-          <span className={fieldLabelClasses}>Machine</span>
-          <select
-            value={draft.machineId}
-            onChange={(event) => update("machineId", event.target.value)}
-            className={selectClasses}
-            disabled={options.isLoading}
-          >
-            <option value="">No specific machine</option>
-            {options.data?.machines.map((machine) => (
-              <option key={machine.id} value={machine.id}>
-                {machine.modelName ? `${machine.label} · ${machine.modelName}` : machine.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        {!isMachineFixed && (
+          <label className="flex flex-col gap-1.5">
+            <span className={fieldLabelClasses}>Machine</span>
+            <select
+              value={draft.machineId}
+              onChange={(event) => update("machineId", event.target.value)}
+              className={selectClasses}
+              disabled={options.isLoading}
+            >
+              <option value="">No specific machine</option>
+              {options.data?.machines.map((machine) => (
+                <option key={machine.id} value={machine.id}>
+                  {machine.modelName ? `${machine.label} · ${machine.modelName}` : machine.label}
+                  {machine.sharedByOrganisationName ? ` (Shared · ${machine.sharedByOrganisationName})` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="flex flex-col gap-1.5">
           <span className={fieldLabelClasses}>What&apos;s happening?</span>
           <textarea

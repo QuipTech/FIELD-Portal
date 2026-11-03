@@ -7,9 +7,7 @@ import { PoolClient } from 'pg';
 import { DatabaseService } from '../../database/database.service';
 import { AuthenticatedUser } from '../../auth/types/authenticatedUser';
 import * as authRepository from '../../auth/auth.repository';
-import { insertGroup } from '../../machineGroups/machineGroups.repository';
 import * as catalogRepository from '../machineCatalog.repository';
-import { loadRegistrar } from '../registerMachine';
 import { DUPLICATE_SERIAL_MESSAGE } from '../machineRegistration.service';
 import { ImportFleetDto } from './dto/importFleetDto';
 import {
@@ -25,16 +23,14 @@ export interface FleetImportResult {
   dryRun: boolean;
   // Machines saved (0 for a dry run).
   imported: number;
-  // Groups the import creates (dry run) or created.
-  newGroups: string[];
   rows: FleetImportRowResult[];
 }
 
 // Fleet CSV import (the portal parses the file and maps its columns).
 // Every row is checked first; with any error nothing is saved and the
 // rows come back with their errors (400 import_has_errors). Otherwise all
-// machines, and any groups an organisation admin's file names, are saved
-// in one transaction, each audited like a single registration.
+// machines are saved in one transaction, each audited like a single
+// registration.
 @Injectable()
 export class FleetImportService {
   constructor(private readonly databaseService: DatabaseService) {}
@@ -45,12 +41,8 @@ export class FleetImportService {
   ): Promise<FleetImportResult> => {
     try {
       return await this.databaseService.withActor(actor, async (client) => {
-        const registrar = await loadRegistrar(client, actor);
-        const plan = await planFleetImport(client, registrar, dto.rows);
-        const summary = {
-          newGroups: Array.from(plan.newGroups.values()),
-          rows: plan.rows,
-        };
+        const plan = await planFleetImport(client, actor.tenantId, dto.rows);
+        const summary = { rows: plan.rows };
         if (dto.dryRun) return { dryRun: true, imported: 0, ...summary };
         const errorCount = plan.rows.filter((row) => row.errors.length).length;
         if (errorCount) {
@@ -78,29 +70,7 @@ export class FleetImportService {
     actor: AuthenticatedUser,
     plan: FleetImportPlan,
   ): Promise<void> => {
-    const audit = (
-      entityType: string,
-      entityId: string,
-      metadata: Record<string, unknown>,
-    ) =>
-      authRepository.insertAuditLog(client, {
-        tenantId: actor.tenantId,
-        userId: actor.userId,
-        action: 'create',
-        entityType,
-        entityId,
-        metadata: { ...metadata, imported: true },
-      });
-    const createdGroups = new Map<string, string>();
-    for (const [key, name] of plan.newGroups) {
-      const groupId = await insertGroup(client, actor.tenantId, { name });
-      createdGroups.set(key, groupId);
-      await audit('machine_group', groupId, { name });
-    }
     for (const machine of plan.machines) {
-      const groupId = machine.newGroupKey
-        ? createdGroups.get(machine.newGroupKey)!
-        : machine.groupId;
       const machineId = await catalogRepository.insertMachine(client, {
         tenantId: actor.tenantId,
         createdBy: actor.userId,
@@ -111,12 +81,18 @@ export class FleetImportService {
         site: machine.site,
         operatingHours: machine.operatingHours,
         status: machine.status,
-        groupId,
       });
-      await audit('machine', machineId, {
-        name: machine.plantId ?? machine.serialNumber,
-        serialNumber: machine.serialNumber,
-        groupId,
+      await authRepository.insertAuditLog(client, {
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        action: 'create',
+        entityType: 'machine',
+        entityId: machineId,
+        metadata: {
+          name: machine.plantId ?? machine.serialNumber,
+          serialNumber: machine.serialNumber,
+          imported: true,
+        },
       });
     }
   };

@@ -11,7 +11,9 @@ import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import { inviteUserRequest } from "@/lib/api/adminUsersApi";
 import type { AdminRole } from "@/lib/types/adminRole";
 import type { AdminOrganisation } from "@/lib/types/adminUser";
-import { assignableRoles, describeRoleOption } from "../assignableRoles";
+import { assignableRoles, describeRoleOption, isMachineAccessAdminRole } from "../assignableRoles";
+import type { MachineAccessMode } from "@/lib/types/machineGroup";
+import { MachineAccessFields } from "./machineAccessFields";
 
 interface InviteUserModalProps {
   roles: AdminRole[];
@@ -24,8 +26,13 @@ interface InviteUserModalProps {
 
 const fieldLabelClasses = "text-xs font-medium uppercase tracking-wide text-mutedGray";
 
-
-export const InviteUserModal = ({ roles, organisations, defaultOrganisationId, onInvited, onClose }: InviteUserModalProps) => {
+export const InviteUserModal = ({
+  roles,
+  organisations,
+  defaultOrganisationId,
+  onInvited,
+  onClose,
+}: InviteUserModalProps) => {
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -33,7 +40,9 @@ export const InviteUserModal = ({ roles, organisations, defaultOrganisationId, o
   const [roleId, setRoleId] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [machineAccessMode, setMachineAccessMode] = useState<MachineAccessMode>("all");
   const roleOptions = assignableRoles(roles, organisationId);
+  const isAdminRole = isMachineAccessAdminRole(roleOptions.find((role) => role.id === roleId));
   const canSend = email.includes("@") && firstName.trim() && lastName.trim() && roleId && !isSending;
 
   const handleSubmit = async (event: FormEvent) => {
@@ -48,6 +57,7 @@ export const InviteUserModal = ({ roles, organisations, defaultOrganisationId, o
         lastName: lastName.trim(),
         roleId,
         organisationId: organisations.length > 1 ? organisationId : undefined,
+        machineAccessMode: isAdminRole ? "all" : machineAccessMode,
       });
       onInvited(email.trim());
     } catch (error) {
@@ -61,7 +71,15 @@ export const InviteUserModal = ({ roles, organisations, defaultOrganisationId, o
       <form onSubmit={handleSubmit} className="flex flex-col gap-3.5 p-5">
         <label className="flex flex-col gap-1.5">
           <span className={fieldLabelClasses}>Email</span>
-          <Input type="email" icon="user" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@company.com" required autoFocus />
+          <Input
+            type="email"
+            icon="user"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="name@company.com"
+            required
+            autoFocus
+          />
         </label>
         <div className="flex gap-2.5">
           <label className="flex flex-1 flex-col gap-1.5">
@@ -82,7 +100,6 @@ export const InviteUserModal = ({ roles, organisations, defaultOrganisationId, o
                 setOrganisationId(event.target.value);
                 setRoleId("");
               }}
-             
             >
               {organisations.map((organisation) => (
                 <option key={organisation.id} value={organisation.id}>
@@ -103,6 +120,7 @@ export const InviteUserModal = ({ roles, organisations, defaultOrganisationId, o
             ))}
           </SelectInput>
         </label>
+        <MachineAccessFields mode={machineAccessMode} onChange={setMachineAccessMode} isAdminRole={isAdminRole} />
         <span className="text-xs text-mutedGray">
           They&apos;ll get an email with a temporary password and choose their own when they first sign in.
         </span>

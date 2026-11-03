@@ -1,4 +1,5 @@
 import { apiRequest } from "./httpClient";
+import type { MachineAccess, MachineAccessMode } from "../types/machineGroup";
 import type {
   AdminOrganisation,
   AdminUserListQuery,
@@ -53,4 +54,18 @@ export const removeUserRequest = (accessToken: string, userId: string): Promise<
   apiRequest<null>(`/admin/users/${userId}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+// "all" (own organisation plus shared groups) or "groups_only". Applies on
+// the person's next request; organisation admins can't be "groups_only"
+// (400). Groups themselves are assigned on Machine groups.
+export const setUserMachineAccessRequest = (
+  accessToken: string,
+  user: { id: string; organisationId: string },
+  machineAccessMode: MachineAccessMode,
+): Promise<MachineAccess> =>
+  apiRequest<MachineAccess>(`/admin/users/${user.id}/machine-access`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ machineAccessMode, organisationId: user.organisationId }),
   });

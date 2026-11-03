@@ -5,7 +5,7 @@ import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { runAuditedChange } from '../common/audit/runAuditedChange';
 import { findUserPermissionCodes } from '../auth/userAccess.repository';
 import { MACHINE_LIFECYCLE_PERMISSION } from '../machineLifecycle/lifecycleTransitions';
-import { getAccessibleMachineScope } from '../machineGroups/access/getAccessibleMachineScope';
+import { ACCESSIBLE_MACHINES } from '../machineSharing/access/machineScope';
 import * as fleetRepository from './machineFleet.repository';
 import * as catalogRepository from './machineCatalog.repository';
 import {
@@ -23,10 +23,10 @@ import {
 
 const MACHINE_NOT_FOUND_MESSAGE = 'Machine not found.';
 
-// The organisation's machines (tenantId from the JWT): the Machines list
-// and changing a machine's operating status (a trigger records each
-// change, migration 0053). Only machines in the caller's machine scope
-// (machineGroups/access) are listed or changed. Registering is
+// The caller's machines: the Machines list (their organisation's plus
+// shared ones) and changing a machine's operating status (own organisation
+// only; a trigger records each change, migration 0053). Only machines in
+// the caller's machine scope (machineSharing/access) are listed or changed. Registering is
 // MachineRegistrationService.
 @Injectable()
 export class MachineFleetService {
@@ -39,8 +39,8 @@ export class MachineFleetService {
     actor: AuthenticatedUser,
     filters: ListMachinesQueryDto,
   ): Promise<MachineFleetList> =>
-    this.databaseService.withTenant(actor.tenantId, async (client) => {
-      const machineScope = await getAccessibleMachineScope(client, actor);
+    this.databaseService.withActor(actor, async (client) => {
+      const machineScope = ACCESSIBLE_MACHINES;
       const scope = {
         tenantId: actor.tenantId,
         viewerId: actor.userId,
@@ -108,7 +108,7 @@ export class MachineFleetService {
       actor,
       MACHINE_NOT_FOUND_MESSAGE,
       async (client) => {
-        const scope = await getAccessibleMachineScope(client, actor);
+        const scope = ACCESSIBLE_MACHINES;
         const previousStatus = await fleetRepository.updateMachineStatus(
           client,
           { tenantId: actor.tenantId, machineId, status: dto.status, scope },

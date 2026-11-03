@@ -5,18 +5,20 @@ import Link from "next/link";
 import { Icon } from "@/components/icons/icon";
 import { Tag } from "@/components/ui/tag";
 import { Button } from "@/components/ui/button";
+import { MachineSharingBadges } from "@/components/machines/machineSharingBadges";
 import { Table, TableHeaderRow, TableHeaderCell, TableRow, TableCell } from "@/components/ui/table";
 import { ActivateMachineDialog, activationActionFor } from "@/components/machines/activateMachineDialog";
 import { BulkActivateDialog } from "@/components/machines/bulkActivateDialog";
 import { getMachineStatusMeta, toMachineStatus } from "@/lib/format/machineStatus";
 import type { FleetMachine } from "@/lib/types/machineFleet";
+import { MachinesBulkBar } from "./machinesBulkBar";
 
 interface MachinesTableProps {
   machines: FleetMachine[];
   // Shown in place of the rows when there are none.
   emptyMessage: string;
-  // After a machine is activated from its row.
-  onActivated: () => void;
+  // After machines are activated.
+  onChanged: () => void;
 }
 
 const formatHours = (hours: number | null) => (hours === null ? "—" : `${hours.toLocaleString()} h`);
@@ -25,13 +27,21 @@ const formatHours = (hours: number | null) => (hours === null ? "—" : `${hours
 const canActivate = (machine: FleetMachine) =>
   Boolean(machine.availableActions?.some((action) => action === "activate" || action === "reactivate"));
 
-export const MachinesTable = ({ machines, emptyMessage, onActivated }: MachinesTableProps) => {
+export const MachinesTable = ({ machines, emptyMessage, onChanged }: MachinesTableProps) => {
   const [activating, setActivating] = useState<FleetMachine | null>(null);
   // Machines ticked for activating together.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkActivating, setIsBulkActivating] = useState(false);
   const [bulkNotice, setBulkNotice] = useState<string | null>(null);
-  const selected = machines.filter((machine) => selectedIds.has(machine.id) && canActivate(machine));
+  const isSelectable = canActivate;
+  const selected = machines.filter((machine) => selectedIds.has(machine.id) && isSelectable(machine));
+  const selectedToActivate = selected.filter(canActivate);
+
+  const finishBulkAction = (notice: string) => {
+    setSelectedIds(new Set());
+    setBulkNotice(notice);
+    onChanged();
+  };
 
   const toggleSelected = (event: MouseEvent, machineId: string) => {
     event.stopPropagation();
@@ -52,25 +62,18 @@ export const MachinesTable = ({ machines, emptyMessage, onActivated }: MachinesT
 
   return (
     <>
-      {(selected.length > 0 || bulkNotice) && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primaryBorder bg-primaryTint px-3 py-2 text-sm text-primaryTintText">
-          {selected.length > 0 ? (
-            <>
-              <span>{selected.length} selected</span>
-              <Button size="sm" variant="primary" onClick={() => setIsBulkActivating(true)}>
-                Activate {selected.length}
-              </Button>
-              <button type="button" className="underline" onClick={() => setSelectedIds(new Set())}>Clear</button>
-            </>
-          ) : (
-            <span role="status">{bulkNotice}</span>
-          )}
-        </div>
-      )}
+      <MachinesBulkBar
+        selectedCount={selected.length}
+        activatableCount={selectedToActivate.length}
+        notice={bulkNotice}
+        onActivate={() => setIsBulkActivating(true)}
+        onClear={() => setSelectedIds(new Set())}
+      />
       <Table className="flex-1">
         <TableHeaderRow>
           <TableHeaderCell flex={2}>Asset</TableHeaderCell>
           <TableHeaderCell flex={1.4}>Make / model</TableHeaderCell>
+          <TableHeaderCell>Groups</TableHeaderCell>
           <TableHeaderCell>Site</TableHeaderCell>
           <TableHeaderCell>Hours</TableHeaderCell>
           <TableHeaderCell flex={0.9}>Status</TableHeaderCell>
@@ -88,10 +91,10 @@ export const MachinesTable = ({ machines, emptyMessage, onActivated }: MachinesT
               <Link key={machine.id} href={`/machines/${machine.id}`}>
                 <TableRow className="hover:bg-surfaceGray">
                   <TableCell flex={2} className="flex items-center gap-2.5">
-                    {canActivate(machine) && (
+                    {isSelectable(machine) && (
                       <input
                         type="checkbox"
-                        aria-label={`Select ${machine.label} to activate`}
+                        aria-label={`Select ${machine.label}`}
                         checked={selectedIds.has(machine.id)}
                         onClick={(event) => toggleSelected(event, machine.id)}
                         onChange={() => undefined}
@@ -106,6 +109,9 @@ export const MachinesTable = ({ machines, emptyMessage, onActivated }: MachinesT
                   </TableCell>
                   <TableCell flex={1.4} className="text-bodyGray">
                     {machine.manufacturer} {machine.model}
+                  </TableCell>
+                  <TableCell className="min-w-0 text-bodyGray">
+                    <MachineSharingBadges machine={machine} />
                   </TableCell>
                   <TableCell className="text-bodyGray">{machine.site ?? "—"}</TableCell>
                   <TableCell className="text-bodyGray">{formatHours(machine.operatingHours)}</TableCell>
@@ -127,15 +133,13 @@ export const MachinesTable = ({ machines, emptyMessage, onActivated }: MachinesT
       </Table>
       {isBulkActivating && (
         <BulkActivateDialog
-          machines={selected.map((machine) => ({ id: machine.id, lifecycleState: machine.lifecycleState! }))}
+          machines={selectedToActivate.map((machine) => ({ id: machine.id, lifecycleState: machine.lifecycleState! }))}
           onDone={({ activated, failures }) => {
             setIsBulkActivating(false);
-            setSelectedIds(new Set());
-            setBulkNotice(
+            finishBulkAction(
               `${activated} machine${activated === 1 ? "" : "s"} activated.` +
                 (failures.length ? ` ${failures.length} couldn't be: ${failures[0]}` : ""),
             );
-            onActivated();
           }}
           onClose={() => setIsBulkActivating(false)}
         />
@@ -145,7 +149,7 @@ export const MachinesTable = ({ machines, emptyMessage, onActivated }: MachinesT
           machineId={activating.id}
           machineLabel={activating.label}
           lifecycleState={activating.lifecycleState}
-          onActivated={onActivated}
+          onActivated={onChanged}
           onClose={() => setActivating(null)}
         />
       )}

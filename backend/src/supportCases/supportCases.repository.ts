@@ -2,9 +2,8 @@ import { PoolClient } from 'pg';
 import { toLimitOffset } from '../common/dto/paginationQueryDto';
 import {
   MachineScope,
-  linkedMachineInScopeSql,
-  toScopeParam,
-} from '../machineGroups/access/machineScope';
+  linkedMachineVisibleSql,
+} from '../machineSharing/access/machineScope';
 import { buildCaseFilter, CaseListFilters } from './caseFilter';
 import {
   CaseCategory,
@@ -13,9 +12,11 @@ import {
 } from './types/supportCaseResponse';
 import { StatusCountRow, SupportCaseRow } from './types/supportCaseRows';
 
-// Every query filters on tenant_id itself: the backend's database role may
-// bypass RLS. For customers, a case about a machine outside their machine
-// scope (machineGroups/access) doesn't exist; staff pass ALL_MACHINES. The assignee is QuipTech support staff from another
+// Every query filters on tenant_id or the caller's machine scope
+// (machineSharing/access) as well as relying on RLS. For customers, a case
+// about a machine outside their machine scope doesn't exist, and a case on
+// a machine shared with them is theirs only when their organisation raised
+// it (RLS); staff pass ALL_MACHINES with the case's organisation. The assignee is QuipTech support staff from another
 // organisation, which RLS hides, so people come from support_case_person
 // (0070) rather than a join on users.
 const CASE_SELECT = `
@@ -74,10 +75,10 @@ export const countCasesByStatus = async (
 ): Promise<StatusCountRow[]> => {
   const result = await client.query<StatusCountRow>(
     `SELECT status, count(*) FROM support_cases
-     WHERE tenant_id = $1 AND deleted_at IS NULL
-       AND ${linkedMachineInScopeSql('machine_id', 'tenant_id', '$2')}
+     WHERE deleted_at IS NULL
+       AND ${linkedMachineVisibleSql('machine_id', 'tenant_id', '$1', scope)}
      GROUP BY status`,
-    [tenantId, toScopeParam(scope)],
+    [tenantId],
   );
   return result.rows;
 };
@@ -90,9 +91,9 @@ export const findCaseByNumber = async (
 ): Promise<SupportCaseRow | null> => {
   const result = await client.query<SupportCaseRow>(
     `${CASE_SELECT}
-     WHERE c.tenant_id = $1 AND c.case_number = $2 AND c.deleted_at IS NULL
-       AND ${linkedMachineInScopeSql('c.machine_id', 'c.tenant_id', '$3')}`,
-    [tenantId, caseNumber, toScopeParam(scope)],
+     WHERE c.case_number = $2 AND c.deleted_at IS NULL
+       AND ${linkedMachineVisibleSql('c.machine_id', 'c.tenant_id', '$1', scope)}`,
+    [tenantId, caseNumber],
   );
   return result.rows[0] ?? null;
 };

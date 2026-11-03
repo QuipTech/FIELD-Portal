@@ -1,11 +1,17 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { PoolClient } from 'pg';
 import { DatabaseService } from '../database/database.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { DashboardConfig } from '../dashboard/dashboardConfig';
 import * as casesRepository from './supportCases.repository';
 import * as optionsRepository from './caseOptions.repository';
 import { requireVisibleSupportCase } from './requireSupportCase';
-import { getAccessibleMachineScope } from '../machineGroups/access/getAccessibleMachineScope';
+import { ACCESSIBLE_MACHINES } from '../machineSharing/access/machineScope';
+import { requireMachineAccess } from '../machineSharing/access/machineAccess';
 import { postMessageToCase } from './postMessageToCase';
 import { recordCaseChange } from './recordCaseChange';
 import { CaseAnnouncer } from './caseAnnouncer.service';
@@ -20,11 +26,12 @@ import {
 } from './types/supportCaseResponse';
 import { toCaseCategoryFields } from './toCaseCategoryFields';
 
-const UNKNOWN_MACHINE_MESSAGE = 'That machine is not in your organisation.';
+const UNKNOWN_MACHINE_MESSAGE =
+  "That machine isn't one of yours or shared with you.";
 
 // The customer side: cases in the caller's own organisation (tenantId
 // from the JWT, every query under its RLS) that they may see under their
-// machine scope (machineGroups/access). Customers can't assign or
+// machine scope (machineSharing/access). Customers can't assign or
 // change status or priority — that's AdminCaseUpdatesService.
 @Injectable()
 export class SupportCasesService {
@@ -38,9 +45,9 @@ export class SupportCasesService {
     actor: AuthenticatedUser,
     query: ListSupportCasesQueryDto,
   ): Promise<SupportCaseList> =>
-    this.databaseService.withTenant(actor.tenantId, async (client) => {
+    this.databaseService.withActor(actor, async (client) => {
       const filters = { ...query, status: query.status ?? 'active' };
-      const scope = await getAccessibleMachineScope(client, actor);
+      const scope = ACCESSIBLE_MACHINES;
       const tenantId = actor.tenantId;
       const rows = await casesRepository.listCases(
         client,
@@ -72,29 +79,29 @@ export class SupportCasesService {
     actor: AuthenticatedUser,
     caseNumber: number,
   ): Promise<SupportCase> =>
-    this.databaseService.withTenant(actor.tenantId, async (client) =>
+    this.databaseService.withActor(actor, async (client) =>
       toSupportCase(await requireVisibleSupportCase(client, actor, caseNumber)),
     );
 
   // Machines for the New case form.
   getOptions = async (actor: AuthenticatedUser): Promise<SupportCaseOptions> =>
-    this.databaseService.withTenant(actor.tenantId, async (client) => {
-      const machines = await optionsRepository.listMachineOptions(
-        client,
-        actor.tenantId,
-        await getAccessibleMachineScope(client, actor),
-      );
+    this.databaseService.withActor(actor, async (client) => {
+      const machines = await optionsRepository.listMachineOptions(client);
       return {
         machines: machines.map((machine) => ({
           id: machine.id,
           label: machine.label,
           modelName: machine.model_name,
+          sharedByOrganisationName: machine.shared_by_organisation_name,
         })),
       };
     });
 
   // One transaction: the case, its "created" line and audit entry, and the
-  // description as its first message carrying the attachments.
+  // description as its first message carrying the attachments. A case
+  // about a machine shared with the caller ('contribute') belongs to the
+  // machine's owning organisation; the caller is its reporter, audited in
+  // their own organisation.
   createCase = async (
     actor: AuthenticatedUser,
     dto: CreateSupportCaseDto,
@@ -102,19 +109,13 @@ export class SupportCasesService {
     const posted = await this.databaseService.withActor(
       actor,
       async (client) => {
-        if (
-          dto.machineId &&
-          !(await optionsRepository.machineBelongsToTenant(
-            client,
-            actor.tenantId,
-            dto.machineId,
-            await getAccessibleMachineScope(client, actor),
-          ))
-        ) {
-          throw new BadRequestException(UNKNOWN_MACHINE_MESSAGE);
-        }
+        const caseTenantId = dto.machineId
+          ? await this.requireCaseMachineOwner(client, dto.machineId)
+          : actor.tenantId;
+        const auditTenantId =
+          caseTenantId === actor.tenantId ? undefined : actor.tenantId;
         const inserted = await casesRepository.insertCase(client, {
-          tenantId: actor.tenantId,
+          tenantId: caseTenantId,
           reporterId: actor.userId,
           subject: dto.subject,
           description: dto.description,
@@ -125,7 +126,8 @@ export class SupportCasesService {
         });
         const caseNumber = Number(inserted.case_number);
         await recordCaseChange(client, {
-          tenantId: actor.tenantId,
+          tenantId: caseTenantId,
+          auditTenantId,
           caseId: inserted.id,
           caseNumber,
           actorId: actor.userId,
@@ -133,7 +135,8 @@ export class SupportCasesService {
           events: [{ type: 'created', toValue: dto.priority }],
         });
         return postMessageToCase(client, {
-          tenantId: actor.tenantId,
+          tenantId: caseTenantId,
+          authorTenantId: auditTenantId,
           supportCase: await requireVisibleSupportCase(
             client,
             actor,
@@ -148,7 +151,7 @@ export class SupportCasesService {
       },
     );
     const created = toSupportCase(posted.supportCase);
-    this.caseAnnouncer.announceChange(actor.tenantId, {
+    this.caseAnnouncer.announceChange(posted.supportCase.tenant_id, {
       row: posted.supportCase,
       events: [],
       actorId: actor.userId,
@@ -166,10 +169,27 @@ export class SupportCasesService {
     const change = await this.databaseService.withActor(actor, (client) =>
       reopenSupportCase(client, actor, caseNumber),
     );
-    return this.caseAnnouncer.announceChange(actor.tenantId, {
+    return this.caseAnnouncer.announceChange(change.row.tenant_id, {
       ...change,
       actorId: actor.userId,
       previousAssigneeId: null,
     });
+  };
+
+  // The machine's owning organisation, where its case belongs. A machine
+  // outside the caller's scope is a 400; a view-only share a 403.
+  private requireCaseMachineOwner = async (
+    client: PoolClient,
+    machineId: string,
+  ): Promise<string> => {
+    try {
+      return (await requireMachineAccess(client, machineId, 'contribute'))
+        .tenantId;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw new BadRequestException(UNKNOWN_MACHINE_MESSAGE);
+      }
+      throw error;
+    }
   };
 }

@@ -12,3 +12,8 @@ export const describeRoleOption = (role: AdminRole) =>
     : role.name === "Owner"
       ? "Owner — full admin access to every organisation"
       : role.name;
+
+// Organisation admins and the Owner always see every machine, so their
+// machine access can't be limited to groups.
+export const isMachineAccessAdminRole = (role: AdminRole | undefined) =>
+  Boolean(role && (role.arePermissionsLocked || role.permissionCodes.some((code) => code === "admin.manage_users" || code === "platform.manage")));

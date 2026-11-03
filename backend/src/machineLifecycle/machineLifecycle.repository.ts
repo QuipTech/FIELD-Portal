@@ -1,9 +1,8 @@
 import { PoolClient } from 'pg';
 import {
   MachineScope,
-  machineInScopeSql,
-  toScopeParam,
-} from '../machineGroups/access/machineScope';
+  ownMachineSql,
+} from '../machineSharing/access/machineScope';
 
 export interface LifecycleMachineRow {
   id: string;
@@ -38,9 +37,9 @@ export const findLifecycleMachine = async (
      FROM machines m
      LEFT JOIN billing.billing_accounts a
        ON a.id = current_billing_account_id() AND a.deleted_at IS NULL
-     WHERE m.tenant_id = $1 AND m.id = $2 AND m.deleted_at IS NULL
-       AND ${machineInScopeSql('m', '$3')}`,
-    [tenantId, machineId, toScopeParam(scope)],
+     WHERE m.id = $2 AND m.deleted_at IS NULL
+       AND ${ownMachineSql('m', '$1', scope)}`,
+    [tenantId, machineId],
   );
   return result.rows[0];
 };

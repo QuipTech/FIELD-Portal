@@ -1,9 +1,8 @@
 import { PoolClient } from 'pg';
 import {
   MachineScope,
-  machineInScopeSql,
-  toScopeParam,
-} from '../machineGroups/access/machineScope';
+  ownMachineSql,
+} from '../machineSharing/access/machineScope';
 
 export interface MachineDetailsRow {
   site: string | null;
@@ -20,7 +19,8 @@ export interface MachineDetailsChange {
 // Every query filters on tenant_id itself: the backend's database role may
 // bypass RLS.
 
-// null when there's no such machine in the caller's machine scope.
+// null when there's no such machine of the organisation in the caller's
+// machine scope (a shared machine is its owner's to edit).
 export const findMachineDetails = async (
   client: PoolClient,
   tenantId: string,
@@ -29,9 +29,9 @@ export const findMachineDetails = async (
 ): Promise<MachineDetailsRow | null> => {
   const result = await client.query<MachineDetailsRow>(
     `SELECT m.site, m.operating_hours, m.cover_photo_id FROM machines m
-     WHERE m.id = $1 AND m.tenant_id = $2 AND m.deleted_at IS NULL
-       AND ${machineInScopeSql('m', '$3')}`,
-    [machineId, tenantId, toScopeParam(scope)],
+     WHERE m.id = $1 AND m.deleted_at IS NULL
+       AND ${ownMachineSql('m', '$2', scope)}`,
+    [machineId, tenantId],
   );
   return result.rows[0] ?? null;
 };

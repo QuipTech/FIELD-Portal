@@ -25,6 +25,9 @@ import { AdminUserRolesService } from './adminUserRoles.service';
 import { AdminUserRemovalService } from './adminUserRemoval.service';
 import { ChangeUserRoleDto } from './dto/changeUserRoleDto';
 import { ListAdminUsersQueryDto } from './dto/listAdminUsersQueryDto';
+import { UserMachineAccessService } from '../machineSharing/userAccess/userMachineAccess.service';
+import { MachineAccessModeDto } from '../machineSharing/dto/machineAccessModeDto';
+import { resolveScopedOrganisation } from '../auth/adminScope/resolveScopedOrganisation';
 
 // Users for the caller's AdminScope: every organisation's for the Owner
 // (AdminScopeGuard).
@@ -36,14 +39,21 @@ export class AdminUsersController {
     private readonly invitations: AdminUserInvitationsService,
     private readonly userRoles: AdminUserRolesService,
     private readonly removal: AdminUserRemovalService,
+    private readonly machineAccess: UserMachineAccessService,
   ) {}
 
+  // Each person has machineAccess, or null outside the caller's organisation.
   @Get()
   list(
+    @CurrentUser() actor: AuthenticatedUser,
     @CurrentAdminScope() scope: AdminScope,
     @Query() query: ListAdminUsersQueryDto,
   ) {
-    return this.adminUsersService.listUsers(scope, query);
+    return this.adminUsersService.listUsersWithMachineAccess(
+      actor,
+      scope,
+      query,
+    );
   }
 
   // Creates the sign-in (Cognito emails a temporary password) and the
@@ -66,6 +76,40 @@ export class AdminUsersController {
     @Body() dto: ChangeUserRoleDto,
   ) {
     return this.userRoles.changeRole(actor, userId, dto);
+  }
+
+  // The person's mode and the shared groups assigned to them or their
+  // organisation (Admin view → Users → Machine access).
+  @Get(':userId/machine-access')
+  getMachineAccess(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('userId', ParseUUIDPipe) userId: string,
+  ) {
+    return this.machineAccess.getAccess(actor, userId);
+  }
+
+  // 'all' (own organisation plus shared groups) or 'groups_only'. Audited;
+  // applies on the person's next request. Organisation admins are always
+  // 'all'. Groups themselves are assigned on Machine groups.
+  @Patch(':userId/machine-access')
+  setMachineAccess(
+    @CurrentUser() actor: AuthenticatedUser,
+    @CurrentAdminScope() scope: AdminScope,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Body() dto: MachineAccessModeDto,
+  ) {
+    return this.machineAccess.setMode(
+      actor,
+      {
+        userId,
+        tenantId: resolveScopedOrganisation(
+          scope,
+          actor.tenantId,
+          dto.organisationId,
+        ),
+      },
+      dto.machineAccessMode,
+    );
   }
 
   // Deletes the user's account completely and disables their sign-in; they

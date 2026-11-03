@@ -23,6 +23,8 @@ import { MachinePhotoGallery } from "./machinePhotoGallery";
 import { MachineSpecList } from "./machineSpecList";
 import { SystemsTabs } from "./systemsTabs";
 import { AppShell } from "@/components/shell/appShell";
+import { isOwnMachine } from "@/lib/machineDetail/machineAccessRules";
+import { MachineSharingPanel } from "./machineSharingPanel";
 
 const ROUTED_TABS: MachineTab[] = ["history", "config-history", "manuals", "cases"];
 
@@ -54,12 +56,17 @@ export const MachineDetailShell = ({ machineId, children }: { machineId: string;
   const notifyError = useCallback((message: string) => setErrorMessage(message), []);
   const dismissSuccess = useCallback(() => setSuccessMessage(null), []);
   const dismissError = useCallback(() => setErrorMessage(null), []);
+  const { reload: reloadCachedMachine } = machine;
+  const reloadMachine = useCallback(() => {
+    invalidateCached(machineCacheKeys.machine(machineId));
+    reloadCachedMachine();
+  }, [machineId, reloadCachedMachine]);
   useOfflineHistorySync(machineId, service, notify);
   useEffect(() => prefetchMachineDetail(service, machineId), [machineId]);
 
   const contextValue = useMemo(
-    () => ({ machineId, machine: machine.data, service, notify, notifyError }),
-    [machineId, machine.data, notify, notifyError],
+    () => ({ machineId, machine: machine.data, service, reloadMachine, notify, notifyError }),
+    [machineId, machine.data, reloadMachine, notify, notifyError],
   );
 
   if (machine.error && !machine.data) {
@@ -88,12 +95,14 @@ export const MachineDetailShell = ({ machineId, children }: { machineId: string;
     <MachineDetailProvider value={contextValue}>
       <AppShell topBar={<MachineHeaderBar machine={machine.data} onStatusChange={changeStatus} />}>
         <main key={contentVersion} className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-5">
-          {machine.data && <MachineActivationBanner machine={machine.data} onActivated={handleLifecycleChange} />}
+          {isOwnMachine(machine.data) && machine.data && (
+            <MachineActivationBanner machine={machine.data} onActivated={handleLifecycleChange} />
+          )}
           <div className="flex flex-wrap gap-4">
             <MachinePhotoGallery />
             <MachineSpecList />
           </div>
-          {machine.data && (
+          {isOwnMachine(machine.data) && machine.data && (
             <MachineLifecycleCard
               machineId={machineId}
               machineLabel={machine.data.assetId}
@@ -101,6 +110,7 @@ export const MachineDetailShell = ({ machineId, children }: { machineId: string;
               onChanged={handleLifecycleChange}
             />
           )}
+          {isOwnMachine(machine.data) && <MachineSharingPanel machineId={machineId} />}
           <MachineTabs machineId={machineId} active={activeTab} openCaseCount={machine.data?.openCaseCount ?? null} />
           {activeTab === "components" && <SystemsTabs />}
           {children}

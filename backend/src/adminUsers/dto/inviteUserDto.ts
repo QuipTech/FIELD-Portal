@@ -1,8 +1,5 @@
 import { Transform } from 'class-transformer';
 import {
-  ArrayMaxSize,
-  ArrayUnique,
-  IsArray,
   IsEmail,
   IsIn,
   IsOptional,
@@ -15,8 +12,7 @@ import { trimString } from '../../common/utils/trimTransforms';
 import {
   MACHINE_ACCESS_MODES,
   MachineAccessMode,
-} from '../../machineGroups/access/machineScope';
-import { MAX_GROUPS_PER_USER } from '../../machineGroups/dto/machineAccessDtos';
+} from '../../machineSharing/access/machineScope';
 
 const toLowerTrimmed = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim().toLowerCase() : value;
@@ -48,17 +44,10 @@ export class InviteUserDto {
   @IsUUID()
   organisationId?: string;
 
-  // Which machines they'll see (default 'all'). 'selected' needs at least
-  // one of the organisation's machine groups, and isn't allowed for an
-  // organisation admin role.
+  // Which machines they'll see (default 'all'): 'groups_only' shows only
+  // machines in shared groups assigned to them or their organisation (on
+  // Machine groups), and isn't allowed for an organisation admin role.
   @IsOptional()
   @IsIn(MACHINE_ACCESS_MODES)
   machineAccessMode?: MachineAccessMode;
-
-  @IsOptional()
-  @IsArray()
-  @ArrayUnique()
-  @ArrayMaxSize(MAX_GROUPS_PER_USER)
-  @IsUUID('all', { each: true })
-  groupIds?: string[];
 }

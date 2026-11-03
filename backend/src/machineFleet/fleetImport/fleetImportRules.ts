@@ -5,7 +5,7 @@ import {
 import { ImportedMachineDto } from './dto/importFleetDto';
 
 // The fleet CSV import's row checks, with no I/O (unit-tested). The
-// service looks up models, serials and groups and then applies these.
+// service looks up models and serials and then applies these.
 
 // The sample file the portal offers (GET /machines/import/template).
 export const FLEET_IMPORT_TEMPLATE: string[][] = [
@@ -17,7 +17,6 @@ export const FLEET_IMPORT_TEMPLATE: string[][] = [
     'site',
     'operating_hours',
     'status',
-    'group',
   ],
   [
     'CAT0793FXYZ01',
@@ -27,7 +26,6 @@ export const FLEET_IMPORT_TEMPLATE: string[][] = [
     'North Pit',
     '12450',
     'running',
-    'ABC Earthmoving',
   ],
   [
     'KMT0830EABC02',
@@ -37,7 +35,6 @@ export const FLEET_IMPORT_TEMPLATE: string[][] = [
     'North Pit',
     '9800',
     'service due',
-    '',
   ],
 ];
 
@@ -70,8 +67,6 @@ export const toModelKey = (make: string, model: string) =>
 
 export const toSerialKey = (serial: string) => serial.trim().toLowerCase();
 
-export const toGroupKey = (name: string) => name.trim().toLowerCase();
-
 export interface CheckedRow {
   serialNumber: string;
   modelKey: string;
@@ -79,7 +74,6 @@ export interface CheckedRow {
   site: string | null;
   operatingHours: number | null;
   status: OperatingStatus;
-  group: string | null;
 }
 
 // A row's own problems (missing or unreadable cells), and serials that
@@ -121,7 +115,6 @@ export const checkRows = (
       site: row.site ?? null,
       operatingHours,
       status: status!,
-      group: row.group ?? null,
     };
   });
   return { checked, errors };

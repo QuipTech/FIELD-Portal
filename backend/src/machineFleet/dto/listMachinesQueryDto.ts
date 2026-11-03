@@ -18,6 +18,9 @@ import {
   LifecycleState,
 } from '../../machineLifecycle/lifecycleTransitions';
 
+export const MACHINE_SOURCES = ['own', 'shared'] as const;
+export type MachineSource = (typeof MACHINE_SOURCES)[number];
+
 // Every filter is optional; blank values count as "any".
 export class ListMachinesQueryDto extends PaginationQueryDto {
   // Matches asset/fleet/serial number, make, model or site.
@@ -62,16 +65,16 @@ export class ListMachinesQueryDto extends PaginationQueryDto {
   @MaxLength(200)
   machineClass?: string;
 
-  // One customer group's machines (GET /machine-groups).
+  // One of the caller's accessible groups (GET /auth/me accessibleGroups).
   @IsOptional()
   @Transform(trimToUndefined)
   @IsUUID()
   groupId?: string;
 
-  // Only machines in no group. Never matches for someone limited to
-  // selected groups (they can't see ungrouped machines).
+  // 'own': the caller's organisation's machines; 'shared': machines other
+  // organisations share with them.
   @IsOptional()
-  @Transform(({ value }) => value === true || value === 'true')
-  @IsBoolean()
-  ungrouped?: boolean;
+  @Transform(trimToUndefined)
+  @IsIn(MACHINE_SOURCES)
+  source?: MachineSource;
 }

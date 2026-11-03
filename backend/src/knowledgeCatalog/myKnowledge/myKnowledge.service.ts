@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PaginationQueryDto } from '../../common/dto/paginationQueryDto';
-import { assertMachineAccessible } from '../../machineHistory/machineHistory.service';
-import { getAccessibleMachineScope } from '../../machineGroups/access/getAccessibleMachineScope';
+import { assertMachineAccessible } from '../../machineHistory/assertMachineAccessible';
+import { ACCESSIBLE_MACHINES } from '../../machineSharing/access/machineScope';
 import { DatabaseService } from '../../database/database.service';
 import { AuthenticatedUser } from '../../auth/types/authenticatedUser';
 import { KnowledgeAccessService } from '../access/knowledgeAccess.service';
@@ -66,7 +66,7 @@ export class MyKnowledgeService {
     query: PaginationQueryDto,
   ): Promise<Paged<MachineDocument>> => {
     await this.databaseService.withActor(actor, (client) =>
-      assertMachineAccessible(client, actor, machineId),
+      assertMachineAccessible(client, machineId),
     );
     return this.listForMyMachines(
       actor,
@@ -84,7 +84,7 @@ export class MyKnowledgeService {
         client,
         access,
         query,
-        await getAccessibleMachineScope(client, actor),
+        ACCESSIBLE_MACHINES,
       ),
     );
     return {

@@ -17,7 +17,7 @@ import * as conversations from '../src/aiAssistant/aiConversations.repository';
 import * as feedback from '../src/aiAssistant/feedback/aiFeedback.repository';
 import { insertReviewItem } from '../src/aiAssistant/aiAnswer.repository';
 import { countAiQueries } from '../src/aiAssistant/usage/aiUsage.repository';
-import { ALL_MACHINES } from '../src/machineGroups/access/machineScope';
+import { ALL_MACHINES } from '../src/machineSharing/access/machineScope';
 
 // The AI assistant's new SQL against a real database (npm run test:db), as
 // the tenant role so RLS applies. Fixtures are written as the migration

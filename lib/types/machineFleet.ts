@@ -1,8 +1,9 @@
 import type { LifecycleAction, LifecycleState } from "./machineLifecycle";
+import type { MachineSharing } from "./machineGroup";
 
 export type OperatingStatus = "running" | "down" | "service_due";
 
-export interface FleetMachine {
+export interface FleetMachine extends MachineSharing {
   id: string;
   // Asset number, else fleet number, else serial.
   label: string;
@@ -45,7 +46,13 @@ export interface MachineFleetFilters {
   make: string;
   status: OperatingStatus | "";
   machineClass: string;
+  // One of the caller's accessible groups.
+  group: string;
+  // "own": their organisation's machines; "shared": shared with them.
+  source: MachineSource | "";
 }
+
+export type MachineSource = "own" | "shared";
 
 export interface MachineCatalogMake {
   id: string;
@@ -60,4 +67,11 @@ export interface NewMachine {
   site?: string;
   operatingHours?: number;
   status: OperatingStatus;
+}
+
+// PATCH /machines/:machineId; only the fields sent change. Own
+// organisation's machines only.
+export interface MachineDetailsChanges {
+  site?: string | null;
+  operatingHours?: number;
 }

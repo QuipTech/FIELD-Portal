@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import * as authRepository from '../auth/auth.repository';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
-import { assertMachineAccessible } from '../machineHistory/machineHistory.service';
+import { assertMachineAccessible } from '../machineHistory/assertMachineAccessible';
 import * as machineComponentsRepository from './machineComponents.repository';
 import * as snapshotsRepository from './snapshots.repository';
 import { toMachineComponent, toSnapshot } from './machineConfigurationMapper';
@@ -15,16 +15,28 @@ import {
 export const SNAPSHOT_NOT_FOUND_MESSAGE = 'Snapshot not found.';
 
 // A machine's installed systems/components and its configuration
-// snapshots, within the caller's own organisation.
+// snapshots: read on any machine in the caller's machine scope (shared
+// ones in their owning organisation); taken or marked only by the owner.
 @Injectable()
 export class MachineConfigurationService {
   constructor(private readonly databaseService: DatabaseService) {}
 
-  listSystems = (actor: AuthenticatedUser, machineId: string): Promise<MachineSystem[]> =>
-    this.databaseService.withTenant(actor.tenantId, async (client) => {
-      await assertMachineAccessible(client, actor, machineId);
-      await machineComponentsRepository.seedInstalledConfiguration(client, machineId);
-      return machineComponentsRepository.listSystems(client, actor.tenantId, machineId);
+  listSystems = (
+    actor: AuthenticatedUser,
+    machineId: string,
+  ): Promise<MachineSystem[]> =>
+    this.databaseService.withActor(actor, async (client) => {
+      const { access } = await assertMachineAccessible(client, machineId);
+      if (!access.isShared)
+        await machineComponentsRepository.seedInstalledConfiguration(
+          client,
+          machineId,
+        );
+      return machineComponentsRepository.listSystems(
+        client,
+        access.tenantId,
+        machineId,
+      );
     });
 
   listComponents = (
@@ -32,28 +44,42 @@ export class MachineConfigurationService {
     machineId: string,
     systemId: string | null,
   ): Promise<MachineComponent[]> =>
-    this.databaseService.withTenant(actor.tenantId, async (client) => {
-      await assertMachineAccessible(client, actor, machineId);
-      await machineComponentsRepository.seedInstalledConfiguration(client, machineId);
+    this.databaseService.withActor(actor, async (client) => {
+      const { access } = await assertMachineAccessible(client, machineId);
+      if (!access.isShared)
+        await machineComponentsRepository.seedInstalledConfiguration(
+          client,
+          machineId,
+        );
       const rows = await machineComponentsRepository.listComponents(client, {
-        tenantId: actor.tenantId,
+        tenantId: access.tenantId,
         machineId,
         systemId,
       });
       return rows.map(toMachineComponent);
     });
 
-  listSnapshots = (actor: AuthenticatedUser, machineId: string): Promise<Snapshot[]> =>
-    this.databaseService.withTenant(actor.tenantId, async (client) => {
-      await assertMachineAccessible(client, actor, machineId);
-      const rows = await snapshotsRepository.listSnapshots(client, actor.tenantId, machineId);
+  listSnapshots = (
+    actor: AuthenticatedUser,
+    machineId: string,
+  ): Promise<Snapshot[]> =>
+    this.databaseService.withActor(actor, async (client) => {
+      const { access } = await assertMachineAccessible(client, machineId);
+      const rows = await snapshotsRepository.listSnapshots(
+        client,
+        access.tenantId,
+        machineId,
+      );
       return rows.map(toSnapshot);
     });
 
   // A technician's manual snapshot of the current configuration.
-  takeSnapshot = (actor: AuthenticatedUser, machineId: string): Promise<Snapshot> =>
-    this.databaseService.withTenant(actor.tenantId, async (client) => {
-      await assertMachineAccessible(client, actor, machineId);
+  takeSnapshot = (
+    actor: AuthenticatedUser,
+    machineId: string,
+  ): Promise<Snapshot> =>
+    this.databaseService.withActor(actor, async (client) => {
+      await assertMachineAccessible(client, machineId, 'manage');
       const snapshotId = await snapshotsRepository.captureSnapshot(client, {
         machineId,
         takenBy: actor.userId,
@@ -67,7 +93,11 @@ export class MachineConfigurationService {
         entityId: snapshotId,
         metadata: { machineId, trigger: 'manual' },
       });
-      const row = await snapshotsRepository.findSnapshot(client, { tenantId: actor.tenantId, machineId, snapshotId });
+      const row = await snapshotsRepository.findSnapshot(client, {
+        tenantId: actor.tenantId,
+        machineId,
+        snapshotId,
+      });
       return toSnapshot(row!);
     });
 
@@ -76,10 +106,13 @@ export class MachineConfigurationService {
     target: { machineId: string; snapshotId: string },
     isKnownGood: boolean,
   ): Promise<Snapshot> =>
-    this.databaseService.withTenant(actor.tenantId, async (client) => {
-      await assertMachineAccessible(client, actor, target.machineId);
+    this.databaseService.withActor(actor, async (client) => {
+      await assertMachineAccessible(client, target.machineId, 'manage');
       const params = { tenantId: actor.tenantId, ...target };
-      const isUpdated = await snapshotsRepository.setSnapshotKnownGood(client, { ...params, isKnownGood });
+      const isUpdated = await snapshotsRepository.setSnapshotKnownGood(client, {
+        ...params,
+        isKnownGood,
+      });
       if (!isUpdated) throw new NotFoundException(SNAPSHOT_NOT_FOUND_MESSAGE);
       await authRepository.insertAuditLog(client, {
         tenantId: actor.tenantId,
@@ -89,6 +122,8 @@ export class MachineConfigurationService {
         entityId: target.snapshotId,
         metadata: { machineId: target.machineId, isKnownGood },
       });
-      return toSnapshot((await snapshotsRepository.findSnapshot(client, params))!);
+      return toSnapshot(
+        (await snapshotsRepository.findSnapshot(client, params))!,
+      );
     });
 }
