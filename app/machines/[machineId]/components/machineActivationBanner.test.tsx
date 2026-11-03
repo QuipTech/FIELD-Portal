@@ -24,6 +24,10 @@ const machine: Machine = {
   owner: null,
   openCaseCount: 0,
   lifecycleState: "registered",
+  groups: [],
+  owningOrganisationName: "Pit Crew",
+  isShared: false,
+  accessLevel: "owner",
 };
 
 afterEach(() => {

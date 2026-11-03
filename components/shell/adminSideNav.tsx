@@ -21,6 +21,9 @@ interface AdminNavLink {
 }
 
 const SUPPORT_QUEUE_HREF = "/admin/cases";
+const MACHINE_GROUPS_HREF = "/admin/machine-groups";
+// Sections with pages beneath them stay highlighted on those pages.
+const SECTIONS_WITH_SUBPAGES = [SUPPORT_QUEUE_HREF, MACHINE_GROUPS_HREF];
 
 // Support staff who aren't the admin reach the admin portal for support
 // cases only.
@@ -30,14 +33,26 @@ const links: AdminNavLink[] = [
   { href: "/admin/roles", label: "Roles & permissions", icon: "shield", permission: PERMISSIONS.managePlatform },
   { href: "/admin/knowledge", label: "Knowledge", icon: "book", permission: PERMISSIONS.managePlatform },
   { href: "/admin/machines", label: "Machine library", icon: "db", permission: PERMISSIONS.managePlatform },
-  { href: "/admin/ai-configuration", label: "AI configuration", icon: "sliders", permission: PERMISSIONS.managePlatform },
+  { href: MACHINE_GROUPS_HREF, label: "Machine groups", icon: "layers", permission: PERMISSIONS.managePlatform },
+  {
+    href: "/admin/ai-configuration",
+    label: "AI configuration",
+    icon: "sliders",
+    permission: PERMISSIONS.managePlatform,
+  },
   { href: "/admin/audit-log", label: "Audit log", icon: "file", permission: PERMISSIONS.managePlatform },
   { href: SUPPORT_QUEUE_HREF, label: "Support cases", icon: "life", isStaffOnly: true },
   { href: "/admin/billing-accounts", label: "Billing", icon: "card", permission: PERMISSIONS.managePlatform },
   { href: "/admin/demo-requests", label: "Demo requests", icon: "mail", permission: PERMISSIONS.managePlatform },
 ];
 
-const NavItem = ({ href, label, icon, active, badgeCount = 0 }: AdminNavLink & { active: boolean; badgeCount?: number }) => (
+const NavItem = ({
+  href,
+  label,
+  icon,
+  active,
+  badgeCount = 0,
+}: AdminNavLink & { active: boolean; badgeCount?: number }) => (
   <Link
     href={href}
     className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-[15px] transition-colors ${
@@ -65,7 +80,7 @@ export const AdminSideNav = () => {
         <NavItem
           key={link.href}
           {...link}
-          active={link.href === SUPPORT_QUEUE_HREF ? pathname.startsWith(link.href) : pathname === link.href}
+          active={SECTIONS_WITH_SUBPAGES.includes(link.href) ? pathname.startsWith(link.href) : pathname === link.href}
           badgeCount={link.href === SUPPORT_QUEUE_HREF ? unreadCaseCount : 0}
         />
       ))}

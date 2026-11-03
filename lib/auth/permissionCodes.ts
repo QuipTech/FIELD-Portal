@@ -18,6 +18,8 @@ export const PERMISSIONS = {
   deleteMachinePhotos: "history.delete_photos",
   // Owner only: the platform administrator — every organisation + platform screens.
   managePlatform: "platform.manage",
+  // Owner and Organisation Admin: people, their machine access and machine groups.
+  manageUsers: "admin.manage_users",
 } as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -37,6 +39,7 @@ export const permissionLabels: Record<PermissionCode, string> = {
   "knowledge.submit": "Submit knowledge items for review",
   "history.delete_photos": "Delete machine photos",
   "platform.manage": "Manage the whole platform",
+  "admin.manage_users": "Manage users and machine groups",
 };
 
 export const describeMissingPermission = (permission: PermissionCode): string =>

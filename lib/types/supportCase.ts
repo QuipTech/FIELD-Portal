@@ -59,7 +59,13 @@ export interface SupportCaseFilters {
 }
 
 export interface SupportCaseOptions {
-  machines: CaseMachine[];
+  machines: CaseMachineOption[];
+}
+
+// A machine the New case form offers; set for one another organisation
+// shares with the caller (Contribute), missing from older backends.
+export interface CaseMachineOption extends CaseMachine {
+  sharedByOrganisationName?: string | null;
 }
 
 export interface NewSupportCase {

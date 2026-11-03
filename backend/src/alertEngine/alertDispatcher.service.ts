@@ -5,7 +5,7 @@ import * as alertDeliveryRepository from './alertDelivery.repository';
 import { toRecipientCandidate } from './alertMappers';
 import { resolveRecipients } from './resolveRecipients';
 import { filterChannels } from './filterChannels';
-import { keepPeopleWhoCanSeeMachine } from '../machineGroups/access/keepPeopleWhoCanSeeMachine';
+import { keepPeopleWhoCanSeeMachine } from '../machineSharing/access/keepPeopleWhoCanSeeMachine';
 import { EmailChannel } from './channels/emailChannel';
 import { SmsChannel } from './channels/smsChannel';
 import { PushChannel } from './channels/pushChannel';

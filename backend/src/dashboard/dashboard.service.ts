@@ -5,8 +5,10 @@ import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { StorageService } from '../storage/storage.service';
 import { toFleetMachineWithPhoto } from '../machineFleet/machinePhotoUrl';
 import { DashboardConfig } from './dashboardConfig';
-import { getAccessibleMachineScope } from '../machineGroups/access/getAccessibleMachineScope';
-import { MachineScope } from '../machineGroups/access/machineScope';
+import {
+  ACCESSIBLE_MACHINES,
+  MachineScope,
+} from '../machineSharing/access/machineScope';
 import * as countsRepository from './dashboardCounts.repository';
 import * as uptimeRepository from './fleetUptime.repository';
 import * as myMachinesRepository from './myMachines.repository';
@@ -27,7 +29,7 @@ import {
 } from './types/dashboardResponse';
 
 // The Dashboard screen in one request, scoped to the caller's
-// organisation and machine scope (machineGroups/access), and for threads
+// organisation and machine scope (machineSharing/access), and for threads
 // and "my machines" to the caller.
 @Injectable()
 export class DashboardService {
@@ -43,8 +45,8 @@ export class DashboardService {
       this.databaseService,
       actor.tenantId,
     );
-    return this.databaseService.withTenant(actor.tenantId, async (client) => {
-      const scope = await getAccessibleMachineScope(client, actor);
+    return this.databaseService.withActor(actor, async (client) => {
+      const scope = ACCESSIBLE_MACHINES;
       const tenantAndUser = {
         tenantId: actor.tenantId,
         userId: actor.userId,

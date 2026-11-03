@@ -2,6 +2,7 @@ import type { MachineDetailService } from "@/lib/types/machineDetailService";
 import { toRangeStart } from "@/lib/machineDetail/historyDateRange";
 import { requireAccessToken } from "../requireAccessToken";
 import { ApiError } from "../httpClient";
+import { NO_LONGER_ACCESSIBLE_MESSAGE } from "../../machineDetail/machineAccessRules";
 import { updateMachineStatusRequest } from "../machineFleetApi";
 import {
   createHistoryEntryRequest,
@@ -38,7 +39,15 @@ const emptyWhenMissing = async <T>(request: Promise<T[]>): Promise<T[]> => {
 
 // The machine detail screens' calls to the FIELD API.
 export const machineDetailService: MachineDetailService = {
-  getMachine: async (machineId) => toMachine(await getMachineRequest(requireAccessToken(), machineId)),
+  // 404: outside their access, e.g. a share that was revoked.
+  getMachine: async (machineId) => {
+    try {
+      return toMachine(await getMachineRequest(requireAccessToken(), machineId));
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) throw new ApiError(NO_LONGER_ACCESSIBLE_MESSAGE, 404);
+      throw error;
+    }
+  },
 
   updateStatus: async (machineId, status) =>
     (await updateMachineStatusRequest(requireAccessToken(), machineId, status)).status,

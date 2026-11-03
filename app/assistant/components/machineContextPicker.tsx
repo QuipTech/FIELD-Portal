@@ -38,6 +38,7 @@ export const MachineContextPicker = ({ fixedMachine, isThreadOpen, machines, val
         {machines.map((machine) => (
           <option key={machine.id} value={machine.id}>
             {machine.label} · {machine.model}
+            {machine.isShared ? ` (Shared · ${machine.owningOrganisationName})` : ""}
           </option>
         ))}
       </select>

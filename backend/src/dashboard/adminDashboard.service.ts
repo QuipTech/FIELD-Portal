@@ -8,7 +8,7 @@ import { KnowledgeAccessService } from '../knowledgeCatalog/access/knowledgeAcce
 import { listCatalogDocuments } from '../knowledgeCatalog/documents/catalogDocuments.repository';
 import { ListCatalogDocumentsQueryDto } from '../knowledgeCatalog/dto/listCatalogDocumentsQueryDto';
 import { listDownMachines } from './dashboardCounts.repository';
-import { getAccessibleMachineScope } from '../machineGroups/access/getAccessibleMachineScope';
+import { ACCESSIBLE_MACHINES } from '../machineSharing/access/machineScope';
 import * as adminRepository from './adminDashboard.repository';
 import { AdminDashboard } from './types/adminDashboardResponse';
 
@@ -41,7 +41,7 @@ export class AdminDashboardService {
         throw new ForbiddenException(NOT_ADMIN_MESSAGE);
       }
       // A Knowledge admin may be limited to machine groups.
-      const scope = await getAccessibleMachineScope(client, actor);
+      const scope = ACCESSIBLE_MACHINES;
       const down = await listDownMachines(client, actor.tenantId, scope);
       const nearBreach = await adminRepository.listCasesNearSlaBreach(
         client,

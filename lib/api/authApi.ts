@@ -1,5 +1,6 @@
 import { apiRequest } from "./httpClient";
 import type { AuthSession, AuthSessionUser, CognitoSyncResponse, SignupProfile } from "../types/authSession";
+import type { AccessibleGroup, MachineAccessMode } from "../types/machineGroup";
 
 // Exchanges a Cognito ID token (any sign-in: email/password, Google, Apple)
 // for a FIELD session. A first-time user without a signup profile gets
@@ -31,6 +32,11 @@ export const checkPasswordResetRequest = (email: string): Promise<PasswordResetE
 export interface CurrentUserResponse extends AuthSessionUser {
   status: string;
   permissions: string[];
+  // Which machines they see; missing from older backends (own
+  // organisation's). Read on every request: the API filters, never the page.
+  machineAccessMode?: MachineAccessMode;
+  // Shared groups assigned to them or their organisation, with their level.
+  accessibleGroups?: AccessibleGroup[];
 }
 
 // Re-reads the signed-in user, including their current roles/permissions.

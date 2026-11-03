@@ -67,14 +67,6 @@ export class ImportedMachineDto {
   @IsString()
   @MaxLength(50)
   status?: string;
-
-  // A machine group's name: matched ignoring case, or created when an
-  // organisation admin imports.
-  @IsOptional()
-  @Transform(toCell)
-  @IsString()
-  @MaxLength(100)
-  group?: string;
 }
 
 // POST /machines/import. dryRun checks every row and saves nothing (the

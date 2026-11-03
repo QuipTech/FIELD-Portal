@@ -7,7 +7,7 @@ import {
 } from '../src/supportCases/supportCases.repository';
 import { listCaseMessages } from '../src/supportCases/caseMessages.repository';
 import { readDatabaseUrl } from './dbTestConnection';
-import { ALL_MACHINES } from '../src/machineGroups/access/machineScope';
+import { ALL_MACHINES } from '../src/machineSharing/access/machineScope';
 import {
   asTenantRole,
   insertThreadMessage,

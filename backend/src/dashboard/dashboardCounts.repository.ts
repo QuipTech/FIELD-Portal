@@ -1,10 +1,9 @@
 import { PoolClient } from 'pg';
 import {
   MachineScope,
-  linkedMachineInScopeSql,
-  machineInScopeSql,
-  toScopeParam,
-} from '../machineGroups/access/machineScope';
+  linkedMachineVisibleSql,
+  visibleMachineSql,
+} from '../machineSharing/access/machineScope';
 import { MACHINE_LABEL_SQL } from '../machineFleet/machineFleet.repository';
 import { CasePriority } from './types/dashboardResponse';
 import {
@@ -17,7 +16,8 @@ const DOWN_MACHINES_SHOWN = 3;
 
 // Every query filters on tenant_id explicitly as well as relying on RLS,
 // since the backend's database role may bypass RLS. Machines, and cases and
-// entries about machines, are limited to the caller's machine scope.
+// entries about machines, are limited to the caller's machine scope
+// (machineSharing/access), machines shared with them included.
 
 export const countOpenCases = async (
   client: PoolClient,
@@ -36,10 +36,10 @@ export const countOpenCases = async (
             count(*) FILTER (WHERE priority = 'P2') AS p2,
             count(*) FILTER (WHERE priority = 'P3') AS p3
      FROM support_cases
-     WHERE tenant_id = $1 AND deleted_at IS NULL
+     WHERE deleted_at IS NULL
        AND status IN ('new', 'open', 'waiting_on_customer')
-       AND ${linkedMachineInScopeSql('machine_id', 'tenant_id', '$5')}`,
-    [tenantId, slaHours.P1, slaHours.P2, slaHours.P3, toScopeParam(scope)],
+       AND ${linkedMachineVisibleSql('machine_id', 'tenant_id', '$1', scope)}`,
+    [tenantId, slaHours.P1, slaHours.P2, slaHours.P3],
   );
   return result.rows[0];
 };
@@ -52,11 +52,11 @@ export const listDownMachines = async (
   const result = await client.query<DownMachineRow>(
     `SELECT m.id, ${MACHINE_LABEL_SQL} AS label, count(*) OVER () AS total
      FROM machines m
-     WHERE m.tenant_id = $1 AND m.deleted_at IS NULL AND m.status = 'down'
-       AND ${machineInScopeSql('m', '$2')}
+     WHERE m.deleted_at IS NULL AND m.status = 'down'
+       AND ${visibleMachineSql('m', '$1', scope)}
      ORDER BY m.updated_at DESC
      LIMIT ${DOWN_MACHINES_SHOWN}`,
-    [tenantId, toScopeParam(scope)],
+    [tenantId],
   );
   return result.rows;
 };
@@ -69,10 +69,10 @@ export const countEntriesThisWeek = async (
   const result = await client.query<EntryCountsRow>(
     `SELECT count(*) AS total, count(*) FILTER (WHERE created_by = $2) AS mine
      FROM technical_history_entries
-     WHERE tenant_id = $1 AND deleted_at IS NULL
+     WHERE deleted_at IS NULL
        AND created_at >= date_trunc('week', now())
-       AND ${linkedMachineInScopeSql('machine_id', 'tenant_id', '$3')}`,
-    [params.tenantId, params.userId, toScopeParam(params.scope)],
+       AND ${linkedMachineVisibleSql('machine_id', 'tenant_id', '$1', params.scope)}`,
+    [params.tenantId, params.userId],
   );
   return result.rows[0];
 };

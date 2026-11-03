@@ -1,9 +1,8 @@
 import { PoolClient } from 'pg';
 import {
   MachineScope,
-  machineInScopeSql,
-  toScopeParam,
-} from '../../machineGroups/access/machineScope';
+  visibleMachineSql,
+} from '../../machineSharing/access/machineScope';
 import { toLimitOffset } from '../../common/dto/paginationQueryDto';
 import { KnowledgeAccess } from '../access/knowledgeAccess';
 import {
@@ -101,7 +100,9 @@ export const listRecentDocuments = async (
 // Documents linked to the models of the caller's machines, each with the
 // machines it matched: one machine when machineId is given; otherwise the
 // machines they're assigned to, or the whole fleet when they have none.
-// Only machines in the caller's machine scope (machineGroups/access) count.
+// Only machines in the caller's machine scope (machineSharing/access) count,
+// shared ones included; which documents are readable stays decided by the
+// caller's own organisation's brand access.
 export const listDocumentsForMachines = async (
   client: PoolClient,
   access: KnowledgeAccess,
@@ -110,10 +111,9 @@ export const listDocumentsForMachines = async (
 ): Promise<MachineDocumentRow[]> => {
   const params: unknown[] = [access.tenantId];
   const readable = withReadable(access, params);
-  params.push(query.machineId ?? null, access.userId, toScopeParam(scope));
-  const machineParam = `$${params.length - 2}::uuid`;
-  const userParam = `$${params.length - 1}::uuid`;
-  const scopeParam = `$${params.length}`;
+  params.push(query.machineId ?? null, access.userId);
+  const machineParam = `$${params.length - 1}::uuid`;
+  const userParam = `$${params.length}::uuid`;
   const { limit, offset } = toLimitOffset(query);
   params.push(limit, offset);
   const result = await client.query<MachineDocumentRow>(
@@ -124,8 +124,8 @@ export const listDocumentsForMachines = async (
        FROM machines m
        JOIN machine_models mm ON mm.id = m.model_id
        JOIN machine_manufacturers mf ON mf.id = m.manufacturer_id
-       WHERE m.tenant_id = $1 AND m.deleted_at IS NULL
-         AND ${machineInScopeSql('m', scopeParam)}
+       WHERE m.deleted_at IS NULL
+         AND ${visibleMachineSql('m', '$1', scope)}
          AND (${machineParam} IS NOT NULL AND m.id = ${machineParam}
               OR ${machineParam} IS NULL AND (
                 NOT EXISTS (SELECT 1 FROM machine_assignments a

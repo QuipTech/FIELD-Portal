@@ -13,6 +13,7 @@ import type { HistoryEntry, HistoryFilters, NewHistoryEntry } from "@/lib/types/
 import { invalidateCached } from "@/lib/machineDetail/resourceCache";
 import { machineKeyPrefix } from "@/lib/machineDetail/machineDetailCacheKeys";
 import { useMachineDetail } from "../machineDetailContext";
+import { canContributeTo } from "@/lib/machineDetail/machineAccessRules";
 import { useHistoryPages } from "./useHistoryPages";
 import { DEFAULT_HISTORY_FILTERS } from "./historyPaging";
 import { usePendingHistoryEntries } from "./usePendingHistoryEntries";
@@ -91,10 +92,12 @@ const MachineHistoryPage = () => {
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-2">
         <HistoryFilterBar filters={filters} authors={pages.authors} onChange={setFilters} />
-        <PermissionButton permission={PERMISSIONS.addHistoryEntry} variant="primary" className="ml-auto" onClick={() => setIsAdding(true)}>
-          <Icon name="plus" />
-          Add entry
-        </PermissionButton>
+        {canContributeTo(machine) && (
+          <PermissionButton permission={PERMISSIONS.addHistoryEntry} variant="primary" className="ml-auto" onClick={() => setIsAdding(true)}>
+            <Icon name="plus" />
+            Add entry
+          </PermissionButton>
+        )}
       </div>
       <HistoryTimeline
         entries={[...pending, ...pages.entries]}

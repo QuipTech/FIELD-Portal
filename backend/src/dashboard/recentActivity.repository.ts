@@ -3,10 +3,9 @@ import { DatabaseService } from '../database/database.service';
 import { MACHINE_LABEL_SQL } from '../machineFleet/machineFleet.repository';
 import {
   MachineScope,
-  linkedMachineInScopeSql,
-  machineInScopeSql,
-  toScopeParam,
-} from '../machineGroups/access/machineScope';
+  linkedMachineVisibleSql,
+  visibleMachineSql,
+} from '../machineSharing/access/machineScope';
 import {
   CaseActivityRow,
   EntryActivityRow,
@@ -29,11 +28,11 @@ export const listCaseActivity = async (
             ${machineLabel} AS machine_label
      FROM support_cases c
      LEFT JOIN machines m ON m.id = c.machine_id AND m.tenant_id = c.tenant_id
-     WHERE c.tenant_id = $1 AND c.deleted_at IS NULL
-       AND ${linkedMachineInScopeSql('c.machine_id', 'c.tenant_id', '$2')}
+     WHERE c.deleted_at IS NULL
+       AND ${linkedMachineVisibleSql('c.machine_id', 'c.tenant_id', '$1', scope)}
      ORDER BY c.updated_at DESC
      LIMIT ${ACTIVITY_LIMIT}`,
-    [tenantId, toScopeParam(scope)],
+    [tenantId],
   );
   return result.rows;
 };
@@ -49,12 +48,12 @@ export const listEntryActivity = async (
             u.first_name AS author_first_name, u.last_name AS author_last_name
      FROM technical_history_entries e
      JOIN machines m ON m.id = e.machine_id AND m.deleted_at IS NULL
-       AND ${machineInScopeSql('m', '$2')}
+       AND ${visibleMachineSql('m', '$1', scope)}
      LEFT JOIN users u ON u.id = e.created_by
-     WHERE e.tenant_id = $1 AND e.deleted_at IS NULL
+     WHERE e.tenant_id = m.tenant_id AND e.deleted_at IS NULL
      ORDER BY e.created_at DESC
      LIMIT ${ACTIVITY_LIMIT}`,
-    [tenantId, toScopeParam(scope)],
+    [tenantId],
   );
   return result.rows;
 };
@@ -70,8 +69,8 @@ export const listThreadActivity = async (
             answer.content AS latest_answer,
             COALESCE(answer.source_count, 0) AS source_count
      FROM ai_conversations c
-     LEFT JOIN machines m ON m.id = c.machine_id AND m.tenant_id = c.tenant_id
-       AND ${machineInScopeSql('m', '$3')}
+     LEFT JOIN machines m ON m.id = c.machine_id
+       AND ${visibleMachineSql('m', '$1', params.scope)}
      LEFT JOIN LATERAL (
        SELECT msg.content,
               (SELECT count(*) FROM ai_source_references r
@@ -84,7 +83,7 @@ export const listThreadActivity = async (
      WHERE c.tenant_id = $1 AND c.user_id = $2 AND c.deleted_at IS NULL
      ORDER BY c.updated_at DESC
      LIMIT ${ACTIVITY_LIMIT}`,
-    [params.tenantId, params.userId, toScopeParam(params.scope)],
+    [params.tenantId, params.userId],
   );
   return result.rows;
 };

@@ -2,9 +2,8 @@ import { escapeLikePattern } from '../common/utils/escapeLikePattern';
 import { PaginationQueryDto } from '../common/dto/paginationQueryDto';
 import {
   MachineScope,
-  linkedMachineInScopeSql,
-  toScopeParam,
-} from '../machineGroups/access/machineScope';
+  linkedMachineVisibleSql,
+} from '../machineSharing/access/machineScope';
 import { CaseStatusFilter } from './dto/listSupportCasesQueryDto';
 import { CasePriority } from './types/supportCaseResponse';
 
@@ -27,18 +26,18 @@ const STATUS_CONDITIONS: Record<CaseStatusFilter, string | null> = {
   all: null,
 };
 
-// WHERE clause and its parameters for the list's filters ($1 = tenant,
-// $2 = machine scope: cases about machines outside it are left out).
+// WHERE clause and its parameters for the list's filters ($1 = the
+// caller's organisation): its cases about no machine or a visible one, and
+// cases its people raised on machines shared with them (RLS).
 export const buildCaseFilter = (
   tenantId: string,
   scope: MachineScope,
   filters: CaseListFilters,
 ) => {
-  const params: unknown[] = [tenantId, toScopeParam(scope)];
+  const params: unknown[] = [tenantId];
   const conditions = [
-    'c.tenant_id = $1',
     'c.deleted_at IS NULL',
-    linkedMachineInScopeSql('c.machine_id', 'c.tenant_id', '$2'),
+    linkedMachineVisibleSql('c.machine_id', 'c.tenant_id', '$1', scope),
   ];
   const statusCondition = STATUS_CONDITIONS[filters.status];
   if (statusCondition) conditions.push(statusCondition);

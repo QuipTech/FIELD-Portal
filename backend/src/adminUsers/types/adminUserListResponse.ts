@@ -1,3 +1,5 @@
+import { MachineAccess } from '../../machineSharing/types/machineGroupTypes';
+
 export interface AdminUserListItem {
   id: string;
   email: string;
@@ -17,4 +19,12 @@ export interface AdminUserListResponse {
   total: number;
   page: number;
   pageSize: number;
+}
+
+export interface AdminUserWithAccessListResponse extends Omit<
+  AdminUserListResponse,
+  'users'
+> {
+  // machineAccess is null only for someone removed while the page loaded.
+  users: (AdminUserListItem & { machineAccess: MachineAccess | null })[];
 }

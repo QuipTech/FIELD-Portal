@@ -1,5 +1,6 @@
 import type { OperatingStatus } from "./machineFleet";
 import type { LifecycleState } from "./machineLifecycle";
+import type { MachineSharing } from "./machineGroup";
 
 export type MachineStatus = "running" | "down" | "serviceDue";
 
@@ -10,7 +11,7 @@ export interface MachinePerson {
 }
 
 // One machine as the detail screens show it (GET /machines/:id).
-export interface Machine {
+export interface Machine extends MachineSharing {
   id: string;
   // What people call the machine: asset number, else fleet, else serial.
   assetId: string;
@@ -25,7 +26,8 @@ export interface Machine {
   operatingHours: number | null;
   hoursReadAt: string | null;
   site: string | null;
-  // Whoever registered the machine.
+  // Whoever registered the machine; null on a shared machine (its
+  // organisation's people aren't shown).
   owner: MachinePerson | null;
   // Open or in-progress support cases about the machine.
   openCaseCount: number;

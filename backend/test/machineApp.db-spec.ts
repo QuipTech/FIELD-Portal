@@ -8,7 +8,7 @@ import * as details from '../src/machineFleet/machineDetails.repository';
 import * as assignments from '../src/machineAssignments/machineAssignments.repository';
 import * as snapshots from '../src/machineConfiguration/snapshots.repository';
 import { ListMachinesQueryDto } from '../src/machineFleet/dto/listMachinesQueryDto';
-import { ALL_MACHINES } from '../src/machineGroups/access/machineScope';
+import { ALL_MACHINES } from '../src/machineSharing/access/machineScope';
 
 // The machine endpoints' new SQL (migration 0104) against a real database
 // (npm run test:db), as the tenant role so RLS applies. Fixtures are

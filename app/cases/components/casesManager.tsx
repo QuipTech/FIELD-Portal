@@ -7,7 +7,7 @@ import { CaseListSkeleton } from "@/components/supportCases/caseListSkeleton";
 import { useSupportCases } from "../useSupportCases";
 import { CasesFilterBar } from "./casesFilterBar";
 import { CasesTable } from "@/components/supportCases/casesTable";
-import { NewCaseButton } from "./newCaseButton";
+import { NewCaseButton } from "@/components/supportCases/newCaseButton";
 
 export const CasesManager = () => {
   const { filters, updateFilter, isFiltered, cases, page, setPage } = useSupportCases();

@@ -4,7 +4,6 @@ import * as adminRolesRepository from '../adminRoles/adminRoles.repository';
 import * as authRepository from '../auth/auth.repository';
 import * as audit from '../common/audit/runAuditedChange';
 import * as removedAccounts from '../users/removedAccounts.repository';
-import { BadRequestException } from '@nestjs/common';
 
 jest.mock('./adminUsers.repository');
 jest.mock('../adminRoles/adminRoles.repository');
@@ -45,18 +44,12 @@ const setup = () => {
     deleteCognitoUsersForEmail: jest.fn().mockResolvedValue(undefined),
   };
   jest.mocked(removedAccounts.isRemovedAccount).mockResolvedValue(false);
-  const machineAccess = {
-    checkInviteAccess: jest
-      .fn()
-      .mockResolvedValue({ mode: 'all', groupIds: [] }),
-  };
   const service = new AdminUserInvitationsService(
     {} as never,
     cognito as never,
     cognitoUsers as never,
-    machineAccess as never,
   );
-  return { service, cognito, cognitoUsers, machineAccess };
+  return { service, cognito, cognitoUsers };
 };
 
 describe('AdminUserInvitationsService.inviteUser', () => {
@@ -112,23 +105,22 @@ describe('AdminUserInvitationsService.inviteUser', () => {
     expect(cognito.createInvitedUser).not.toHaveBeenCalled();
   });
 
-  it('checks machine access for the role before contacting Cognito', async () => {
-    const { service, cognito, machineAccess } = setup();
-    machineAccess.checkInviteAccess.mockRejectedValue(
-      new BadRequestException('Choose at least one machine group.'),
-    );
+  it("refuses 'groups_only' for an admin role before contacting Cognito", async () => {
+    const { service, cognito } = setup();
+    jest.mocked(adminRolesRepository.listRoles).mockResolvedValue([
+      {
+        id: 'role-1',
+        name: 'Organisation Admin',
+        tenant_id: null,
+        permission_codes: ['admin.manage_users'],
+      } as never,
+    ]);
     await expect(
       service.inviteUser(actor, ownerScope, {
         ...dto,
-        machineAccessMode: 'selected',
-        groupIds: [],
+        machineAccessMode: 'groups_only',
       }),
     ).rejects.toMatchObject({ status: 400 });
-    expect(machineAccess.checkInviteAccess).toHaveBeenCalledWith(
-      'org-a',
-      { mode: 'selected', groupIds: [] },
-      false,
-    );
     expect(cognito.createInvitedUser).not.toHaveBeenCalled();
   });
 });

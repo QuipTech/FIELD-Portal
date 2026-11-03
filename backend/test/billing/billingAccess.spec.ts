@@ -3,7 +3,7 @@ import { PoolClient } from 'pg';
 import { assertNewSessionAllowed } from '../../src/aiAssistant/aiSessionAccess';
 import { EntitlementsService } from '../../src/entitlements/entitlements.service';
 import { assertFullMachineAccess } from '../../src/machineLifecycle/activeMachine/activeMachine.repository';
-import { ALL_MACHINES } from '../../src/machineGroups/access/machineScope';
+import { ALL_MACHINES } from '../../src/machineSharing/access/machineScope';
 import { findOrganisationSubscription } from '../../src/organisationSubscription/organisationSubscription.repository';
 import { toOrganisationSubscription } from '../../src/organisationSubscription/organisationSubscriptionRules';
 import {

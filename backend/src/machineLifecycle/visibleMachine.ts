@@ -1,44 +1,42 @@
 import { PoolClient } from 'pg';
-import { getAccessibleMachineScope } from '../machineGroups/access/getAccessibleMachineScope';
+import { ACCESSIBLE_MACHINES } from '../machineSharing/access/machineScope';
 import { findFleetMachine } from '../machineFleet/machineFleet.repository';
 import { findLifecycleMachine } from './machineLifecycle.repository';
 
 type Actor = { tenantId: string; userId: string };
 
-// The lifecycle and transfer lookups, limited to the caller's machine
-// scope (machineGroups/access): a machine in a group they can't see is
-// undefined/null, so the services answer 404.
+// The lifecycle and transfer lookups: the caller's own organisation's
+// machines in their machine scope (machineSharing/access). A shared machine
+// or one they can't see is undefined, so the services answer 404; only the
+// owner activates, archives or transfers. Runs under withActor.
 
 export const findVisibleLifecycleMachine = async (
   client: PoolClient,
   actor: Actor,
   machineId: string,
 ) =>
-  findLifecycleMachine(
-    client,
-    actor.tenantId,
-    machineId,
-    await getAccessibleMachineScope(client, actor),
-  );
+  findLifecycleMachine(client, actor.tenantId, machineId, ACCESSIBLE_MACHINES);
 
 export const findTransferMachine = async (
   client: PoolClient,
   actor: Actor,
   machineId: string,
 ) => {
-  const scope = await getAccessibleMachineScope(client, actor);
+  const machine = await findLifecycleMachine(
+    client,
+    actor.tenantId,
+    machineId,
+    ACCESSIBLE_MACHINES,
+  );
   return {
-    machine: await findLifecycleMachine(
-      client,
-      actor.tenantId,
-      machineId,
-      scope,
-    ),
-    fleetMachine: await findFleetMachine(
-      client,
-      actor.tenantId,
-      machineId,
-      scope,
-    ),
+    machine,
+    fleetMachine: machine
+      ? await findFleetMachine(
+          client,
+          actor.tenantId,
+          machineId,
+          ACCESSIBLE_MACHINES,
+        )
+      : null,
   };
 };

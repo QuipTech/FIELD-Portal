@@ -1,10 +1,15 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Avatar } from "@/components/ui/avatar";
+import { PermissionButton } from "@/components/auth/permissionButton";
+import { MachineSharingBadges } from "@/components/machines/machineSharingBadges";
+import { PERMISSIONS } from "@/lib/auth/permissionCodes";
 import { getInitials } from "@/lib/format/nameInitials";
 import { SkeletonBar } from "@/components/ui/skeletonBar";
 import { useMachineDetail } from "../machineDetailContext";
+import { isOwnMachine } from "@/lib/machineDetail/machineAccessRules";
+import { EditMachineModal } from "./editMachineModal";
 
 const readingFormat = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false });
 
@@ -40,7 +45,8 @@ const CopyButton = ({ value, what }: { value: string; what: string }) => {
 };
 
 export const MachineSpecList = () => {
-  const { machine } = useMachineDetail();
+  const { machine, reloadMachine, notify } = useMachineDetail();
+  const [isEditing, setIsEditing] = useState(false);
   if (!machine) return <SkeletonBar className="h-[260px] min-w-[280px] flex-1 rounded-xl" />;
 
   return (
@@ -61,11 +67,29 @@ export const MachineSpecList = () => {
         aside={machine.hoursReadAt && formatReadAt(machine.hoursReadAt)}
       />
       <SpecRow label="Site" value={machine.site ?? "—"} />
+      <SpecRow label="Groups" value={<MachineSharingBadges machine={machine} emptyLabel="None" />} />
       <SpecRow
-        label="Owner"
-        value={machine.owner?.name ?? "Unassigned"}
+        label={machine.isShared ? "Owned by" : "Owner"}
+        value={machine.isShared ? machine.owningOrganisationName : (machine.owner?.name ?? "Unassigned")}
         aside={machine.owner && <Avatar initials={getInitials(machine.owner.name)} imageSrc={machine.owner.avatarUrl ?? undefined} size="sm" />}
       />
+      {isOwnMachine(machine) && (
+        <div className="flex py-2.5">
+          <PermissionButton permission={PERMISSIONS.manageMachine} size="sm" className="ml-auto" onClick={() => setIsEditing(true)}>
+            Edit machine
+          </PermissionButton>
+        </div>
+      )}
+      {isEditing && (
+        <EditMachineModal
+          machine={machine}
+          onSaved={() => {
+            reloadMachine();
+            notify("Machine saved");
+          }}
+          onClose={() => setIsEditing(false)}
+        />
+      )}
     </div>
   );
 };

@@ -3,7 +3,7 @@ import { PoolClient } from 'pg';
 import { DatabaseService } from '../database/database.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { requireSupportCase } from './requireSupportCase';
-import { ALL_MACHINES } from '../machineGroups/access/machineScope';
+import { ALL_MACHINES } from '../machineSharing/access/machineScope';
 import { StaffCaseAccess } from './caseAccess.service';
 import { SupportCaseRow } from './types/supportCaseRows';
 

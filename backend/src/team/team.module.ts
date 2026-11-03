@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { AdminUsersModule } from '../adminUsers/adminUsers.module';
-import { MachineGroupsModule } from '../machineGroups/machineGroups.module';
+import { MachineSharingModule } from '../machineSharing/machineSharing.module';
 import { TeamController } from './team.controller';
 import { TeamService } from './team.service';
 
 @Module({
-  imports: [AdminUsersModule, MachineGroupsModule],
+  imports: [AdminUsersModule, MachineSharingModule],
   controllers: [TeamController],
   providers: [TeamService],
 })

@@ -4,6 +4,7 @@ import { Tag } from "@/components/ui/tag";
 import { ActionMenu } from "@/components/ui/actionMenu";
 import { LoadingSpinner } from "@/components/ui/loadingSpinner";
 import { Table, TableHeaderRow, TableHeaderCell, TableRow, TableCell } from "@/components/ui/table";
+import { MachineGroupBadge } from "@/components/machines/machineGroupBadge";
 import { getInitials } from "@/lib/format/nameInitials";
 import { formatLastActiveLabel } from "@/lib/format/lastActiveLabel";
 import { adminUserStatusLabel, adminUserStatusTone, type AdminUser } from "@/lib/types/adminUser";
@@ -16,27 +17,62 @@ interface UsersTableProps {
   // their own role or remove themselves).
   currentUserId: string | null;
   onChangeRole: (user: AdminUser) => void;
+  // Offered once their access has loaded.
+  canEditMachineAccess: (user: AdminUser) => boolean;
+  onEditMachineAccess: (user: AdminUser) => void;
   onRemove: (user: AdminUser) => void;
 }
+
+const MachineAccessSummary = ({ user }: { user: AdminUser }) => {
+  const access = user.machineAccess;
+  if (!access) return <span className="text-xs text-mutedGray">—</span>;
+  const isGroupsOnly = access.effectiveMode === "groups_only";
+  return (
+    <>
+      <span className={`text-xs ${isGroupsOnly && access.groups.length === 0 ? "text-danger" : "text-bodyGray"}`}>
+        {isGroupsOnly ? "Only shared groups" : "Own organisation"}
+      </span>
+      {access.groups.map((group) => (
+        <MachineGroupBadge key={group.id} name={group.name} colour={group.colour} />
+      ))}
+    </>
+  );
+};
 
 const TableMessage = ({ children }: { children: ReactNode }) => (
   <div className="flex items-center justify-center gap-2 p-10 text-sm text-mutedGray">{children}</div>
 );
 
-export const UsersTable = ({ users, isLoading, errorMessage, currentUserId, onChangeRole, onRemove }: UsersTableProps) => {
+export const UsersTable = ({
+  users,
+  isLoading,
+  errorMessage,
+  currentUserId,
+  onChangeRole,
+  canEditMachineAccess,
+  onEditMachineAccess,
+  onRemove,
+}: UsersTableProps) => {
   return (
     <Table>
       <TableHeaderRow>
         <TableHeaderCell flex={3}>Name</TableHeaderCell>
         <TableHeaderCell flex={0.8}>Role</TableHeaderCell>
         <TableHeaderCell flex={0.8}>Organisation</TableHeaderCell>
+        <TableHeaderCell flex={1}>Machine access</TableHeaderCell>
         <TableHeaderCell flex={0.8}>Last active</TableHeaderCell>
         <TableHeaderCell flex={0.7}>Status</TableHeaderCell>
         <TableHeaderCell flex={0.3}>{""}</TableHeaderCell>
       </TableHeaderRow>
-      {errorMessage && <TableMessage><span className="text-danger">{errorMessage}</span></TableMessage>}
+      {errorMessage && (
+        <TableMessage>
+          <span className="text-danger">{errorMessage}</span>
+        </TableMessage>
+      )}
       {!errorMessage && isLoading && users.length === 0 && (
-        <TableMessage><LoadingSpinner /> Loading users…</TableMessage>
+        <TableMessage>
+          <LoadingSpinner /> Loading users…
+        </TableMessage>
       )}
       {!errorMessage && !isLoading && users.length === 0 && <TableMessage>No users found.</TableMessage>}
       {!errorMessage &&
@@ -58,8 +94,15 @@ export const UsersTable = ({ users, isLoading, errorMessage, currentUserId, onCh
                   <span className="text-xs text-mutedGray">No role</span>
                 )}
               </TableCell>
-              <TableCell flex={0.8} className="text-bodyGray">{user.organisation.name}</TableCell>
-              <TableCell flex={0.8} className="text-xs text-mutedGray">{formatLastActiveLabel(user)}</TableCell>
+              <TableCell flex={0.8} className="text-bodyGray">
+                {user.organisation.name}
+              </TableCell>
+              <TableCell flex={1} className="flex min-w-0 flex-wrap gap-1">
+                <MachineAccessSummary user={user} />
+              </TableCell>
+              <TableCell flex={0.8} className="text-xs text-mutedGray">
+                {formatLastActiveLabel(user)}
+              </TableCell>
               <TableCell flex={0.7}>
                 <Tag tone={adminUserStatusTone[user.status]}>{adminUserStatusLabel[user.status]}</Tag>
               </TableCell>
@@ -69,6 +112,15 @@ export const UsersTable = ({ users, isLoading, errorMessage, currentUserId, onCh
                     label={fullName}
                     items={[
                       { label: "Change role", icon: "shield", onSelect: () => onChangeRole(user) },
+                      ...(canEditMachineAccess(user)
+                        ? [
+                            {
+                              label: "Edit machine access",
+                              icon: "truck" as const,
+                              onSelect: () => onEditMachineAccess(user),
+                            },
+                          ]
+                        : []),
                       { label: "Remove user", icon: "x", tone: "danger", onSelect: () => onRemove(user) },
                     ]}
                   />

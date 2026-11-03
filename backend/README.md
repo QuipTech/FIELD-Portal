@@ -54,7 +54,7 @@ backend/
 │   ├── organisationSubscription/ ← GET /organisation/subscription — the caller's plan, or Free
 │   ├── supportCases/         ← /support-cases REST + Socket.IO gateway (live case chat)
 │   ├── machineFleet/         ← GET/POST/PATCH /machines (the Machines list), GET /machine-catalog, POST /machines/import (fleet CSV)
-│   ├── machineGroups/        ← /machine-groups, POST /machines/bulk-assign-group, people's machine access; getAccessibleMachineScope (every machine read). API reference in its README
+│   ├── machineSharing/       ← global machine groups (/admin/machine-groups), machine shares, people's machine access; accessible_machines() scope for every machine read. API reference in its README
 │   ├── machineAssignments/   ← /machines/:id/technicians — technicians assigned to a machine
 │   ├── team/                 ← /team — an organisation admin's people and roles
 │   ├── idempotency/          ← Idempotency-Key replay for the app's offline outbox

@@ -10,7 +10,7 @@ import {
   AssistantConversation,
   AssistantThread,
 } from './types/aiAssistantResponse';
-import { getAccessibleMachineScope } from '../machineGroups/access/getAccessibleMachineScope';
+import { ACCESSIBLE_MACHINES } from '../machineSharing/access/machineScope';
 
 const CONVERSATION_NOT_FOUND_MESSAGE = 'Thread not found.';
 
@@ -27,7 +27,7 @@ export class AiConversationsService {
       aiConversationsRepository.listConversations(client, {
         tenantId: actor.tenantId,
         userId: actor.userId,
-        scope: await getAccessibleMachineScope(client, actor),
+        scope: ACCESSIBLE_MACHINES,
       }),
     );
     return rows.map(toAssistantConversation);
@@ -44,7 +44,7 @@ export class AiConversationsService {
           tenantId: actor.tenantId,
           userId: actor.userId,
           conversationId,
-          scope: await getAccessibleMachineScope(client, actor),
+          scope: ACCESSIBLE_MACHINES,
         });
         if (!found) throw new NotFoundException(CONVERSATION_NOT_FOUND_MESSAGE);
         return {

@@ -16,7 +16,7 @@ export const Modal = ({ title, children, onClose, widthClassName = "w-[440px]" }
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`flex max-h-[90vh] max-w-full flex-col overflow-y-auto rounded-2xl bg-surface ${widthClassName}`}
+        className={`flex max-h-[90vh] max-w-full flex-col overflow-y-auto rounded-2xl bg-surface text-left ${widthClassName}`}
       >
         <div className="flex h-14 flex-none items-center border-b border-borderGray px-4">
           <span className="text-[15px] font-medium text-ink">{title}</span>

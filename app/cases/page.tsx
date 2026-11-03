@@ -1,6 +1,6 @@
 import { AppShell } from "@/components/shell/appShell";
 import { TopBar } from "@/components/shell/topBar";
-import { NewCaseButton } from "./components/newCaseButton";
+import { NewCaseButton } from "@/components/supportCases/newCaseButton";
 import { CasesManager } from "./components/casesManager";
 import { AssignedCasesSection } from "./components/assignedCasesSection";
 

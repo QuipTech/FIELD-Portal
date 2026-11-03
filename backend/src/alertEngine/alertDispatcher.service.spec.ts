@@ -6,10 +6,10 @@ import { SmsChannel } from './channels/smsChannel';
 import { PushChannel } from './channels/pushChannel';
 import { buildRule, ORG_A, ORG_B } from './alertTestFixtures';
 import { RecipientCandidateRow } from './types/alertRows';
-import * as machineVisibility from '../machineGroups/access/machineVisibility.repository';
+import * as machineVisibility from '../machineSharing/access/machineVisibility.repository';
 
 jest.mock('./alertDelivery.repository');
-jest.mock('../machineGroups/access/machineVisibility.repository');
+jest.mock('../machineSharing/access/machineVisibility.repository');
 const repository = jest.mocked(alertDeliveryRepository);
 const visibility = jest.mocked(machineVisibility);
 

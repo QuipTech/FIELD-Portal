@@ -3,7 +3,7 @@ import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { runAuditedChange } from '../common/audit/runAuditedChange';
 import { DatabaseService } from '../database/database.service';
 import { CorrectIdentifiersDto } from './dto/correctIdentifiersDto';
-import { assertMachineAccessible } from '../machineHistory/machineHistory.service';
+import { assertMachineAccessible } from '../machineHistory/assertMachineAccessible';
 import {
   lockMachineIdentifiers,
   MachineIdentifiers,
@@ -31,7 +31,7 @@ export class MachineIdentifiersService {
       actor,
       DUPLICATE_SERIAL_MESSAGE,
       async (client) => {
-        await assertMachineAccessible(client, actor, machineId);
+        await assertMachineAccessible(client, machineId, 'manage');
         const current = await lockMachineIdentifiers(
           client,
           actor.tenantId,

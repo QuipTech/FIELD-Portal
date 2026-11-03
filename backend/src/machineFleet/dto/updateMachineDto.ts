@@ -36,11 +36,4 @@ export class UpdateMachineDto {
   @ValidateIf((_dto, value) => value !== null)
   @IsUUID()
   coverPhotoId?: string | null;
-
-  // Its customer group; null takes it out of its group. Organisation
-  // admins only.
-  @IsOptional()
-  @ValidateIf((_dto, value) => value !== null)
-  @IsUUID()
-  groupId?: string | null;
 }

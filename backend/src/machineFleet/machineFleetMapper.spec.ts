@@ -18,9 +18,10 @@ const machineRow = (
   operating_hours: 14208,
   status: 'down',
   lifecycle_state: 'active',
-  group_id: null,
-  group_name: null,
-  group_colour: null,
+  owning_organisation_name: 'Pit Crew',
+  access_level: 'owner',
+  is_shared: false,
+  groups: [],
   photo_storage_key: null,
   ...overrides,
 });
@@ -41,25 +42,32 @@ describe('toFleetMachine', () => {
       lifecycleState: 'active',
       availableActions: [],
       canRequestTransfer: false,
-      groupId: null,
-      groupName: null,
-      groupColour: null,
+      groups: [],
+      owningOrganisationName: 'Pit Crew',
+      isShared: false,
+      accessLevel: 'owner',
     });
   });
 
-  it('shows the group a machine is in', () => {
+  it('shows a shared machine with its groups and never offers its lifecycle', () => {
+    const group = { id: 'group-1', name: 'ABC Earthmoving', colour: '#4A34C7' };
     expect(
       toFleetMachine(
         machineRow({
-          group_id: 'group-1',
-          group_name: 'ABC Earthmoving',
-          group_colour: '#4A34C7',
+          groups: [group],
+          owning_organisation_name: 'TRT',
+          is_shared: true,
+          access_level: 'view',
         }),
+        true,
       ),
     ).toMatchObject({
-      groupId: 'group-1',
-      groupName: 'ABC Earthmoving',
-      groupColour: '#4A34C7',
+      groups: [group],
+      owningOrganisationName: 'TRT',
+      isShared: true,
+      accessLevel: 'view',
+      availableActions: [],
+      canRequestTransfer: false,
     });
   });
 

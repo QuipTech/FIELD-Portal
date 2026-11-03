@@ -45,8 +45,8 @@ export class MachineTransfersService {
     machineId: string,
     params: { receivingOrganisationSlug: string; reason: string },
   ): Promise<MachineTransfer> => {
-    const { machine, fleetMachine } = await this.databaseService.withTenant(
-      actor.tenantId,
+    const { machine, fleetMachine } = await this.databaseService.withActor(
+      actor,
       (client) => findTransferMachine(client, actor, machineId),
     );
     if (!machine || !fleetMachine)
@@ -116,9 +116,8 @@ export class MachineTransfersService {
     actor: AuthenticatedUser,
     machineId: string,
   ): Promise<MachineTransfer[]> => {
-    const machine = await this.databaseService.withTenant(
-      actor.tenantId,
-      (client) => findVisibleLifecycleMachine(client, actor, machineId),
+    const machine = await this.databaseService.withActor(actor, (client) =>
+      findVisibleLifecycleMachine(client, actor, machineId),
     );
     if (!machine) throw new NotFoundException(MACHINE_NOT_FOUND_MESSAGE);
     return (

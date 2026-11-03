@@ -27,6 +27,8 @@ export const listHistoryEntries = async (
     `SELECT e.id, e.entry_type, e.description, e.is_amendment, e.created_at,
             e.operating_hours, e.downtime_hours,
             u.id AS author_id, u.first_name AS author_first_name, u.last_name AS author_last_name,
+            CASE WHEN u.id IS NULL THEN person_organisation_name(e.created_by) END
+              AS author_organisation_name,
             c.id AS component_id, c.name AS component_name, s.name AS system_name,
             COALESCE((
               SELECT json_agg(json_build_object(
@@ -72,7 +74,9 @@ export const listHistoryAuthors = async (
   client: PoolClient,
   tenantId: string,
   machineId: string,
-): Promise<{ id: string; first_name: string | null; last_name: string | null }[]> => {
+): Promise<
+  { id: string; first_name: string | null; last_name: string | null }[]
+> => {
   const result = await client.query(
     `SELECT DISTINCT u.id, u.first_name, u.last_name
      FROM technical_history_entries e

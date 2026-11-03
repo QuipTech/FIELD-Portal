@@ -12,6 +12,7 @@ import { PERMISSIONS } from "@/lib/auth/permissionCodes";
 import { useCachedResource } from "@/lib/machineDetail/useCachedResource";
 import { machineCacheKeys } from "@/lib/machineDetail/machineDetailCacheKeys";
 import { useMachineDetail } from "./machineDetailContext";
+import { canContributeTo } from "@/lib/machineDetail/machineAccessRules";
 import { ComponentStatusCard } from "./components/componentStatusCard";
 import { SECTION_LABEL_CLASSES } from "./components/systemsTabs";
 
@@ -19,7 +20,7 @@ import { SECTION_LABEL_CLASSES } from "./components/systemsTabs";
 // the systems tabs). Every component loads once, so switching system
 // needs no request.
 const MachineComponentsPage = () => {
-  const { machineId, service } = useMachineDetail();
+  const { machineId, machine, service } = useMachineDetail();
   // Only platform admins can edit the Machine library, where systems come from.
   const canEditLibrary = usePermissions().can(PERMISSIONS.managePlatform);
   const systems = useCachedResource(machineCacheKeys.systems(machineId), () => service.listSystems(machineId), "Couldn't load systems.");
@@ -50,9 +51,11 @@ const MachineComponentsPage = () => {
         description="This machine's systems and components come from its model in the Machine library. Once the model is set up, they appear here with their condition from the machine's history."
         actions={
           <>
-            <LinkButton href={`/machines/${machineId}/history?add=entry`} variant="primary">
-              <Icon name="plus" /> Add history entry
-            </LinkButton>
+            {canContributeTo(machine) && (
+              <LinkButton href={`/machines/${machineId}/history?add=entry`} variant="primary">
+                <Icon name="plus" /> Add history entry
+              </LinkButton>
+            )}
             {canEditLibrary && (
               <LinkButton href="/admin/machines">
                 <Icon name="layers" /> Open Machine library

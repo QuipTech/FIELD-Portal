@@ -6,8 +6,12 @@ import { CaseEventRow } from './types/supportCaseRows';
 export const SUPPORT_CASE_AUDIT_ENTITY = 'support_case';
 
 export interface CaseChange {
-  // The case's organisation: the audit entry lands in its audit log.
+  // The case's organisation: its thread lines live there, and so does the
+  // audit entry, unless auditTenantId says otherwise.
   tenantId: string;
+  // Someone raising or replying to a case on a machine shared with them
+  // is audited in their own organisation (they can't write the owner's log).
+  auditTenantId?: string;
   caseId: string;
   caseNumber: number;
   actorId: string;
@@ -34,7 +38,7 @@ export const recordCaseChange = async (
     );
   }
   await insertAuditLog(client, {
-    tenantId: change.tenantId,
+    tenantId: change.auditTenantId ?? change.tenantId,
     userId: change.actorId,
     action: change.action,
     entityType: SUPPORT_CASE_AUDIT_ENTITY,

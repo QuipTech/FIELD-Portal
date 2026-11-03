@@ -3,9 +3,8 @@ import { OperatingStatus } from './types/machineFleetResponse';
 import { CatalogModelRow } from './types/machineFleetRows';
 import {
   MachineScope,
-  machineInScopeSql,
-  toScopeParam,
-} from '../machineGroups/access/machineScope';
+  visibleMachineSql,
+} from '../machineSharing/access/machineScope';
 
 // The sites, makes and classes of the machines the caller can see, for
 // the filter panel.
@@ -14,8 +13,8 @@ export const listFleetFacets = async (
   tenantId: string,
   scope: MachineScope,
 ) => {
-  const params = [tenantId, toScopeParam(scope)];
-  const visible = `m.tenant_id = $1 AND m.deleted_at IS NULL AND ${machineInScopeSql('m', '$2')}`;
+  const params = [tenantId];
+  const visible = `m.deleted_at IS NULL AND ${visibleMachineSql('m', '$1', scope)}`;
   const sites = await client.query<{ site: string }>(
     `SELECT DISTINCT m.site FROM machines m
      WHERE ${visible} AND m.site IS NOT NULL AND m.site <> ''
@@ -90,13 +89,12 @@ export const insertMachine = async (
     site: string | null;
     operatingHours: number | null;
     status: OperatingStatus;
-    groupId: string | null;
   },
 ): Promise<string> => {
   const result = await client.query<{ id: string }>(
     `INSERT INTO machines (tenant_id, created_by, manufacturer_id, model_id, serial_number,
-                           asset_number, site, operating_hours, operating_hours_read_at, status, group_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::integer, CASE WHEN $8::integer IS NULL THEN NULL ELSE now() END, $9, $10)
+                           asset_number, site, operating_hours, operating_hours_read_at, status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::integer, CASE WHEN $8::integer IS NULL THEN NULL ELSE now() END, $9)
      RETURNING id`,
     [
       params.tenantId,
@@ -108,7 +106,6 @@ export const insertMachine = async (
       params.site,
       params.operatingHours,
       params.status,
-      params.groupId,
     ],
   );
   return result.rows[0].id;

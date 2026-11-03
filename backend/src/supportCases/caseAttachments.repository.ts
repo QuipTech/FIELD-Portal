@@ -65,17 +65,21 @@ export const linkAttachmentsToMessage = async (
   return result.rowCount ?? 0;
 };
 
+// One case's messages' attachments. Not filtered on tenant_id: on a shared
+// machine's case they can sit in the raising organisation (uploaded before
+// the case existed) while the case is the owner's; RLS shows them to
+// whoever can see the case.
 export const listMessageAttachments = async (
   client: PoolClient,
-  tenantId: string,
+  caseId: string,
   messageIds: string[],
 ): Promise<CaseAttachmentRow[]> => {
   if (!messageIds.length) return [];
   const result = await client.query<CaseAttachmentRow>(
     `SELECT ${ATTACHMENT_COLUMNS} FROM support_attachments
-     WHERE tenant_id = $1 AND message_id = ANY($2::uuid[]) AND storage_key IS NOT NULL
+     WHERE support_case_id = $1 AND message_id = ANY($2::uuid[]) AND storage_key IS NOT NULL
      ORDER BY created_at, id`,
-    [tenantId, messageIds],
+    [caseId, messageIds],
   );
   return result.rows;
 };
