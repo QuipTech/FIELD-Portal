@@ -77,7 +77,7 @@ const MachineHistoryPage = () => {
     const outcome = await createEntry(entry);
     setIsAdding(false);
     if (outcome.kind === "offline") notify("Saved offline — syncs when back in range");
-    else if (outcome.missingPhotos > 0) notifyError(`Entry saved, but ${outcome.missingPhotos} photo(s) didn't upload.`);
+    else if (outcome.missingFiles > 0) notifyError(`Entry saved, but ${outcome.missingFiles} file(s) didn't upload.`);
     else notify("History entry saved");
   };
 

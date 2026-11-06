@@ -15,6 +15,15 @@ export interface HistoryPhoto {
   url: string;
 }
 
+export interface HistoryDocument {
+  id: string;
+  fileName: string;
+  contentType: string;
+  // Signed, valid 15 minutes; null until the entry is on the server.
+  url: string | null;
+  downloadUrl: string | null;
+}
+
 // "synced" is on the server; "saving" is an optimistic entry awaiting the
 // POST; "offline" is queued on this device until the connection is back.
 export type HistorySyncState = "synced" | "saving" | "offline";
@@ -31,6 +40,7 @@ export interface HistoryEntry {
   operatingHours: number | null;
   downtimeHours: number | null;
   photos: HistoryPhoto[];
+  documents: HistoryDocument[];
   syncState: HistorySyncState;
 }
 
@@ -68,6 +78,8 @@ export interface NewHistoryEntry {
   componentReplaced: boolean;
   description: string;
   photos: File[];
+  // Absent on entries queued offline before documents existed.
+  documents?: File[];
   operatingHours: number | null;
   downtimeHours: number | null;
 }

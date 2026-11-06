@@ -1,6 +1,7 @@
 import { toLifecycleState } from '../machineLifecycle/lifecycleTransitions';
 import { StorageService } from '../storage/storage.service';
 import { toMachinePhoto } from './machinePhotoMapper';
+import { toMachineDocumentFile } from './machineDocumentMapper';
 import {
   HistoryEntryRow,
   MachineDetailRow,
@@ -83,5 +84,10 @@ export const toHistoryEntry = async (
     row.downtime_hours === null ? null : Number(row.downtime_hours),
   photos: await Promise.all(
     row.photos.map((photo) => toMachinePhoto(storageService, photo)),
+  ),
+  documents: await Promise.all(
+    row.documents.map((document) =>
+      toMachineDocumentFile(storageService, document),
+    ),
   ),
 });

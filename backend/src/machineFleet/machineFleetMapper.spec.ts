@@ -21,6 +21,7 @@ const machineRow = (
   owning_organisation_name: 'Pit Crew',
   access_level: 'owner',
   is_shared: false,
+  app_connected: false,
   groups: [],
   photo_storage_key: null,
   ...overrides,
@@ -45,6 +46,7 @@ describe('toFleetMachine', () => {
       groups: [],
       owningOrganisationName: 'Pit Crew',
       isShared: false,
+      appConnected: false,
       accessLevel: 'owner',
     });
   });

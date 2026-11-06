@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { SkipThrottle, ThrottlerGuard } from '@nestjs/throttler';
 import { BIOMETRIC_SIGN_IN_THROTTLER } from '../auth/biometricKeys/biometricSignInThrottle';
+import { DEVICE_PAIRING_THROTTLER } from '../machineControl/pairing/devicePairingThrottle';
 import { Request } from 'express';
 import { DemoRequestsService } from './demoRequests.service';
 import { CreateDemoRequestDto } from './dto/createDemoRequestDto';
@@ -21,7 +22,10 @@ const USER_AGENT_MAX = 512;
 // CORS for /public/* is the marketing site only (publicOrigins.ts).
 @Controller('public/demo-requests')
 @UseGuards(ThrottlerGuard)
-@SkipThrottle({ [BIOMETRIC_SIGN_IN_THROTTLER.name]: true })
+@SkipThrottle({
+  [BIOMETRIC_SIGN_IN_THROTTLER.name]: true,
+  [DEVICE_PAIRING_THROTTLER.name]: true,
+})
 export class PublicDemoRequestsController {
   constructor(private readonly demoRequestsService: DemoRequestsService) {}
 

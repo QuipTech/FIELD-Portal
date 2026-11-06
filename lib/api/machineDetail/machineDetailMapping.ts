@@ -54,6 +54,13 @@ export const toHistoryEntry = (entry: LiveHistoryEntry): HistoryEntry => {
       contentType: photo.contentType,
       url: photo.signedUrl,
     })),
+    documents: (entry.documents ?? []).map((document) => ({
+      id: document.id,
+      fileName: document.fileName,
+      contentType: document.contentType,
+      url: document.signedUrl,
+      downloadUrl: document.downloadUrl,
+    })),
     syncState: "synced",
   };
 };

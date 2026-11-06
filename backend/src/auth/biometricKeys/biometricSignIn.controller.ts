@@ -8,6 +8,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { SkipThrottle, ThrottlerGuard } from '@nestjs/throttler';
+import { DEVICE_PAIRING_THROTTLER } from '../../machineControl/pairing/devicePairingThrottle';
 import { DEMO_REQUEST_THROTTLER } from '../../demoRequests/demoRequestsThrottle';
 import { BiometricSignInService } from './biometricSignIn.service';
 import {
@@ -19,7 +20,10 @@ import {
 // Only the biometric limit applies here (biometricSignInThrottle.ts).
 @Controller('auth/biometric')
 @UseGuards(ThrottlerGuard)
-@SkipThrottle({ [DEMO_REQUEST_THROTTLER.name]: true })
+@SkipThrottle({
+  [DEMO_REQUEST_THROTTLER.name]: true,
+  [DEVICE_PAIRING_THROTTLER.name]: true,
+})
 export class BiometricSignInController {
   constructor(private readonly signIn: BiometricSignInService) {}
 

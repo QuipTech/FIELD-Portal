@@ -23,6 +23,8 @@ import {
   updateSnapshotRequest,
   uploadGalleryPhotoRequest,
 } from "../machineConfigurationApi";
+import { deleteMachineDocumentRequest, listMachineDocumentsRequest, uploadMachineDocumentRequest } from "../machineDocumentsApi";
+import { documentTypeForEntry } from "../../types/machineDocument";
 import { toCreateHistoryRequest, toGalleryPhoto, toHistoryEntry, toMachine } from "./machineDetailMapping";
 
 // A list the backend can't serve (an older backend without the endpoint
@@ -96,9 +98,26 @@ export const machineDetailService: MachineDetailService = {
     const target = { machineId, entryId: created.id };
     const uploads = await Promise.allSettled(entry.photos.map((file) => uploadMachinePhotoRequest(accessToken, target, file)));
     const photos = uploads.flatMap((upload) => (upload.status === "fulfilled" ? [upload.value.photo] : []));
-    return toHistoryEntry({ ...created, photos: [...created.photos, ...photos] });
+    const documentUploads = await Promise.allSettled(
+      (entry.documents ?? []).map((file) =>
+        uploadMachineDocumentRequest(accessToken, machineId, file, {
+          documentType: documentTypeForEntry(entry.type),
+          historyEntryId: created.id,
+        }),
+      ),
+    );
+    const documents = documentUploads.flatMap((upload) => (upload.status === "fulfilled" ? [upload.value] : []));
+    return toHistoryEntry({ ...created, photos: [...created.photos, ...photos], documents: [...(created.documents ?? []), ...documents] });
   },
 
   deleteHistoryPhoto: (machineId, entryId, photoId) =>
     deleteMachinePhotoRequest(requireAccessToken(), { machineId, entryId, photoId }),
+
+  listDocuments: (machineId) => emptyWhenMissing(listMachineDocumentsRequest(requireAccessToken(), machineId)),
+
+  uploadDocument: async (machineId, file, documentType, onProgress) => {
+    await uploadMachineDocumentRequest(requireAccessToken(), machineId, file, { documentType }, onProgress);
+  },
+
+  deleteDocument: (machineId, documentId) => deleteMachineDocumentRequest(requireAccessToken(), machineId, documentId),
 };

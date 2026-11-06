@@ -2,6 +2,7 @@
 
 import { useState, type MouseEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Icon } from "@/components/icons/icon";
 import { Tag } from "@/components/ui/tag";
 import { Button } from "@/components/ui/button";
@@ -9,9 +10,13 @@ import { MachineSharingBadges } from "@/components/machines/machineSharingBadges
 import { Table, TableHeaderRow, TableHeaderCell, TableRow, TableCell } from "@/components/ui/table";
 import { ActivateMachineDialog, activationActionFor } from "@/components/machines/activateMachineDialog";
 import { BulkActivateDialog } from "@/components/machines/bulkActivateDialog";
+import { ConnectMachineAppDialog } from "@/components/machines/machineApp/connectMachineAppDialog";
 import { getMachineStatusMeta, toMachineStatus } from "@/lib/format/machineStatus";
+import { canContributeTo } from "@/lib/machineDetail/machineAccessRules";
+import { machineAppPagePath } from "@/lib/types/machineAppConnection";
 import type { FleetMachine } from "@/lib/types/machineFleet";
 import { MachinesBulkBar } from "./machinesBulkBar";
+import { ConnectMachineAppButton } from "./connectMachineAppButton";
 
 interface MachinesTableProps {
   machines: FleetMachine[];
@@ -28,7 +33,9 @@ const canActivate = (machine: FleetMachine) =>
   Boolean(machine.availableActions?.some((action) => action === "activate" || action === "reactivate"));
 
 export const MachinesTable = ({ machines, emptyMessage, onChanged }: MachinesTableProps) => {
+  const router = useRouter();
   const [activating, setActivating] = useState<FleetMachine | null>(null);
+  const [connecting, setConnecting] = useState<FleetMachine | null>(null);
   // Machines ticked for activating together.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkActivating, setIsBulkActivating] = useState(false);
@@ -77,7 +84,7 @@ export const MachinesTable = ({ machines, emptyMessage, onChanged }: MachinesTab
           <TableHeaderCell>Site</TableHeaderCell>
           <TableHeaderCell>Hours</TableHeaderCell>
           <TableHeaderCell flex={0.9}>Status</TableHeaderCell>
-          <TableHeaderCell flex={0.9}> </TableHeaderCell>
+          <TableHeaderCell flex={2.2}> </TableHeaderCell>
         </TableHeaderRow>
         {machines.length === 0 ? (
           <div className="flex flex-1 items-center justify-center p-10 text-center text-[15px] text-mutedGray">
@@ -118,11 +125,17 @@ export const MachinesTable = ({ machines, emptyMessage, onChanged }: MachinesTab
                   <TableCell flex={0.9}>
                     <Tag tone={status.tone}>{status.label}</Tag>
                   </TableCell>
-                  <TableCell flex={0.9}>
+                  <TableCell flex={2.2} className="flex flex-wrap items-center justify-end gap-1.5 !overflow-visible">
                     {canActivate(machine) && (
                       <Button size="sm" variant="primary" onClick={(event) => startActivating(event, machine)}>
                         Activate
                       </Button>
+                    )}
+                    {canContributeTo(machine) && (
+                      <ConnectMachineAppButton
+                        isConnected={Boolean(machine.appConnected)}
+                        onClick={() => (machine.appConnected ? router.push(machineAppPagePath(machine.id)) : setConnecting(machine))}
+                      />
                     )}
                   </TableCell>
                 </TableRow>
@@ -131,6 +144,14 @@ export const MachinesTable = ({ machines, emptyMessage, onChanged }: MachinesTab
           })
         )}
       </Table>
+      {connecting && (
+        <ConnectMachineAppDialog
+          machineId={connecting.id}
+          machineLabel={connecting.label}
+          onConnected={() => router.push(machineAppPagePath(connecting.id))}
+          onClose={() => setConnecting(null)}
+        />
+      )}
       {isBulkActivating && (
         <BulkActivateDialog
           machines={selectedToActivate.map((machine) => ({ id: machine.id, lifecycleState: machine.lifecycleState! }))}
