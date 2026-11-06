@@ -2,6 +2,7 @@ import { MachineAccessLevel } from '../../machineSharing/access/machineAccess';
 import { MachineGroupRef } from '../../machineSharing/types/machineGroupTypes';
 import { LifecycleState } from '../../machineLifecycle/lifecycleTransitions';
 import { AssignedTechnician } from '../../machineAssignments/assignedTechnicianMapper';
+import { MachineDocumentType } from '../dto/machineDocumentDtos';
 
 export interface MachineSummary {
   id: string;
@@ -68,6 +69,30 @@ export interface HistoryEntry {
   operatingHours: number | null;
   downtimeHours: number | null;
   photos: MachinePhoto[];
+  documents: MachineDocumentFile[];
+}
+
+export interface MachineDocumentFile {
+  id: string;
+  historyEntryId: string | null;
+  documentType: MachineDocumentType;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedAt: string;
+  // Both signed on read, valid 15 minutes. signedUrl opens the file in the
+  // browser where it can; downloadUrl saves it under its original name.
+  signedUrl: string;
+  downloadUrl: string;
+}
+
+// A row on the machine's Documents tab.
+export interface MachineDocument extends MachineDocumentFile {
+  // The person, or their organisation on a shared machine. Null once the
+  // account has been deleted.
+  uploadedByName: string | null;
+  // The owning organisation can delete any file; a share only its own uploads.
+  canDelete: boolean;
 }
 
 export interface GalleryPhoto {

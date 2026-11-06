@@ -39,7 +39,18 @@ export const listHistoryEntries = async (
               WHERE a.history_entry_id = e.id AND a.tenant_id = $2
                 AND a.file_type = 'photo' AND a.deleted_at IS NULL
                 AND a.storage_key IS NOT NULL
-            ), '[]'::json) AS photos
+            ), '[]'::json) AS photos,
+            COALESCE((
+              SELECT json_agg(json_build_object(
+                       'id', d.id, 'history_entry_id', d.history_entry_id,
+                       'document_type', d.document_type, 'storage_key', d.storage_key,
+                       'file_name', d.file_name, 'content_type', d.content_type,
+                       'size_bytes', d.size_bytes, 'created_at', d.created_at)
+                       ORDER BY d.created_at)
+              FROM machine_documents d
+              WHERE d.history_entry_id = e.id AND d.tenant_id = $2
+                AND d.deleted_at IS NULL
+            ), '[]'::json) AS documents
      FROM technical_history_entries e
      LEFT JOIN users u ON u.id = e.created_by
      LEFT JOIN installed_components c ON c.id = e.installed_component_id

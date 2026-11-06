@@ -2,6 +2,7 @@ import { BadRequestException, PayloadTooLargeException } from '@nestjs/common';
 import {
   AVATAR_RULE,
   DOCUMENT_RULE,
+  MACHINE_DOCUMENT_RULE,
   PHOTO_RULE,
   validateIncomingFile,
 } from './storageFileRules';
@@ -17,6 +18,35 @@ const PDF = [0x25, 0x50, 0x44, 0x46, 0x2d];
 const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d];
 const JPEG = [0xff, 0xd8, 0xff, 0xe0];
 const HEIC = [0, 0, 0, 0x18, ...Buffer.from('ftypheic')];
+
+describe('MACHINE_DOCUMENT_RULE', () => {
+  it('accepts reports and scans', () => {
+    expect(
+      validateIncomingFile(file('service.pdf', PDF), MACHINE_DOCUMENT_RULE)
+        .contentType,
+    ).toBe('application/pdf');
+    expect(
+      validateIncomingFile(file('scan.png', PNG), MACHINE_DOCUMENT_RULE)
+        .contentType,
+    ).toBe('image/png');
+  });
+
+  it('refuses a renamed executable and anything over 20 MB', () => {
+    const executable = [0x4d, 0x5a, 0x90, 0x00];
+    expect(() =>
+      validateIncomingFile(
+        file('report.pdf', executable),
+        MACHINE_DOCUMENT_RULE,
+      ),
+    ).toThrow(BadRequestException);
+    expect(() =>
+      validateIncomingFile(
+        file('big.pdf', PDF, 20 * 1024 * 1024 + 1),
+        MACHINE_DOCUMENT_RULE,
+      ),
+    ).toThrow(PayloadTooLargeException);
+  });
+});
 
 describe('validateIncomingFile', () => {
   it('stores the content type for the extension, not the client’s MIME type', () => {

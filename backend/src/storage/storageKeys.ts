@@ -46,6 +46,14 @@ export const buildMachinePhotoKey = (
 ) =>
   `photos/${tenantId}/${machineId}/${randomUUID()}-${toSafeFileName(fileName)}`;
 
+// Under documents/, which the backend's IAM policy already allows.
+export const buildMachineDocumentKey = (
+  tenantId: string,
+  machineId: string,
+  fileName: string,
+) =>
+  `documents/${tenantId}/machines/${machineId}/${randomUUID()}-${toSafeFileName(fileName)}`;
+
 // One avatar per user: a new upload with the same extension overwrites it.
 export const buildAvatarKey = (
   tenantId: string,

@@ -1,5 +1,6 @@
 import type { HistoryEntryType, NewHistoryEntry } from "@/lib/types/historyEntry";
 import type { SearchSelectOption } from "@/components/ui/searchSelect";
+import { MAX_DOCUMENT_BYTES } from "@/lib/types/machineDocument";
 
 // The form as typed; numbers stay strings until they're validated.
 export interface HistoryEntryDraft {
@@ -8,16 +9,18 @@ export interface HistoryEntryDraft {
   componentReplaced: boolean;
   description: string;
   photos: File[];
+  documents: File[];
   hours: string;
   downtime: string;
 }
 
-export type HistoryEntryErrors = Partial<Record<"type" | "description" | "photos" | "hours" | "downtime", string>>;
+export type HistoryEntryErrors = Partial<Record<"type" | "description" | "photos" | "documents" | "hours" | "downtime", string>>;
 
 export const DESCRIPTION_MAX_LENGTH = 5000;
 export const MAX_PHOTOS = 10;
 export const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 export const PHOTO_ACCEPT = ".jpg,.jpeg,.png,.heic";
+export const MAX_ENTRY_DOCUMENTS = 10;
 const MAX_DOWNTIME_HOURS = 10_000;
 
 const parseHours = (value: string): number | null => (value.trim() ? Number(value.replace(/,/g, "")) : null);
@@ -31,6 +34,7 @@ export const validateHistoryEntryDraft = (draft: HistoryEntryDraft): HistoryEntr
   if (!draft.description.trim()) errors.description = "Describe what happened.";
   else if (draft.description.length > DESCRIPTION_MAX_LENGTH) errors.description = `Keep it under ${DESCRIPTION_MAX_LENGTH} characters.`;
   if (draft.photos.some((photo) => photo.size > MAX_PHOTO_BYTES)) errors.photos = "Each photo must be 10 MB or smaller.";
+  if (draft.documents.some((document) => document.size > MAX_DOCUMENT_BYTES)) errors.documents = "Each document must be 20 MB or smaller.";
   if (!isValidHours(parseHours(draft.hours))) errors.hours = "Enter the hour meter reading as a number.";
   if (!isValidHours(parseHours(draft.downtime), MAX_DOWNTIME_HOURS)) errors.downtime = "Enter downtime in hours, e.g. 3.5.";
   return errors;
@@ -46,6 +50,7 @@ export const toNewHistoryEntry = (draft: HistoryEntryDraft, componentOptions: Se
     componentReplaced: draft.type === "repair" && Boolean(component) && draft.componentReplaced,
     description: draft.description.trim(),
     photos: draft.photos,
+    documents: draft.documents,
     operatingHours: parseHours(draft.hours),
     downtimeHours: parseHours(draft.downtime),
   };

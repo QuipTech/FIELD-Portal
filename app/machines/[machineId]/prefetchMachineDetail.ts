@@ -7,6 +7,7 @@ import { DEFAULT_HISTORY_FILTERS, HISTORY_PAGE_SIZE } from "./history/historyPag
 // Requests a visible tab already made are shared, not repeated.
 export const prefetchMachineDetail = (service: MachineDetailService, machineId: string): void => {
   prefetchCached(machineCacheKeys.photos(machineId), () => service.listPhotos(machineId));
+  prefetchCached(machineCacheKeys.documents(machineId), () => service.listDocuments(machineId));
   prefetchCached(machineCacheKeys.systems(machineId), () => service.listSystems(machineId));
   prefetchCached(machineCacheKeys.components(machineId), () => service.listComponents(machineId, null));
   prefetchCached(machineCacheKeys.snapshots(machineId), () => service.listSnapshots(machineId));

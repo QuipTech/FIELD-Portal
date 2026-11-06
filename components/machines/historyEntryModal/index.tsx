@@ -10,6 +10,7 @@ import type { NewHistoryEntry } from "@/lib/types/historyEntry";
 import { EntryFormField } from "./entryFormField";
 import { EntryTypeSegmentedControl } from "./entryTypeSegmentedControl";
 import { HistoryMediaPicker } from "./historyMediaPicker";
+import { HistoryDocumentPicker } from "./historyDocumentPicker";
 import {
   DESCRIPTION_MAX_LENGTH,
   toNewHistoryEntry,
@@ -38,6 +39,7 @@ export const HistoryEntryModal = (props: HistoryEntryModalProps) => {
     componentReplaced: false,
     description: initialDescription,
     photos: [],
+    documents: [],
     hours: defaultHours === null ? "" : String(defaultHours),
     downtime: "",
   });
@@ -102,6 +104,9 @@ export const HistoryEntryModal = (props: HistoryEntryModalProps) => {
         </EntryFormField>
         <EntryFormField label="Media" error={errors.photos}>
           <HistoryMediaPicker photos={draft.photos} onChange={(photos) => update({ photos })} />
+        </EntryFormField>
+        <EntryFormField label="Documents" error={errors.documents}>
+          <HistoryDocumentPicker documents={draft.documents} onChange={(documents) => update({ documents })} />
         </EntryFormField>
         <div className="flex gap-3">
           <EntryFormField label="Hours" htmlFor="history-entry-hours" error={errors.hours} className="flex-1">

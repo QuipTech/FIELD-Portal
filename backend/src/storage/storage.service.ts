@@ -7,6 +7,7 @@ import {
   CASE_ATTACHMENT_RULE,
   DOCUMENT_RULE,
   LOGO_RULE,
+  MACHINE_DOCUMENT_RULE,
   PHOTO_RULE,
   validateIncomingFile,
 } from './storageFileRules';
@@ -16,6 +17,7 @@ import {
   buildCaseAttachmentKey,
   buildDataExportKey,
   buildDocumentKey,
+  buildMachineDocumentKey,
   buildMachinePhotoKey,
   isTenantOwnedKey,
 } from './storageKeys';
@@ -55,6 +57,20 @@ export class StorageService {
     const { contentType } = validateIncomingFile(file, PHOTO_RULE);
     return this.storeFile(
       buildMachinePhotoKey(tenantId, machineId, file!.originalname),
+      file!,
+      contentType,
+    );
+  };
+
+  // tenantId is the machine's owning organisation.
+  uploadMachineDocument = (
+    file: IncomingFile | undefined,
+    tenantId: string,
+    machineId: string,
+  ): Promise<StoredFile> => {
+    const { contentType } = validateIncomingFile(file, MACHINE_DOCUMENT_RULE);
+    return this.storeFile(
+      buildMachineDocumentKey(tenantId, machineId, file!.originalname),
       file!,
       contentType,
     );

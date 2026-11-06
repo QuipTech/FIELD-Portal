@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export type MachineTab = "components" | "history" | "config-history" | "manuals" | "cases";
+export type MachineTab = "components" | "history" | "documents" | "machine-app" | "config-history" | "manuals" | "cases";
 
 interface MachineTabsProps {
   machineId: string;
@@ -14,6 +14,8 @@ export const MachineTabs = ({ machineId, active, openCaseCount }: MachineTabsPro
   const tabs: { key: MachineTab; label: string; href: string }[] = [
     { key: "components", label: "Components", href: `/machines/${machineId}` },
     { key: "history", label: "History", href: `/machines/${machineId}/history` },
+    { key: "documents", label: "Documents", href: `/machines/${machineId}/documents` },
+    { key: "machine-app", label: "Machine app", href: `/machines/${machineId}/machine-app` },
     { key: "config-history", label: "Configuration history", href: `/machines/${machineId}/config-history` },
     { key: "manuals", label: "Manuals", href: `/machines/${machineId}/manuals` },
     { key: "cases", label: "Open cases", href: `/machines/${machineId}/cases` },

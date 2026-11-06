@@ -18,6 +18,10 @@ const USER_DATA_QUERIES: Record<string, string> = {
   uploadedPhotos: `SELECT id, history_entry_id, file_name, content_type, size_bytes, created_at
                    FROM technical_attachments
                    WHERE uploaded_by = $1 AND deleted_at IS NULL ORDER BY created_at`,
+  uploadedMachineDocuments: `SELECT id, machine_id, history_entry_id, document_type, file_name,
+                               content_type, size_bytes, created_at
+                             FROM machine_documents
+                             WHERE uploaded_by = $1 AND deleted_at IS NULL ORDER BY created_at`,
   caseActivity: `SELECT u.id, u.support_case_id, c.subject AS case_subject, u.note, u.created_at
                  FROM support_updates u JOIN support_cases c ON c.id = u.support_case_id
                  WHERE u.created_by = $1 ORDER BY u.created_at`,

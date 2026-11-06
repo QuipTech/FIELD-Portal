@@ -8,6 +8,7 @@ import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import { formatDayMonth } from "@/lib/format/elapsedTimeLabel";
 import { historyEntryTypeMeta, type HistoryEntry, type HistoryPhoto, type HistorySyncState } from "@/lib/types/historyEntry";
 import { HistoryPhotoLightbox } from "./historyPhotoLightbox";
+import { HistoryEntryDocuments } from "./historyEntryDocuments";
 
 interface HistoryTimelineEntryProps {
   entry: HistoryEntry;
@@ -77,6 +78,7 @@ export const HistoryTimelineEntry = ({ entry, onDeletePhoto }: HistoryTimelineEn
           ))}
         </div>
       )}
+      <HistoryEntryDocuments documents={entry.documents} />
       {photoIndex !== null && (
         <HistoryPhotoLightbox
           photos={entry.photos}

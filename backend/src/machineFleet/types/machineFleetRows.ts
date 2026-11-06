@@ -16,6 +16,7 @@ export interface FleetMachineRow {
   owning_organisation_name: string;
   access_level: MachineAccessLevel;
   is_shared: boolean;
+  app_connected: boolean;
   groups: MachineGroupRef[];
   photo_storage_key: string | null;
 }

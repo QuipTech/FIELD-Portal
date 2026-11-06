@@ -33,6 +33,8 @@ export interface FleetMachine {
   // The organisation that owns it; isShared when that isn't the caller's.
   owningOrganisationName: string;
   isShared: boolean;
+  // Its tablet has paired with the machine app.
+  appConnected: boolean;
   // 'owner' for the caller's own machines; a shared one's 'view' or
   // 'contribute' (adds history, photos and cases).
   accessLevel: MachineAccessLevel;

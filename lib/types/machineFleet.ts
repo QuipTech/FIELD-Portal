@@ -19,6 +19,8 @@ export interface FleetMachine extends MachineSharing {
   lifecycleState?: LifecycleState;
   // What the caller may do next; empty without machine.lifecycle.
   availableActions?: LifecycleAction[];
+  // Its tablet has paired with the machine app. Missing from older backends.
+  appConnected?: boolean;
 }
 
 export interface FeaturedDownMachine {

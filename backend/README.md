@@ -594,6 +594,19 @@ the API runs normally.
     `POST …/history/:entryId/photos` (`history.create`);
     `DELETE …/history/:entryId/photos/:photoId` (`history.delete_photos`)
     — a **soft** delete: the row and S3 object stay for the audit trail.
+  - `GET /machines/:machineId/documents` (`machine.view`, optional `?type=`);
+    `POST …/documents` (`history.create`; multipart `file`, `documentType`,
+    optional `historyEntryId`); `DELETE …/documents/:documentId`
+    (`machine.manage`, soft delete: the owning organisation any file, a
+    `contribute` share only its own uploads). Service
+    reports, inspections, certificates and others: PDF, Word, JPG, PNG or
+    HEIC, up to 20 MB, stored under `documents/{tenantId}/machines/`.
+  - `GET /machines/:machineId/app-connection` (`machine.view`);
+    `POST …/app-connection/pairing-code` and `DELETE …/app-connection`
+    (`machine.manage`; own machines and `contribute` shares, active only).
+    `POST /mc/device/pair` is the tablet's signed-out call: `code`, optional
+    `serialNumber`, `platform`, `appVersion`; returns its `deviceToken` once.
+    Limited to 5 tries a minute per IP.
   - `PATCH /users/me` (first/last name), `POST /users/me/avatar`.
 - **Uploads** go S3 first, then the database; if the database write fails
   the object is deleted again. Upload responses include `file:

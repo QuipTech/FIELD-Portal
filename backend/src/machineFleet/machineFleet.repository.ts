@@ -31,6 +31,7 @@ export const FLEET_COLUMNS = `
   t.name AS owning_organisation_name,
   COALESCE(am.access_level, 'owner') AS access_level,
   COALESCE(am.is_shared, false) AS is_shared,
+  EXISTS (SELECT 1 FROM mc_devices d WHERE d.machine_id = m.id AND d.disabled_at IS NULL AND d.deleted_at IS NULL) AS app_connected,
   ${MACHINE_GROUPS_SQL} AS groups,
   ${MACHINE_PHOTO_KEY_SQL} AS photo_storage_key`;
 

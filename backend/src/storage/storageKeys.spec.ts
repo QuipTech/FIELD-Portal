@@ -3,6 +3,7 @@ import {
   buildDocumentKey,
   buildMachinePhotoKey,
   buildSharedDocumentKey,
+  buildMachineDocumentKey,
   isTenantOwnedKey,
   toSafeFileName,
 } from './storageKeys';
@@ -30,6 +31,17 @@ describe('storage keys', () => {
     // No path separators survive, so a name can't climb out of its folder.
     expect(toSafeFileName('../../etc/passwd')).not.toContain('/');
     expect(toSafeFileName('***')).toBe('file');
+  });
+});
+
+describe('buildMachineDocumentKey', () => {
+  it('stays inside the organisation’s own documents folder', () => {
+    const key = buildMachineDocumentKey(TENANT, 'machine-1', 'Report 1.pdf');
+    expect(key).toMatch(
+      new RegExp(`^documents/${TENANT}/machines/machine-1/.+-Report-1\\.pdf$`),
+    );
+    expect(isTenantOwnedKey(key, TENANT)).toBe(true);
+    expect(isTenantOwnedKey(key, OTHER_TENANT)).toBe(false);
   });
 });
 

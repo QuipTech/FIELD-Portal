@@ -8,7 +8,7 @@ import { HISTORY_SYNCED_EVENT, type HistorySyncedDetail } from "@/lib/machineDet
 import { toPendingHistoryEntry } from "@/lib/machineDetail/toPendingHistoryEntry";
 import { isOfflineError } from "@/lib/machineDetail/isOfflineError";
 
-export type SaveOutcome = { kind: "saved"; missingPhotos: number } | { kind: "offline" };
+export type SaveOutcome = { kind: "saved"; missingFiles: number } | { kind: "offline" };
 
 // Entries not on the server yet, shown above the timeline: optimistic ones
 // while their POST runs, and ones saved offline until they sync.
@@ -57,7 +57,8 @@ export const usePendingHistoryEntries = (
       const saved = await service.createHistoryEntry(machineId, entry);
       removePending(id);
       onSaved(saved);
-      return { kind: "saved", missingPhotos: entry.photos.length - saved.photos.length };
+      const fileCount = entry.photos.length + (entry.documents?.length ?? 0);
+      return { kind: "saved", missingFiles: fileCount - saved.photos.length - saved.documents.length };
     } catch (error) {
       if (isOfflineError(error)) return saveOffline(id, entry);
       removePending(id);

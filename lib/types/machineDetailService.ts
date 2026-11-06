@@ -3,6 +3,7 @@ import type { MachineComponent, MachineSystem } from "./machineComponent";
 import type { DiffExportFormat, Snapshot, SnapshotDiff } from "./configurationDiff";
 import type { OperatingStatus } from "./machineFleet";
 import type { HistoryAuthor, HistoryEntry, HistoryPage, HistoryQuery, NewHistoryEntry } from "./historyEntry";
+import type { MachineDocument, MachineDocumentType } from "./machineDocument";
 
 // Everything the machine detail screens read and write (see
 // lib/api/machineDetail/machineDetailService.ts).
@@ -23,4 +24,12 @@ export interface MachineDetailService {
   listHistoryAuthors: (machineId: string) => Promise<HistoryAuthor[]>;
   createHistoryEntry: (machineId: string, entry: NewHistoryEntry) => Promise<HistoryEntry>;
   deleteHistoryPhoto: (machineId: string, entryId: string, photoId: string) => Promise<void>;
+  listDocuments: (machineId: string) => Promise<MachineDocument[]>;
+  uploadDocument: (
+    machineId: string,
+    file: File,
+    documentType: MachineDocumentType,
+    onProgress?: (fraction: number) => void,
+  ) => Promise<void>;
+  deleteDocument: (machineId: string, documentId: string) => Promise<void>;
 }
