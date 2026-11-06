@@ -135,6 +135,12 @@ export interface CaseEvent {
   createdAt: string;
 }
 
+// A machine the New case form offers; sharedByOrganisationName is set for
+// one another organisation shares with the caller ('contribute').
+export interface CaseMachineOption extends CaseMachine {
+  sharedByOrganisationName: string | null;
+}
+
 export interface SupportCaseOptions {
-  machines: CaseMachine[];
+  machines: CaseMachineOption[];
 }

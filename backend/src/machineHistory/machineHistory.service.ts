@@ -1,35 +1,29 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { DatabaseService } from '../database/database.service';
 import * as authRepository from '../auth/auth.repository';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { StorageService } from '../storage/storage.service';
-import { componentBelongsToMachine } from '../machineConfiguration/machineComponents.repository';
+import { assertComponentOnMachine } from './assertComponentOnMachine';
 import { captureSnapshot } from '../machineConfiguration/snapshots.repository';
 import * as machineHistoryRepository from './machineHistory.repository';
 import * as historyEntriesRepository from './historyEntries.repository';
 import { signMachinePhoto } from '../machineFleet/machinePhotoUrl';
 import { listAssignedTechnicians } from '../machineAssignments/machineAssignments.repository';
 import { toAssignedTechnician } from '../machineAssignments/assignedTechnicianMapper';
-import { toHistoryEntry, toMachineDetail, toPersonName } from './machineHistoryMapper';
+import {
+  toHistoryEntry,
+  toMachineDetail,
+  toPersonName,
+} from './machineHistoryMapper';
 import { CreateHistoryEntryDto } from './dto/createHistoryEntryDto';
 import { ListHistoryQueryDto } from './dto/listHistoryQueryDto';
-import { MachineRow } from './types/machineHistoryRows';
+import { ACCESSIBLE_MACHINES } from '../machineSharing/access/machineScope';
+import {
+  assertMachineAccessible,
+  MACHINE_NOT_FOUND_MESSAGE,
+} from './assertMachineAccessible';
 import { HistoryEntry, MachineDetail } from './types/machineHistoryResponse';
-
-export const MACHINE_NOT_FOUND_MESSAGE = 'Machine not found.';
-const COMPONENT_NOT_FOUND_MESSAGE = "That component isn't installed on this machine.";
-
-// Throws 404 unless the machine exists in the caller's own organisation.
-export const assertMachineInTenant = async (
-  client: PoolClient,
-  tenantId: string,
-  machineId: string,
-): Promise<MachineRow> => {
-  const machine = await machineHistoryRepository.findMachine(client, tenantId, machineId);
-  if (!machine) throw new NotFoundException(MACHINE_NOT_FOUND_MESSAGE);
-  return machine;
-};
 
 @Injectable()
 export class MachineHistoryService {
@@ -38,14 +32,28 @@ export class MachineHistoryService {
     private readonly storageService: StorageService,
   ) {}
 
-  getMachine = (actor: AuthenticatedUser, machineId: string): Promise<MachineDetail> =>
-    this.databaseService.withTenant(actor.tenantId, async (client) => {
-      const row = await machineHistoryRepository.findMachineDetail(client, actor.tenantId, machineId);
+  getMachine = (
+    actor: AuthenticatedUser,
+    machineId: string,
+  ): Promise<MachineDetail> =>
+    this.databaseService.withActor(actor, async (client) => {
+      const row = await machineHistoryRepository.findMachineDetail(
+        client,
+        actor.tenantId,
+        machineId,
+        ACCESSIBLE_MACHINES,
+      );
       if (!row) throw new NotFoundException(MACHINE_NOT_FOUND_MESSAGE);
-      const technicians = await listAssignedTechnicians(client, actor.tenantId, machineId);
+      // A shared machine's people (owner, technicians) aren't the reader's to see.
+      const technicians = row.is_shared
+        ? []
+        : await listAssignedTechnicians(client, actor.tenantId, machineId);
       return {
         ...toMachineDetail(row),
-        photoUrl: await signMachinePhoto(this.storageService, row.photo_storage_key),
+        photoUrl: await signMachinePhoto(
+          this.storageService,
+          row.photo_storage_key,
+        ),
         assignedTechnicians: technicians.map(toAssignedTechnician),
       };
     });
@@ -55,52 +63,96 @@ export class MachineHistoryService {
     machineId: string,
     query: ListHistoryQueryDto = {},
   ): Promise<HistoryEntry[]> => {
-    const rows = await this.databaseService.withTenant(actor.tenantId, async (client) => {
-      await assertMachineInTenant(client, actor.tenantId, machineId);
-      return historyEntriesRepository.listHistoryEntries(client, actor.tenantId, machineId, {
-        entryType: query.type,
-        from: query.from,
-        to: query.to,
-        authorId: query.author,
-        limit: query.limit,
-        offset: query.offset,
-      });
+    const rows = await this.databaseService.withActor(actor, async (client) => {
+      const { access } = await assertMachineAccessible(client, machineId);
+      return historyEntriesRepository.listHistoryEntries(
+        client,
+        access.tenantId,
+        machineId,
+        {
+          entryType: query.type,
+          from: query.from,
+          to: query.to,
+          authorId: query.author,
+          limit: query.limit,
+          offset: query.offset,
+        },
+      );
     });
-    return Promise.all(rows.map((row) => toHistoryEntry(this.storageService, row)));
+    return Promise.all(
+      rows.map((row) => toHistoryEntry(this.storageService, row)),
+    );
   };
 
-  listAuthors = (actor: AuthenticatedUser, machineId: string): Promise<{ id: string; name: string }[]> =>
-    this.databaseService.withTenant(actor.tenantId, async (client) => {
-      await assertMachineInTenant(client, actor.tenantId, machineId);
-      const rows = await historyEntriesRepository.listHistoryAuthors(client, actor.tenantId, machineId);
-      return rows.map((row) => ({ id: row.id, name: toPersonName(row.first_name, row.last_name) }));
+  listAuthors = (
+    actor: AuthenticatedUser,
+    machineId: string,
+  ): Promise<{ id: string; name: string }[]> =>
+    this.databaseService.withActor(actor, async (client) => {
+      const { access } = await assertMachineAccessible(client, machineId);
+      const rows = await historyEntriesRepository.listHistoryAuthors(
+        client,
+        access.tenantId,
+        machineId,
+      );
+      return rows.map((row) => ({
+        id: row.id,
+        name: toPersonName(row.first_name, row.last_name),
+      }));
     });
 
   // Also records the hour-meter reading on the machine, and takes a
   // "component_replaced" snapshot for a repair that swapped a component.
-  createEntry = async (actor: AuthenticatedUser, machineId: string, dto: CreateHistoryEntryDto): Promise<HistoryEntry> => {
-    const row = await this.databaseService.withTenant(actor.tenantId, async (client) => {
-      await assertMachineInTenant(client, actor.tenantId, machineId);
-      await this.assertComponentOnMachine(client, actor.tenantId, machineId, dto.componentId);
-      const entryId = await historyEntriesRepository.insertHistoryEntry(client, {
-        tenantId: actor.tenantId,
+  // On a shared machine ('contribute') the entry belongs to the owning
+  // organisation, by the caller; the machine record and its configuration
+  // stay the owner's to change, so neither is touched.
+  createEntry = async (
+    actor: AuthenticatedUser,
+    machineId: string,
+    dto: CreateHistoryEntryDto,
+  ): Promise<HistoryEntry> => {
+    const row = await this.databaseService.withActor(actor, async (client) => {
+      const { access } = await assertMachineAccessible(
+        client,
         machineId,
-        userId: actor.userId,
-        entryType: dto.entryType,
-        description: dto.description,
-        componentId: dto.componentId ?? null,
-        operatingHours: dto.operatingHours ?? null,
-        downtimeHours: dto.downtimeHours ?? null,
+        'contribute',
+      );
+      await assertComponentOnMachine(client, {
+        tenantId: access.tenantId,
+        machineId,
+        componentId: dto.componentId,
       });
-      if (dto.operatingHours !== undefined) {
+      const entryId = await historyEntriesRepository.insertHistoryEntry(
+        client,
+        {
+          tenantId: access.tenantId,
+          machineId,
+          userId: actor.userId,
+          entryType: dto.entryType,
+          description: dto.description,
+          componentId: dto.componentId ?? null,
+          operatingHours: dto.operatingHours ?? null,
+          downtimeHours: dto.downtimeHours ?? null,
+        },
+      );
+      if (dto.operatingHours !== undefined && !access.isShared) {
         await historyEntriesRepository.recordOperatingHours(client, {
           tenantId: actor.tenantId,
           machineId,
           operatingHours: dto.operatingHours,
         });
       }
-      if (dto.entryType === 'repair' && dto.componentId && dto.componentReplaced) {
-        await captureSnapshot(client, { machineId, takenBy: actor.userId, trigger: 'component_replaced' });
+      if (
+        dto.entryType === 'repair' &&
+        dto.componentId &&
+        dto.componentReplaced &&
+        !access.isShared
+      ) {
+        await captureSnapshot(client, {
+          machineId,
+          takenBy: actor.userId,
+          trigger: 'component_replaced',
+        });
       }
       await authRepository.insertAuditLog(client, {
         tenantId: actor.tenantId,
@@ -108,22 +160,21 @@ export class MachineHistoryService {
         action: 'create',
         entityType: 'technical_history_entry',
         entityId: entryId,
-        metadata: { machineId, entryType: dto.entryType, componentId: dto.componentId ?? null },
+        metadata: {
+          machineId,
+          entryType: dto.entryType,
+          componentId: dto.componentId ?? null,
+          ...(access.isShared ? { owningOrganisationId: access.tenantId } : {}),
+        },
       });
-      const [created] = await historyEntriesRepository.listHistoryEntries(client, actor.tenantId, machineId, { entryId });
+      const [created] = await historyEntriesRepository.listHistoryEntries(
+        client,
+        access.tenantId,
+        machineId,
+        { entryId },
+      );
       return created;
     });
     return toHistoryEntry(this.storageService, row);
-  };
-
-  private assertComponentOnMachine = async (
-    client: PoolClient,
-    tenantId: string,
-    machineId: string,
-    componentId: string | undefined,
-  ): Promise<void> => {
-    if (!componentId) return;
-    const isOnMachine = await componentBelongsToMachine(client, { tenantId, machineId, componentId });
-    if (!isOnMachine) throw new BadRequestException(COMPONENT_NOT_FOUND_MESSAGE);
   };
 }

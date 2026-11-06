@@ -8,6 +8,10 @@ import {
   MessageRow,
   MessageSourceRow,
 } from './types/aiAssistantRows';
+import {
+  MachineScope,
+  visibleMachineSql,
+} from '../machineSharing/access/machineScope';
 
 const THREAD_LIST_LIMIT = 50;
 
@@ -18,16 +22,21 @@ const CONVERSATION_COLUMNS = `
   c.id, c.title, c.machine_id, c.updated_at,
   CASE WHEN m.id IS NULL THEN NULL ELSE ${MACHINE_LABEL_SQL} END AS machine_label`;
 
-const CONVERSATION_FROM = `
+// A thread's machine is only shown while it's in the caller's machine
+// scope (machineSharing/access, shared machines included; $tenantParam is
+// the caller's organisation); asking in a thread whose machine left the
+// scope is a 404 (AiAskContextService).
+const conversationFrom = (tenantParam: string, scope: MachineScope) => `
   FROM ai_conversations c
-  LEFT JOIN machines m ON m.id = c.machine_id AND m.tenant_id = c.tenant_id`;
+  LEFT JOIN machines m ON m.id = c.machine_id
+    AND ${visibleMachineSql('m', tenantParam, scope)}`;
 
 export const listConversations = async (
   client: PoolClient,
-  params: { tenantId: string; userId: string },
+  params: { tenantId: string; userId: string; scope: MachineScope },
 ): Promise<ConversationRow[]> => {
   const result = await client.query<ConversationRow>(
-    `SELECT ${CONVERSATION_COLUMNS} ${CONVERSATION_FROM}
+    `SELECT ${CONVERSATION_COLUMNS} ${conversationFrom('$1', params.scope)}
      WHERE c.tenant_id = $1 AND c.user_id = $2 AND c.deleted_at IS NULL
      ORDER BY c.updated_at DESC
      LIMIT ${THREAD_LIST_LIMIT}`,
@@ -38,10 +47,15 @@ export const listConversations = async (
 
 export const findConversation = async (
   client: PoolClient,
-  params: { tenantId: string; userId: string; conversationId: string },
+  params: {
+    tenantId: string;
+    userId: string;
+    conversationId: string;
+    scope: MachineScope;
+  },
 ): Promise<ConversationRow | null> => {
   const result = await client.query<ConversationRow>(
-    `SELECT ${CONVERSATION_COLUMNS} ${CONVERSATION_FROM}
+    `SELECT ${CONVERSATION_COLUMNS} ${conversationFrom('$2', params.scope)}
      WHERE c.id = $1 AND c.tenant_id = $2 AND c.user_id = $3
        AND c.deleted_at IS NULL`,
     [params.conversationId, params.tenantId, params.userId],

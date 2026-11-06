@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
 import { DatabaseService } from '../database/database.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
-import { assertMachineInTenant } from '../machineHistory/machineHistory.service';
+import { assertMachineAccessible } from '../machineHistory/assertMachineAccessible';
 import * as snapshotsRepository from './snapshots.repository';
 import { toSnapshot } from './machineConfigurationMapper';
 import { diffSnapshotItems } from './snapshotDiff';
@@ -39,20 +39,39 @@ export const requireSnapshot = async (
 export class SnapshotDiffService {
   constructor(private readonly databaseService: DatabaseService) {}
 
-  getDiff = (actor: AuthenticatedUser, target: DiffTarget): Promise<SnapshotDiff> =>
-    this.databaseService.withTenant(actor.tenantId, async (client) => {
-      await assertMachineInTenant(client, actor.tenantId, target.machineId);
-      const scope = { tenantId: actor.tenantId, machineId: target.machineId };
+  getDiff = (
+    actor: AuthenticatedUser,
+    target: DiffTarget,
+  ): Promise<SnapshotDiff> =>
+    this.databaseService.withActor(actor, async (client) => {
+      const { access } = await assertMachineAccessible(
+        client,
+        target.machineId,
+      );
+      const scope = { tenantId: access.tenantId, machineId: target.machineId };
       const [first, second] = await Promise.all([
         requireSnapshot(client, { ...scope, snapshotId: target.fromId }),
         requireSnapshot(client, { ...scope, snapshotId: target.toId }),
       ]);
-      const [older, newer] = first.taken_at <= second.taken_at ? [first, second] : [second, first];
+      const [older, newer] =
+        first.taken_at <= second.taken_at ? [first, second] : [second, first];
       const [olderItems, newerItems] = await Promise.all([
-        snapshotsRepository.listSnapshotItems(client, actor.tenantId, older.id),
-        snapshotsRepository.listSnapshotItems(client, actor.tenantId, newer.id),
+        snapshotsRepository.listSnapshotItems(
+          client,
+          access.tenantId,
+          older.id,
+        ),
+        snapshotsRepository.listSnapshotItems(
+          client,
+          access.tenantId,
+          newer.id,
+        ),
       ]);
-      return { from: toSnapshot(older), to: toSnapshot(newer), ...diffSnapshotItems(olderItems, newerItems) };
+      return {
+        from: toSnapshot(older),
+        to: toSnapshot(newer),
+        ...diffSnapshotItems(olderItems, newerItems),
+      };
     });
 
   exportDiff = async (
@@ -61,13 +80,24 @@ export class SnapshotDiffService {
     format: DiffExportFormat,
   ): Promise<DiffExportFile> => {
     const diff = await this.getDiff(actor, target);
-    const machineLabel = await this.databaseService.withTenant(actor.tenantId, async (client) => {
-      const machine = await assertMachineInTenant(client, actor.tenantId, target.machineId);
-      return `${machine.manufacturer_name} ${machine.model_name} · ${machine.label}`;
-    });
+    const machineLabel = await this.databaseService.withActor(
+      actor,
+      async (client) => {
+        const machine = await assertMachineAccessible(client, target.machineId);
+        return `${machine.manufacturer_name} ${machine.model_name} · ${machine.label}`;
+      },
+    );
     const fileName = `config-diff-${diff.from.takenAt.slice(0, 10)}-to-${diff.to.takenAt.slice(0, 10)}.${format}`;
     return format === 'csv'
-      ? { body: toDiffCsv(diff), contentType: 'text/csv; charset=utf-8', fileName }
-      : { body: await toDiffPdf(diff, machineLabel), contentType: 'application/pdf', fileName };
+      ? {
+          body: toDiffCsv(diff),
+          contentType: 'text/csv; charset=utf-8',
+          fileName,
+        }
+      : {
+          body: await toDiffPdf(diff, machineLabel),
+          contentType: 'application/pdf',
+          fileName,
+        };
   };
 }

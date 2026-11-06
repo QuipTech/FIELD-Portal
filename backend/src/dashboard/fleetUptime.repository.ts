@@ -1,24 +1,31 @@
 import { PoolClient } from 'pg';
+import {
+  MachineScope,
+  visibleMachineSql,
+} from '../machineSharing/access/machineScope';
 import { StatusEventRow } from './types/dashboardRows';
 
-// Reads machine_status_events (migration 0053), tenant-filtered.
+// Reads machine_status_events (migration 0053), tenant-filtered and
+// limited to machines in the caller's machine scope.
 
 // Status changes inside the window, plus each machine's last status
 // before it (its state when the window opens).
 export const listStatusEvents = async (
   client: PoolClient,
-  params: { tenantId: string; windowStart: Date },
+  params: { tenantId: string; windowStart: Date; scope: MachineScope },
 ): Promise<StatusEventRow[]> => {
   const result = await client.query<StatusEventRow>(
     `SELECT e.machine_id, e.status, e.changed_at
      FROM machine_status_events e
      JOIN machines m ON m.id = e.machine_id AND m.deleted_at IS NULL
-     WHERE e.tenant_id = $1 AND e.changed_at >= $2
+       AND ${visibleMachineSql('m', '$1', params.scope)}
+     WHERE e.tenant_id = m.tenant_id AND e.changed_at >= $2
      UNION ALL
      (SELECT DISTINCT ON (e.machine_id) e.machine_id, e.status, e.changed_at
       FROM machine_status_events e
       JOIN machines m ON m.id = e.machine_id AND m.deleted_at IS NULL
-      WHERE e.tenant_id = $1 AND e.changed_at < $2
+        AND ${visibleMachineSql('m', '$1', params.scope)}
+      WHERE e.tenant_id = m.tenant_id AND e.changed_at < $2
       ORDER BY e.machine_id, e.changed_at DESC)`,
     [params.tenantId, params.windowStart],
   );

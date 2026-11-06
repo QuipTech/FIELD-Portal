@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PaginationQueryDto } from '../../common/dto/paginationQueryDto';
-import { assertMachineInTenant } from '../../machineHistory/machineHistory.service';
+import { assertMachineAccessible } from '../../machineHistory/assertMachineAccessible';
+import { ACCESSIBLE_MACHINES } from '../../machineSharing/access/machineScope';
 import { DatabaseService } from '../../database/database.service';
 import { AuthenticatedUser } from '../../auth/types/authenticatedUser';
 import { KnowledgeAccessService } from '../access/knowledgeAccess.service';
@@ -65,7 +66,7 @@ export class MyKnowledgeService {
     query: PaginationQueryDto,
   ): Promise<Paged<MachineDocument>> => {
     await this.databaseService.withActor(actor, (client) =>
-      assertMachineInTenant(client, actor.tenantId, machineId),
+      assertMachineAccessible(client, machineId),
     );
     return this.listForMyMachines(
       actor,
@@ -78,8 +79,13 @@ export class MyKnowledgeService {
     query: ForMyMachinesQueryDto,
   ): Promise<Paged<MachineDocument>> => {
     const access = await this.knowledgeAccess.resolve(actor);
-    const rows = await this.databaseService.withActor(actor, (client) =>
-      myKnowledgeRepository.listDocumentsForMachines(client, access, query),
+    const rows = await this.databaseService.withActor(actor, async (client) =>
+      myKnowledgeRepository.listDocumentsForMachines(
+        client,
+        access,
+        query,
+        ACCESSIBLE_MACHINES,
+      ),
     );
     return {
       items: rows.map((row) => ({

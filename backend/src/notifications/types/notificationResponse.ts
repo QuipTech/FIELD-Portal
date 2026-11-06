@@ -8,6 +8,8 @@ export const NOTIFICATION_KINDS = [
   'knowledge_document',
   // From an organisation's alert rules (src/alertEngine).
   'alert',
+  // An owning organisation withdrew a machine from a share (src/machineSharing).
+  'machine_sharing',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 

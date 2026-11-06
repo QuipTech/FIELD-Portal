@@ -1,4 +1,8 @@
 import { PoolClient } from 'pg';
+import {
+  MachineScope,
+  linkedMachineVisibleSql,
+} from '../machineSharing/access/machineScope';
 import { DUE_SOON_SHARE } from '../supportCases/caseSla';
 
 const LISTED_CASES = 5;
@@ -21,6 +25,7 @@ export interface NearBreachCaseRow {
 export const listCasesNearSlaBreach = async (
   client: PoolClient,
   tenantId: string,
+  scope: MachineScope,
 ): Promise<NearBreachCaseRow[]> => {
   const result = await client.query<NearBreachCaseRow>(
     `SELECT c.case_number, c.subject, c.priority, c.sla_due_at,
@@ -28,10 +33,11 @@ export const listCasesNearSlaBreach = async (
             count(*) OVER () AS total_count,
             count(*) FILTER (WHERE c.sla_due_at < now()) OVER () AS breached_count
      FROM support_cases c
-     WHERE c.tenant_id = $1 AND c.deleted_at IS NULL
+     WHERE c.deleted_at IS NULL
        AND c.status IN ('new', 'open') AND NOT c.sla_paused AND c.sla_due_at IS NOT NULL
        AND (c.sla_due_at < now()
             OR c.sla_due_at - now() <= (c.sla_due_at - c.created_at) * $2::float)
+       AND ${linkedMachineVisibleSql('c.machine_id', 'c.tenant_id', '$1', scope)}
      ORDER BY c.sla_due_at
      LIMIT ${LISTED_CASES}`,
     [tenantId, DUE_SOON_SHARE],

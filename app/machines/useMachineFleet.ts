@@ -19,11 +19,11 @@ export const useMachineFleet = (search: string, reloadToken: number) => {
     return () => clearTimeout(timer);
   }, [search]);
 
-  const [page, setPage] = usePageReset([filters.site, filters.make, filters.status, filters.machineClass, debouncedSearch]);
+  const [page, setPage] = usePageReset([filters.site, filters.make, filters.status, filters.machineClass, filters.group, filters.source, debouncedSearch]);
 
   const fleet = useApiResource(
     (accessToken) => listMachinesRequest(accessToken, filters, debouncedSearch, page),
-    [filters.site, filters.make, filters.status, filters.machineClass, debouncedSearch, reloadToken, page],
+    [filters.site, filters.make, filters.status, filters.machineClass, filters.group, filters.source, debouncedSearch, reloadToken, page],
     "Couldn't load machines. Please try again.",
   );
 

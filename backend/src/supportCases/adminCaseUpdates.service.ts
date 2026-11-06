@@ -8,6 +8,7 @@ import { listSupportStaff } from './adminSupportCases.repository';
 import { updateCase } from './supportCases.repository';
 import { markCaseRead } from './caseReads.repository';
 import { requireSupportCase } from './requireSupportCase';
+import { ALL_MACHINES } from '../machineSharing/access/machineScope';
 import { recordCaseChange } from './recordCaseChange';
 import { postMessageToCase } from './postMessageToCase';
 import { withStaffCase } from './withStaffCase';
@@ -77,6 +78,7 @@ export class AdminCaseUpdatesService {
           client,
           access.caseTenantId,
           caseNumber,
+          ALL_MACHINES,
         );
         return {
           row,
@@ -122,7 +124,7 @@ export class AdminCaseUpdatesService {
         });
         const [withAttachments] = await this.caseAttachmentsService.toMessages(
           client,
-          access.caseTenantId,
+          supportCase.id,
           [result.message],
         );
         return { posted: result, message: withAttachments };

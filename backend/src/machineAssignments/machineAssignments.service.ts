@@ -7,8 +7,9 @@ import { PoolClient } from 'pg';
 import { DatabaseService } from '../database/database.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { runAuditedChange } from '../common/audit/runAuditedChange';
-import { assertMachineInTenant } from '../machineHistory/machineHistory.service';
+import { assertMachineAccessible } from '../machineHistory/assertMachineAccessible';
 import * as assignmentsRepository from './machineAssignments.repository';
+import { filterUsersWhoCanSeeMachine } from '../machineSharing/access/machineVisibility.repository';
 import {
   AssignedTechnician,
   toAssignedTechnician,
@@ -16,9 +17,12 @@ import {
 
 const NOT_IN_ORGANISATION_MESSAGE = "That person isn't in your organisation.";
 const NOT_ASSIGNED_MESSAGE = "That person isn't assigned to this machine.";
+const CANT_SEE_MACHINE_MESSAGE =
+  "That person can't see this machine's group. Change their machine access first.";
 
 // Technicians assigned to a machine, within the caller's organisation.
 // Assigning someone already assigned is a no-op; both changes are audited.
+// Only people who can see the machine (machine groups) can be assigned.
 @Injectable()
 export class MachineAssignmentsService {
   constructor(private readonly databaseService: DatabaseService) {}
@@ -27,8 +31,8 @@ export class MachineAssignmentsService {
     actor: AuthenticatedUser,
     machineId: string,
   ): Promise<AssignedTechnician[]> =>
-    this.databaseService.withTenant(actor.tenantId, async (client) => {
-      await assertMachineInTenant(client, actor.tenantId, machineId);
+    this.databaseService.withActor(actor, async (client) => {
+      await assertMachineAccessible(client, machineId, 'manage');
       return this.loadTechnicians(client, actor.tenantId, machineId);
     });
 
@@ -38,10 +42,10 @@ export class MachineAssignmentsService {
     userId: string,
   ): Promise<AssignedTechnician[]> =>
     runAuditedChange(this.databaseService, actor, '', async (client) => {
-      const machine = await assertMachineInTenant(
+      const machine = await assertMachineAccessible(
         client,
-        actor.tenantId,
         machineId,
+        'manage',
       );
       if (
         !(await assignmentsRepository.isOrganisationUser(
@@ -51,6 +55,14 @@ export class MachineAssignmentsService {
         ))
       ) {
         throw new BadRequestException(NOT_IN_ORGANISATION_MESSAGE);
+      }
+      const visibleTo = await filterUsersWhoCanSeeMachine(client, {
+        tenantId: actor.tenantId,
+        machineId,
+        userIds: [userId],
+      });
+      if (!visibleTo.has(userId)) {
+        throw new BadRequestException(CANT_SEE_MACHINE_MESSAGE);
       }
       await assignmentsRepository.insertAssignment(client, {
         tenantId: actor.tenantId,
@@ -75,10 +87,10 @@ export class MachineAssignmentsService {
     userId: string,
   ): Promise<void> =>
     runAuditedChange(this.databaseService, actor, '', async (client) => {
-      const machine = await assertMachineInTenant(
+      const machine = await assertMachineAccessible(
         client,
-        actor.tenantId,
         machineId,
+        'manage',
       );
       const removed = await assignmentsRepository.deleteAssignment(client, {
         tenantId: actor.tenantId,

@@ -12,11 +12,13 @@ import { AddMachineButton } from "./components/addMachineButton";
 import { LinkButton } from "@/components/ui/linkButton";
 import { usePermissions } from "@/lib/auth/usePermissions";
 import { MachineFleetView } from "./components/machineFleetView";
+import { ImportMachinesButton } from "./components/fleetImport/importMachinesButton";
 
 const MachinesPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [reloadToken, setReloadToken] = useState(0);
   const { can } = usePermissions();
+  const reloadFleet = () => setReloadToken((token) => token + 1);
 
   return (
     <AppShell
@@ -39,7 +41,8 @@ const MachinesPage = () => {
             {can(PERMISSIONS.manageMachineLifecycle) && (
               <LinkButton href="/machines/transfers" variant="ghost">Transfers</LinkButton>
             )}
-            <AddMachineButton onRegistered={() => setReloadToken((token) => token + 1)} />
+            <ImportMachinesButton onImported={reloadFleet} />
+            <AddMachineButton onRegistered={reloadFleet} />
           </div>
         </div>
         <PermissionView permission={PERMISSIONS.viewMachines}>

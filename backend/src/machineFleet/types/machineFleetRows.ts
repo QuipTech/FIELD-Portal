@@ -1,3 +1,6 @@
+import { MachineAccessLevel } from '../../machineSharing/access/machineAccess';
+import { MachineGroupRef } from '../../machineSharing/types/machineGroupTypes';
+
 // Rows read by machineFleet.repository. bigint arrives from pg as a string.
 export interface FleetMachineRow {
   id: string;
@@ -10,6 +13,10 @@ export interface FleetMachineRow {
   operating_hours: number | null;
   status: string;
   lifecycle_state: string;
+  owning_organisation_name: string;
+  access_level: MachineAccessLevel;
+  is_shared: boolean;
+  groups: MachineGroupRef[];
   photo_storage_key: string | null;
 }
 

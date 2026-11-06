@@ -4,6 +4,10 @@ import {
   FLEET_FROM,
 } from '../machineFleet/machineFleet.repository';
 import { FleetMachineRow } from '../machineFleet/types/machineFleetRows';
+import {
+  MachineScope,
+  visibleMachineSql,
+} from '../machineSharing/access/machineScope';
 
 const MY_MACHINES_LIMIT = 4;
 
@@ -11,15 +15,15 @@ const MY_MACHINES_LIMIT = 4;
 // asked the assistant about; down and service-due ones first.
 export const listMyMachines = async (
   client: PoolClient,
-  params: { tenantId: string; userId: string },
+  params: { tenantId: string; userId: string; scope: MachineScope },
 ): Promise<FleetMachineRow[]> => {
   const result = await client.query<FleetMachineRow>(
     `WITH touched AS (
        SELECT machine_id, created_at AS at FROM technical_history_entries
-       WHERE tenant_id = $1 AND created_by = $2 AND deleted_at IS NULL
+       WHERE created_by = $2 AND deleted_at IS NULL
        UNION ALL
        SELECT machine_id, updated_at FROM support_cases
-       WHERE tenant_id = $1 AND created_by = $2 AND machine_id IS NOT NULL
+       WHERE created_by = $2 AND machine_id IS NOT NULL
          AND deleted_at IS NULL
        UNION ALL
        SELECT machine_id, updated_at FROM ai_conversations
@@ -33,7 +37,8 @@ export const listMyMachines = async (
      )
      SELECT ${FLEET_COLUMNS} ${FLEET_FROM}
      JOIN latest l ON l.machine_id = m.id
-     WHERE m.tenant_id = $1 AND m.deleted_at IS NULL
+     WHERE m.deleted_at IS NULL
+       AND ${visibleMachineSql('m', '$1', params.scope)}
      ORDER BY CASE m.status WHEN 'down' THEN 0 WHEN 'service_due' THEN 1 ELSE 2 END,
               l.last_worked_at DESC
      LIMIT ${MY_MACHINES_LIMIT}`,

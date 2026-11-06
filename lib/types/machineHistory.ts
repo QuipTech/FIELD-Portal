@@ -1,5 +1,6 @@
 import type { UploadedFile } from "./uploadedFile";
 import type { LifecycleState } from "./machineLifecycle";
+import type { MachineSharing } from "./machineGroup";
 
 export type LiveHistoryEntryType = "service" | "repair" | "inspection" | "fault" | "note";
 
@@ -25,6 +26,11 @@ export interface MachineDetailResponse extends MachineSummary {
   openCaseCount: number;
   // Missing from older backends, which had no lifecycle.
   lifecycleState?: LifecycleState;
+  // Missing from older backends, which had no sharing.
+  groups?: MachineSharing["groups"];
+  owningOrganisationName?: string;
+  isShared?: boolean;
+  accessLevel?: MachineSharing["accessLevel"];
 }
 
 export interface GalleryPhotoResponse {

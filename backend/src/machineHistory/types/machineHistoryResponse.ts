@@ -1,3 +1,5 @@
+import { MachineAccessLevel } from '../../machineSharing/access/machineAccess';
+import { MachineGroupRef } from '../../machineSharing/types/machineGroupTypes';
 import { LifecycleState } from '../../machineLifecycle/lifecycleTransitions';
 import { AssignedTechnician } from '../../machineAssignments/assignedTechnicianMapper';
 
@@ -27,6 +29,14 @@ export interface MachineDetail extends MachineSummary {
   owner: { id: string; name: string; avatarUrl: string | null } | null;
   // Open or in-progress support cases about the machine.
   openCaseCount: number;
+  // Its machine groups the caller may know about.
+  groups: MachineGroupRef[];
+  // The organisation that owns it; isShared when that isn't the caller's.
+  // A shared machine's people (owner, technicians) are left out.
+  owningOrganisationName: string;
+  isShared: boolean;
+  // 'owner', or a shared machine's 'view' / 'contribute'.
+  accessLevel: MachineAccessLevel;
   // Signed for 15 minutes: the cover photo, else the newest gallery photo.
   photoUrl: string | null;
   assignedTechnicians: AssignedTechnician[];
@@ -50,6 +60,9 @@ export interface HistoryEntry {
   createdAt: string;
   // Null once the author's account has been deleted.
   author: { id: string; name: string } | null;
+  // On a shared machine, an author in another organisation shows as that
+  // organisation instead of the person.
+  authorOrganisationName: string | null;
   // The installed component the entry is about, if one was named.
   component: { id: string; name: string; systemName: string } | null;
   operatingHours: number | null;

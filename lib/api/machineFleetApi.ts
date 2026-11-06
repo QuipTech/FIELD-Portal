@@ -2,6 +2,7 @@ import { apiRequest } from "./httpClient";
 import type {
   FleetMachine,
   MachineCatalogMake,
+  MachineDetailsChanges,
   MachineFleetFilters,
   MachineFleetList,
   NewMachine,
@@ -10,13 +11,22 @@ import type {
 
 const authorizationHeader = (accessToken: string) => ({ Authorization: `Bearer ${accessToken}` });
 
-export const EMPTY_MACHINE_FILTERS: MachineFleetFilters = { site: "", make: "", status: "", machineClass: "" };
+export const EMPTY_MACHINE_FILTERS: MachineFleetFilters = {
+  site: "",
+  make: "",
+  status: "",
+  machineClass: "",
+  group: "",
+  source: "",
+};
 
 export const MACHINES_PAGE_SIZE = 25;
 
 const toQueryString = (filters: MachineFleetFilters, search: string, page: number): string => {
   const params = new URLSearchParams({ page: String(page), pageSize: String(MACHINES_PAGE_SIZE) });
-  Object.entries(filters).forEach(([key, value]) => value && params.set(key, value));
+  const { group, ...otherFilters } = filters;
+  Object.entries(otherFilters).forEach(([key, value]) => value && params.set(key, value));
+  if (group) params.set("groupId", group);
   if (search.trim()) params.set("search", search.trim());
   return params.toString();
 };
@@ -36,6 +46,14 @@ export const registerMachineRequest = (accessToken: string, machine: NewMachine)
     method: "POST",
     headers: authorizationHeader(accessToken),
     body: JSON.stringify(machine),
+  });
+
+// Needs machine.manage; own organisation's machines only.
+export const updateMachineDetailsRequest = (accessToken: string, machineId: string, changes: MachineDetailsChanges) =>
+  apiRequest<FleetMachine>(`/machines/${machineId}`, {
+    method: "PATCH",
+    headers: authorizationHeader(accessToken),
+    body: JSON.stringify(changes),
   });
 
 // Needs machine.manage. Each change feeds the dashboard's fleet uptime.

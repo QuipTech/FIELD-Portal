@@ -9,7 +9,9 @@ export type NotificationKind =
   | "ai_review"
   | "knowledge_document"
   // From the organisation's alert rules.
-  | "alert";
+  | "alert"
+  // To the platform administrator: an owner withdrew a machine from a share.
+  | "machine_sharing";
 
 export interface UserNotification {
   id: string;

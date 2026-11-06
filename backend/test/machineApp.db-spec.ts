@@ -8,6 +8,7 @@ import * as details from '../src/machineFleet/machineDetails.repository';
 import * as assignments from '../src/machineAssignments/machineAssignments.repository';
 import * as snapshots from '../src/machineConfiguration/snapshots.repository';
 import { ListMachinesQueryDto } from '../src/machineFleet/dto/listMachinesQueryDto';
+import { ALL_MACHINES } from '../src/machineSharing/access/machineScope';
 
 // The machine endpoints' new SQL (migration 0104) against a real database
 // (npm run test:db), as the tenant role so RLS applies. Fixtures are
@@ -73,7 +74,8 @@ describe('machine photo', () => {
     const older = await insertPhoto(machineA, 'photos/older.jpg', 60);
     await insertPhoto(machineA, 'photos/newer.jpg', 1);
     const photoKey = async () =>
-      (await fleet.findFleetMachine(db, tenantId, machineA))!.photo_storage_key;
+      (await fleet.findFleetMachine(db, tenantId, machineA, ALL_MACHINES))!
+        .photo_storage_key;
     expect(await photoKey()).toBe('photos/newer.jpg');
     await details.updateMachineDetails(db, {
       tenantId,
@@ -81,7 +83,9 @@ describe('machine photo', () => {
       change: { coverPhotoId: older, site: 'Pit 2', operatingHours: 1200 },
     });
     expect(await photoKey()).toBe('photos/older.jpg');
-    expect(await details.findMachineDetails(db, tenantId, machineA)).toEqual({
+    expect(
+      await details.findMachineDetails(db, tenantId, machineA, ALL_MACHINES),
+    ).toEqual({
       site: 'Pit 2',
       operating_hours: 1200,
       cover_photo_id: older,
@@ -99,7 +103,9 @@ describe('machine photo', () => {
       machineId: machineA,
       change: { operatingHours: 10 },
     });
-    expect(await details.findMachineDetails(db, tenantId, machineA)).toEqual({
+    expect(
+      await details.findMachineDetails(db, tenantId, machineA, ALL_MACHINES),
+    ).toEqual({
       site: 'Pit 2',
       operating_hours: 10,
       cover_photo_id: null,
@@ -122,7 +128,7 @@ describe('assigned technicians', () => {
         assignedBy: techId,
       }),
     ).toBe(false);
-    const scope = { tenantId, viewerId: techId };
+    const scope = { tenantId, viewerId: techId, machineScope: ALL_MACHINES };
     const mine = await fleet.listMachines(
       db,
       scope,

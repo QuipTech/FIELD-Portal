@@ -19,6 +19,8 @@ import { AskAssistantDto } from './dto/askAssistantDto';
 import { AiRetrievalService, hasAskScope } from './aiRetrieval.service';
 import { assertFullMachineAccess } from '../machineLifecycle/activeMachine/activeMachine.repository';
 import { assertNewSessionAllowed } from './aiSessionAccess';
+import { requireMachineAccess } from '../machineSharing/access/machineAccess';
+import { ACCESSIBLE_MACHINES } from '../machineSharing/access/machineScope';
 
 // Earlier messages resent with each question (5 exchanges).
 const HISTORY_MESSAGE_LIMIT = 10;
@@ -102,11 +104,16 @@ export class AiAskContextService {
     actor: AuthenticatedUser,
     dto: AskAssistantDto,
   ): Promise<ThreadState> => {
+    // Machine context is limited to the caller's machine scope (their own
+    // and shared machines): a machine outside it is a 404, even in an
+    // existing thread.
+    const machineScope = ACCESSIBLE_MACHINES;
     const conversation = dto.conversationId
       ? await aiConversationsRepository.findConversation(client, {
           tenantId: actor.tenantId,
           userId: actor.userId,
           conversationId: dto.conversationId,
+          scope: machineScope,
         })
       : null;
     if (dto.conversationId && !conversation) {
@@ -123,14 +130,19 @@ export class AiAskContextService {
     // never cut off (spec: suspension and limits never stop work in
     // progress): the plan includes the assistant, the account isn't
     // suspended for non-payment, and machine context needs an active machine.
+    const machine = machineId
+      ? await this.loadMachine(client, machineId)
+      : null;
     if (!conversation) {
       await assertNewSessionAllowed(client);
       if (machineId)
-        await assertFullMachineAccess(client, actor.tenantId, machineId);
+        await assertFullMachineAccess(
+          client,
+          actor.tenantId,
+          machineId,
+          machineScope,
+        );
     }
-    const machine = machineId
-      ? await this.loadMachine(client, actor.tenantId, machineId)
-      : null;
     const livePrompt = await aiConversationsRepository.findLivePrompt(client);
     return {
       conversationId: conversation?.id ?? randomUUID(),
@@ -147,11 +159,12 @@ export class AiAskContextService {
     };
   };
 
+  // A shared machine's record and history live in its owning organisation.
   private loadMachine = async (
     client: PoolClient,
-    tenantId: string,
     machineId: string,
   ): Promise<{ row: MachineRow; context: string }> => {
+    const { tenantId } = await requireMachineAccess(client, machineId);
     const row = await machineHistoryRepository.findMachine(
       client,
       tenantId,

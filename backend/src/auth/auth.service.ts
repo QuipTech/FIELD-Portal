@@ -8,6 +8,7 @@ import { issueSession } from './authSessionIssuer';
 import * as authRepository from './auth.repository';
 import { findUserAccess } from './userAccess.repository';
 import { AuthResponse, MeResponse } from './types/authResponse';
+import { findUsersMachineAccess } from '../machineSharing/userAccess/userMachineAccess.repository';
 import { toMeCapabilities } from './meCapabilities';
 import { RefreshTokenPayload } from './types/jwtPayload';
 
@@ -63,7 +64,7 @@ export class AuthService {
   };
 
   me = async (userId: string, tenantId: string): Promise<MeResponse> =>
-    this.databaseService.withTenant(tenantId, async (client) => {
+    this.databaseService.withActor({ tenantId, userId }, async (client) => {
       const user = await authRepository.findUserById(client, userId);
       const tenant = await authRepository.findTenantById(client, tenantId);
       if (!user || !tenant) {
@@ -72,6 +73,10 @@ export class AuthService {
       // Re-read on each call, so role/permission changes reach the
       // portal without signing in again.
       const access = await findUserAccess(client, user.id);
+      const machineAccess = (
+        await findUsersMachineAccess(client, [user.id])
+      ).get(user.id);
+      if (!machineAccess) throw new UnauthorizedException();
       return {
         id: user.id,
         email: user.email,
@@ -84,6 +89,8 @@ export class AuthService {
         language: user.language,
         ...access,
         capabilities: toMeCapabilities(access.permissions),
+        machineAccessMode: machineAccess.effectiveMode,
+        accessibleGroups: machineAccess.groups,
         tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug },
       };
     });

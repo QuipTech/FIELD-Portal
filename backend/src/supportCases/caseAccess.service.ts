@@ -5,6 +5,10 @@ import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { findCaseTenantId } from './adminSupportCases.repository';
 import { findIsSupportStaff } from './supportStaffStatus';
 import { findCaseByNumber } from './supportCases.repository';
+import {
+  ACCESSIBLE_MACHINES,
+  ALL_MACHINES,
+} from '../machineSharing/access/machineScope';
 import { CaseViewerRole, resolveCaseViewerRole } from './caseAccessPolicy';
 import { CaseStaffRole } from './types/adminSupportCaseResponse';
 import { SupportCaseRow } from './types/supportCaseRows';
@@ -51,15 +55,40 @@ export class CaseAccessService {
     if (!caseTenantId) return null;
     const supportCase = await this.databaseService.withTenant(
       caseTenantId,
-      (client) => findCaseByNumber(client, caseTenantId, caseNumber),
+      (client) =>
+        findCaseByNumber(client, caseTenantId, caseNumber, ALL_MACHINES),
     );
     if (!supportCase) return null;
     const role = resolveCaseViewerRole(
       { userId: actor.userId, tenantId: actor.tenantId, permissions, isStaff },
       { tenantId: caseTenantId, assigneeId: supportCase.assignee_id },
     );
-    return role ? { role, caseTenantId, supportCase } : null;
+    if (role && role !== 'customer') {
+      return { role, caseTenantId, supportCase };
+    }
+    // A customer: their organisation's case, or one it raised on a machine
+    // shared with it, in either case about a machine they can see.
+    return (await this.canSeeCaseMachine(actor, caseNumber))
+      ? { role: 'customer', caseTenantId, supportCase }
+      : null;
   };
+
+  // A customer only sees cases about machines in their machine scope
+  // (machineSharing/access); cases about no machine stay visible.
+  private canSeeCaseMachine = (
+    actor: AuthenticatedUser,
+    caseNumber: number,
+  ): Promise<boolean> =>
+    this.databaseService.withActor(actor, async (client) =>
+      Boolean(
+        await findCaseByNumber(
+          client,
+          actor.tenantId,
+          caseNumber,
+          ACCESSIBLE_MACHINES,
+        ),
+      ),
+    );
 
   // The admin and staff routes: 404 unless the caller is the admin or the
   // case's assignee — a customer of the case gets 404 here too.

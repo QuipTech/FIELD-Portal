@@ -7,6 +7,7 @@ import * as idempotency from '../src/idempotency/idempotency.repository';
 import * as devices from '../src/notifications/devices/pushDevices.repository';
 import * as preferences from '../src/notifications/preferences/notificationPreferences.repository';
 import { listCasesNearSlaBreach } from '../src/dashboard/adminDashboard.repository';
+import { ALL_MACHINES } from '../src/machineGroups/access/machineScope';
 
 // Idempotency keys, push devices, notification preferences (migration
 // 0106) and the admin dashboard's SLA query against a real database
@@ -137,7 +138,7 @@ describe('admin dashboard', () => {
     await insertCase('due soon', '-3 hours 30 minutes', '30 minutes');
     await insertCase('on track', '-1 hour', '3 hours');
     await insertCase('waiting', '-5 hours', '-1 hour', 'waiting_on_customer');
-    const rows = await listCasesNearSlaBreach(db, tenantId);
+    const rows = await listCasesNearSlaBreach(db, tenantId, ALL_MACHINES);
     expect(rows.map((row) => [row.subject, row.sla_state])).toEqual([
       ['breached', 'breached'],
       ['due soon', 'due_soon'],

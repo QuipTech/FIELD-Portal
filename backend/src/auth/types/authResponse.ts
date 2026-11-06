@@ -1,4 +1,6 @@
 import { MeCapabilities } from '../meCapabilities';
+import { MachineAccessMode } from '../../machineSharing/access/machineScope';
+import { AccessibleGroup } from '../../machineSharing/types/machineGroupTypes';
 
 // GET /auth/me — the signed-in user, re-read on every call.
 export interface MeResponse {
@@ -20,6 +22,14 @@ export interface MeResponse {
   permissions: string[];
   // Branch on these rather than role names.
   capabilities: MeCapabilities;
+  // Which machines they see: 'all' (their organisation's, always for
+  // organisation admins, plus shared groups) or 'groups_only' (only
+  // machines in accessibleGroups). Read on every request: never filter on
+  // the device for security, the API already does.
+  machineAccessMode: MachineAccessMode;
+  // Shared groups assigned to them or their organisation, with their level
+  // (for the Group filter and chips).
+  accessibleGroups: AccessibleGroup[];
   tenant: { id: string; name: string; slug: string };
 }
 

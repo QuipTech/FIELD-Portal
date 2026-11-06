@@ -17,6 +17,7 @@ import * as conversations from '../src/aiAssistant/aiConversations.repository';
 import * as feedback from '../src/aiAssistant/feedback/aiFeedback.repository';
 import { insertReviewItem } from '../src/aiAssistant/aiAnswer.repository';
 import { countAiQueries } from '../src/aiAssistant/usage/aiUsage.repository';
+import { ALL_MACHINES } from '../src/machineSharing/access/machineScope';
 
 // The AI assistant's new SQL against a real database (npm run test:db), as
 // the tenant role so RLS applies. Fixtures are written as the migration
@@ -140,9 +141,10 @@ describe('conversations', () => {
   it('clears threads so they no longer list or open', async () => {
     const lookup = { tenantId: tenantA, userId: userA };
     expect(await conversations.softDeleteConversations(db, lookup)).toBe(1);
-    expect(await conversations.listConversations(db, lookup)).toEqual([]);
+    const scoped = { ...lookup, scope: ALL_MACHINES };
+    expect(await conversations.listConversations(db, scoped)).toEqual([]);
     expect(
-      await conversations.findConversation(db, { ...lookup, conversationId }),
+      await conversations.findConversation(db, { ...scoped, conversationId }),
     ).toBeNull();
   });
 });

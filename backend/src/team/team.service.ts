@@ -15,6 +15,8 @@ import { ChangeUserRoleDto } from '../adminUsers/dto/changeUserRoleDto';
 import { InviteUserDto } from '../adminUsers/dto/inviteUserDto';
 import { ListAdminUsersQueryDto } from '../adminUsers/dto/listAdminUsersQueryDto';
 import { isTeamMember } from './teamAccess.repository';
+import { UserMachineAccessService } from '../machineSharing/userAccess/userMachineAccess.service';
+import { MachineAccess } from '../machineSharing/types/machineGroupTypes';
 import { isTeamAssignableRole } from './teamRoleRules';
 
 const MEMBER_NOT_FOUND_MESSAGE = 'User not found.';
@@ -39,13 +41,20 @@ export class TeamService {
     private readonly invitations: AdminUserInvitationsService,
     private readonly userRoles: AdminUserRolesService,
     private readonly removal: AdminUserRemovalService,
+    private readonly machineAccess: UserMachineAccessService,
   ) {}
 
+  // Each member with their machine access (their mode and shared groups).
   listMembers = (actor: AuthenticatedUser, query: ListAdminUsersQueryDto) =>
-    this.adminUsers.listUsers(this.toScope(actor), {
+    this.adminUsers.listUsersWithMachineAccess(actor, this.toScope(actor), {
       ...query,
       organisationId: undefined,
     });
+
+  getMachineAccess = (
+    actor: AuthenticatedUser,
+    userId: string,
+  ): Promise<MachineAccess> => this.machineAccess.getAccess(actor, userId);
 
   listRoles = async (actor: AuthenticatedUser): Promise<TeamRole[]> => {
     const rows = await listRoles(this.databaseService, this.toScope(actor));

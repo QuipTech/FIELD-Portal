@@ -8,7 +8,8 @@ import {
   countUnreadCasesForCustomer,
   markCaseRead,
 } from './caseReads.repository';
-import { requireSupportCase } from './requireSupportCase';
+import { requireVisibleSupportCase } from './requireSupportCase';
+import { ACCESSIBLE_MACHINES } from '../machineSharing/access/machineScope';
 import { postMessageToCase } from './postMessageToCase';
 import { CaseAttachmentsService } from './caseAttachments.service';
 import { CaseAnnouncer } from './caseAnnouncer.service';
@@ -20,8 +21,9 @@ import {
   CaseMessage,
 } from './types/supportCaseResponse';
 
-// A case's thread as the customer sees it: everything in their own
-// organisation, never an internal note. Messages are saved over REST,
+// A case's thread as the customer sees it, never an internal note: their
+// organisation's cases, and cases it raised on machines shared with it
+// (those live in the machine's owning organisation, supportCase.tenant_id). Messages are saved over REST,
 // then pushed to everyone who has the case open.
 @Injectable()
 export class CaseMessagesService {
@@ -36,21 +38,21 @@ export class CaseMessagesService {
     caseNumber: number,
     since?: Date,
   ): Promise<CaseMessage[]> =>
-    this.databaseService.withTenant(actor.tenantId, async (client) => {
-      const supportCase = await requireSupportCase(
+    this.databaseService.withActor(actor, async (client) => {
+      const supportCase = await requireVisibleSupportCase(
         client,
-        actor.tenantId,
+        actor,
         caseNumber,
       );
       const rows = await listCaseMessages(client, {
-        tenantId: actor.tenantId,
+        tenantId: supportCase.tenant_id,
         caseId: supportCase.id,
         includeInternal: false,
         since,
       });
       return this.caseAttachmentsService.toMessages(
         client,
-        actor.tenantId,
+        supportCase.id,
         rows,
       );
     });
@@ -60,15 +62,15 @@ export class CaseMessagesService {
     caseNumber: number,
     since?: Date,
   ): Promise<CaseEvent[]> =>
-    this.databaseService.withTenant(actor.tenantId, async (client) => {
-      const supportCase = await requireSupportCase(
+    this.databaseService.withActor(actor, async (client) => {
+      const supportCase = await requireVisibleSupportCase(
         client,
-        actor.tenantId,
+        actor,
         caseNumber,
       );
       const rows = await listCaseEvents(
         client,
-        actor.tenantId,
+        supportCase.tenant_id,
         supportCase.id,
         since,
       );
@@ -83,13 +85,17 @@ export class CaseMessagesService {
     const { posted, message } = await this.databaseService.withActor(
       actor,
       async (client) => {
-        const supportCase = await requireSupportCase(
+        const supportCase = await requireVisibleSupportCase(
           client,
-          actor.tenantId,
+          actor,
           caseNumber,
         );
         const result = await postMessageToCase(client, {
-          tenantId: actor.tenantId,
+          tenantId: supportCase.tenant_id,
+          authorTenantId:
+            supportCase.tenant_id === actor.tenantId
+              ? undefined
+              : actor.tenantId,
           supportCase,
           authorId: actor.userId,
           authorRole: 'customer',
@@ -104,13 +110,17 @@ export class CaseMessagesService {
         });
         const [withAttachments] = await this.caseAttachmentsService.toMessages(
           client,
-          actor.tenantId,
+          supportCase.id,
           [result.message],
         );
         return { posted: result, message: withAttachments };
       },
     );
-    this.caseAnnouncer.announceMessage(actor.tenantId, posted, message);
+    this.caseAnnouncer.announceMessage(
+      posted.supportCase.tenant_id,
+      posted,
+      message,
+    );
     return message;
   };
 
@@ -132,10 +142,10 @@ export class CaseMessagesService {
     actor: AuthenticatedUser,
     caseNumber: number,
   ): Promise<void> =>
-    this.databaseService.withTenant(actor.tenantId, async (client) => {
-      const supportCase = await requireSupportCase(
+    this.databaseService.withActor(actor, async (client) => {
+      const supportCase = await requireVisibleSupportCase(
         client,
-        actor.tenantId,
+        actor,
         caseNumber,
       );
       await markCaseRead(client, {
@@ -146,11 +156,12 @@ export class CaseMessagesService {
     });
 
   countUnread = async (actor: AuthenticatedUser): Promise<{ count: number }> =>
-    this.databaseService.withTenant(actor.tenantId, async (client) => ({
+    this.databaseService.withActor(actor, async (client) => ({
       count: await countUnreadCasesForCustomer(
         client,
         actor.tenantId,
         actor.userId,
+        ACCESSIBLE_MACHINES,
       ),
     }));
 }

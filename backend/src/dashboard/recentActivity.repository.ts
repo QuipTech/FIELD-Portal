@@ -2,6 +2,11 @@ import { PoolClient } from 'pg';
 import { DatabaseService } from '../database/database.service';
 import { MACHINE_LABEL_SQL } from '../machineFleet/machineFleet.repository';
 import {
+  MachineScope,
+  linkedMachineVisibleSql,
+  visibleMachineSql,
+} from '../machineSharing/access/machineScope';
+import {
   CaseActivityRow,
   EntryActivityRow,
   KnowledgeActivityRow,
@@ -16,13 +21,15 @@ const machineLabel = `CASE WHEN m.id IS NULL THEN NULL ELSE ${MACHINE_LABEL_SQL}
 export const listCaseActivity = async (
   client: PoolClient,
   tenantId: string,
+  scope: MachineScope,
 ): Promise<CaseActivityRow[]> => {
   const result = await client.query<CaseActivityRow>(
     `SELECT c.case_number, c.subject, c.status, c.priority, c.updated_at,
             ${machineLabel} AS machine_label
      FROM support_cases c
      LEFT JOIN machines m ON m.id = c.machine_id AND m.tenant_id = c.tenant_id
-     WHERE c.tenant_id = $1 AND c.deleted_at IS NULL
+     WHERE c.deleted_at IS NULL
+       AND ${linkedMachineVisibleSql('c.machine_id', 'c.tenant_id', '$1', scope)}
      ORDER BY c.updated_at DESC
      LIMIT ${ACTIVITY_LIMIT}`,
     [tenantId],
@@ -33,6 +40,7 @@ export const listCaseActivity = async (
 export const listEntryActivity = async (
   client: PoolClient,
   tenantId: string,
+  scope: MachineScope,
 ): Promise<EntryActivityRow[]> => {
   const result = await client.query<EntryActivityRow>(
     `SELECT e.id, e.machine_id, ${MACHINE_LABEL_SQL} AS machine_label,
@@ -40,8 +48,9 @@ export const listEntryActivity = async (
             u.first_name AS author_first_name, u.last_name AS author_last_name
      FROM technical_history_entries e
      JOIN machines m ON m.id = e.machine_id AND m.deleted_at IS NULL
+       AND ${visibleMachineSql('m', '$1', scope)}
      LEFT JOIN users u ON u.id = e.created_by
-     WHERE e.tenant_id = $1 AND e.deleted_at IS NULL
+     WHERE e.tenant_id = m.tenant_id AND e.deleted_at IS NULL
      ORDER BY e.created_at DESC
      LIMIT ${ACTIVITY_LIMIT}`,
     [tenantId],
@@ -53,14 +62,15 @@ export const listEntryActivity = async (
 // answer and how many sources it was given.
 export const listThreadActivity = async (
   client: PoolClient,
-  params: { tenantId: string; userId: string },
+  params: { tenantId: string; userId: string; scope: MachineScope },
 ): Promise<ThreadActivityRow[]> => {
   const result = await client.query<ThreadActivityRow>(
     `SELECT c.id, c.title, c.updated_at, ${machineLabel} AS machine_label,
             answer.content AS latest_answer,
             COALESCE(answer.source_count, 0) AS source_count
      FROM ai_conversations c
-     LEFT JOIN machines m ON m.id = c.machine_id AND m.tenant_id = c.tenant_id
+     LEFT JOIN machines m ON m.id = c.machine_id
+       AND ${visibleMachineSql('m', '$1', params.scope)}
      LEFT JOIN LATERAL (
        SELECT msg.content,
               (SELECT count(*) FROM ai_source_references r

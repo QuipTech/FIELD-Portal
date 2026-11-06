@@ -89,6 +89,26 @@ describe('personal Checkout', () => {
     expect(stripe.createCheckoutSession).not.toHaveBeenCalled();
   });
 
+  it('returns a mobile payer to the app hand-back page', async () => {
+    const { service, stripe } = setup([]);
+    await service.openCheckout(invoice, 'cus_a', ORIGIN, 'app');
+    expect(stripe.createCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        successUrl: `${ORIGIN}/app-return/billing?payment=complete`,
+        cancelUrl: `${ORIGIN}/app-return/billing?payment=cancelled`,
+      }),
+      `invoice:invoice-a:checkout:0:${ORIGIN}:app`,
+    );
+  });
+
+  it("doesn't hand the app an open session that returns to the website", async () => {
+    const { service, stripe } = setup([session({})]);
+    expect(await service.openCheckout(invoice, 'cus_a', ORIGIN, 'app')).toBe(
+      'https://checkout.stripe.com/c/pay/new',
+    );
+    expect(stripe.createCheckoutSession).toHaveBeenCalledTimes(1);
+  });
+
   it('replaces an expired session with a new key', async () => {
     const { service, stripe } = setup([session({ status: 'expired' })]);
     await service.openCheckout(invoice, 'cus_a', ORIGIN);

@@ -22,12 +22,14 @@ const toOperatingStatus = (status: string): OperatingStatus =>
     ? (status as OperatingStatus)
     : 'running';
 
-// canManageLifecycle: whether the caller holds machine.lifecycle.
+// canManageLifecycle: whether the caller holds machine.lifecycle. A shared
+// machine's lifecycle is never theirs to change.
 export const toFleetMachine = (
   row: FleetMachineRow,
-  canManageLifecycle = false,
+  canManageLifecycleIfOwned = false,
 ): FleetMachine => {
   const lifecycleState = toLifecycleState(row.lifecycle_state);
+  const canManageLifecycle = canManageLifecycleIfOwned && !row.is_shared;
   return {
     id: row.id,
     label: row.label,
@@ -43,6 +45,10 @@ export const toFleetMachine = (
     lifecycleState,
     availableActions: listAvailableActions(lifecycleState, canManageLifecycle),
     canRequestTransfer: canRequestTransfer(lifecycleState, canManageLifecycle),
+    groups: row.groups,
+    owningOrganisationName: row.owning_organisation_name,
+    isShared: row.is_shared,
+    accessLevel: row.access_level,
   };
 };
 

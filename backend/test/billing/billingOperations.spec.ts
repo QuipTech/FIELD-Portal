@@ -190,7 +190,7 @@ describe('billing operations', () => {
       expect((await liveAssetPro()).status).toBe('active');
       await plans().cancel(admin, 'Moving to another system');
       await fixture.query(
-        `UPDATE billing.subscriptions SET current_period_end = current_date, cancel_at = current_date
+        `UPDATE billing.subscriptions SET current_period_start = current_date - 30, current_period_end = current_date, cancel_at = current_date
          WHERE billing_account_id = $1 AND plan_code = 'ASSET_PRO'`,
         [accountId],
       );
@@ -235,10 +235,10 @@ describe('billing operations', () => {
       await insertOverdueInvoice(8);
       await overdue().sendDueNotices(new Date());
       await overdue().sendDueNotices(new Date());
-      expect(await notificationsFor(fixture.ids.customerAdmin)).toEqual([
-        'Invoice overdue',
-        'Invoice 7 days overdue',
-      ]);
+      // Both are written in one transaction, so their order isn't fixed.
+      expect(
+        (await notificationsFor(fixture.ids.customerAdmin)).sort(),
+      ).toEqual(['Invoice 7 days overdue', 'Invoice overdue']);
     });
 
     it('allows suspension only after the 14-day notice, then pauses new work (T30)', async () => {

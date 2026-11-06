@@ -5,6 +5,7 @@ import * as alertDeliveryRepository from './alertDelivery.repository';
 import { toRecipientCandidate } from './alertMappers';
 import { resolveRecipients } from './resolveRecipients';
 import { filterChannels } from './filterChannels';
+import { keepPeopleWhoCanSeeMachine } from '../machineSharing/access/keepPeopleWhoCanSeeMachine';
 import { EmailChannel } from './channels/emailChannel';
 import { SmsChannel } from './channels/smsChannel';
 import { PushChannel } from './channels/pushChannel';
@@ -76,12 +77,22 @@ export class AlertDispatcherService {
       },
     );
     const candidates = rows.map(toRecipientCandidate);
-    if (!options.onlyUserId)
-      return resolveRecipients(rule.audiences, candidates, rule.tenantId);
-    return candidates.filter(
-      (candidate) =>
-        candidate.userId === options.onlyUserId &&
-        candidate.tenantId === rule.tenantId,
+    const recipients = options.onlyUserId
+      ? candidates.filter(
+          (candidate) =>
+            candidate.userId === options.onlyUserId &&
+            candidate.tenantId === rule.tenantId,
+        )
+      : resolveRecipients(rule.audiences, candidates, rule.tenantId);
+    // Only people who can see the machine an alert (or its case) is about.
+    return keepPeopleWhoCanSeeMachine(
+      this.databaseService,
+      {
+        tenantId: rule.tenantId,
+        machineId: match.machineId,
+        caseId: match.caseId,
+      },
+      recipients,
     );
   };
 

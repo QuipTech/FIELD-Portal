@@ -8,6 +8,8 @@ import { LogoutButton } from "./logoutButton";
 import { NavUnreadBadge } from "./navUnreadBadge";
 import { useUnreadCaseCount } from "@/lib/hooks/useUnreadCaseCount";
 import { useSupportStaffAccess } from "@/lib/hooks/useSupportStaffAccess";
+import { usePermissions } from "@/lib/auth/usePermissions";
+import { PERMISSIONS } from "@/lib/auth/permissionCodes";
 
 interface NavLink {
   href: string;
@@ -47,6 +49,7 @@ export const SideNav = () => {
   const { isStaff, isAdmin } = useSupportStaffAccess();
   // The admin's queue lives in the admin portal; here only assigned cases count.
   const staffCaseCount = useUnreadCaseCount("staff", isStaff && !isAdmin);
+  const { can } = usePermissions();
 
   return (
     <div
@@ -70,6 +73,9 @@ export const SideNav = () => {
         />
       ))}
       <div className="mt-auto flex flex-col gap-0.5 border-t border-white/[0.16] pt-2.5">
+        {can(PERMISSIONS.managePlatform) && (
+          <NavItem href="/admin/dashboard" label={collapsed ? "" : "Admin portal"} icon="shield" active={false} />
+        )}
         <NavItem
           href="/settings"
           label={collapsed ? "" : "Settings"}

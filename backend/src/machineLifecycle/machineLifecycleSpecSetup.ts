@@ -49,31 +49,35 @@ export const setUpLifecycleService = (scenario: Scenario = {}) => {
   });
   const createdAccounts: unknown[] = [];
   const createdSubscriptions: unknown[] = [];
-  const tenantDatabase = {
-    withTenant: async (_tenantId: string, work: (client: unknown) => unknown) =>
-      work({
-        query: async (sql: string) => ({
-          rows: sql.includes('FROM tenants')
-            ? [
-                {
-                  name: 'Pit Crew',
-                  billing_account_id:
-                    scenario.hasNoBillingAccount && createdAccounts.length === 0
-                      ? null
-                      : 'account-1',
-                },
-              ]
-            : [
-                {
-                  id: 'machine-1',
-                  lifecycle_state: scenario.lifecycleState ?? 'registered',
-                  billing_account_id: 'account-1',
-                  timezone: 'Australia/Brisbane',
-                  suspended_at: scenario.suspended ? new Date() : null,
-                },
-              ],
-        }),
+  const runWork = async (work: (client: unknown) => unknown) =>
+    work({
+      query: async (sql: string) => ({
+        rows: sql.includes('FROM tenants')
+          ? [
+              {
+                name: 'Pit Crew',
+                billing_account_id:
+                  scenario.hasNoBillingAccount && createdAccounts.length === 0
+                    ? null
+                    : 'account-1',
+              },
+            ]
+          : [
+              {
+                id: 'machine-1',
+                lifecycle_state: scenario.lifecycleState ?? 'registered',
+                billing_account_id: 'account-1',
+                timezone: 'Australia/Brisbane',
+                suspended_at: scenario.suspended ? new Date() : null,
+              },
+            ],
       }),
+    });
+  const tenantDatabase = {
+    withTenant: (_tenantId: string, work: (client: unknown) => unknown) =>
+      runWork(work),
+    withActor: (_actor: unknown, work: (client: unknown) => unknown) =>
+      runWork(work),
   } as unknown as DatabaseService;
   const config = {
     loadConfig: async () => ({

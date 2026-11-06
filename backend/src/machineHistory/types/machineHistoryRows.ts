@@ -1,3 +1,6 @@
+import { MachineAccessLevel } from '../../machineSharing/access/machineAccess';
+import { MachineGroupRef } from '../../machineSharing/types/machineGroupTypes';
+
 export interface MachineRow {
   id: string;
   serial_number: string;
@@ -22,6 +25,10 @@ export interface MachineDetailRow extends MachineRow {
   owner_avatar_url: string | null;
   photo_storage_key: string | null;
   open_case_count: number;
+  groups: MachineGroupRef[];
+  owning_organisation_name: string;
+  access_level: MachineAccessLevel;
+  is_shared: boolean;
 }
 
 export interface PhotoRow {
@@ -42,6 +49,9 @@ export interface HistoryEntryRow {
   author_id: string | null;
   author_first_name: string | null;
   author_last_name: string | null;
+  // On a shared machine, an author in another organisation (the reader
+  // can't see its people, users RLS): that organisation's name.
+  author_organisation_name: string | null;
   component_id: string | null;
   component_name: string | null;
   system_name: string | null;

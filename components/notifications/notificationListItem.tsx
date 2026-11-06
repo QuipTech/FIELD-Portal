@@ -13,6 +13,7 @@ const KIND_STYLES: Record<NotificationKind, { icon: IconName; tone: Tone }> = {
   ai_review: { icon: "spark", tone: "primary" },
   knowledge_document: { icon: "book", tone: "default" },
   alert: { icon: "alert", tone: "danger" },
+  machine_sharing: { icon: "layers", tone: "amber" },
 };
 
 interface NotificationListItemProps {

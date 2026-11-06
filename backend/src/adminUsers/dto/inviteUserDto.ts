@@ -1,6 +1,7 @@
 import { Transform } from 'class-transformer';
 import {
   IsEmail,
+  IsIn,
   IsOptional,
   IsString,
   IsUUID,
@@ -8,6 +9,10 @@ import {
   MinLength,
 } from 'class-validator';
 import { trimString } from '../../common/utils/trimTransforms';
+import {
+  MACHINE_ACCESS_MODES,
+  MachineAccessMode,
+} from '../../machineSharing/access/machineScope';
 
 const toLowerTrimmed = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim().toLowerCase() : value;
@@ -38,4 +43,11 @@ export class InviteUserDto {
   @IsOptional()
   @IsUUID()
   organisationId?: string;
+
+  // Which machines they'll see (default 'all'): 'groups_only' shows only
+  // machines in shared groups assigned to them or their organisation (on
+  // Machine groups), and isn't allowed for an organisation admin role.
+  @IsOptional()
+  @IsIn(MACHINE_ACCESS_MODES)
+  machineAccessMode?: MachineAccessMode;
 }

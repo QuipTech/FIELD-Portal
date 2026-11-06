@@ -1,4 +1,5 @@
 import { labelEventType } from './auditEventLabels';
+import { describeMachineGroupEvent } from './describeMachineGroupEvent';
 
 type Metadata = Record<string, unknown>;
 
@@ -126,7 +127,8 @@ export const describeAuditEvent = (
     text(metadata.name) ??
     text(metadata.title) ??
     text(metadata.displayName);
-
+  const groupEvent = describeMachineGroupEvent(event, name);
+  if (groupEvent) return groupEvent;
   switch (entityType) {
     case 'role':
       return action === 'update'

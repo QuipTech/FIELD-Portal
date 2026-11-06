@@ -8,6 +8,7 @@ import { KnowledgeAccessService } from '../knowledgeCatalog/access/knowledgeAcce
 import { listCatalogDocuments } from '../knowledgeCatalog/documents/catalogDocuments.repository';
 import { ListCatalogDocumentsQueryDto } from '../knowledgeCatalog/dto/listCatalogDocumentsQueryDto';
 import { listDownMachines } from './dashboardCounts.repository';
+import { ACCESSIBLE_MACHINES } from '../machineSharing/access/machineScope';
 import * as adminRepository from './adminDashboard.repository';
 import { AdminDashboard } from './types/adminDashboardResponse';
 
@@ -39,10 +40,13 @@ export class AdminDashboardService {
       ) {
         throw new ForbiddenException(NOT_ADMIN_MESSAGE);
       }
-      const down = await listDownMachines(client, actor.tenantId);
+      // A Knowledge admin may be limited to machine groups.
+      const scope = ACCESSIBLE_MACHINES;
+      const down = await listDownMachines(client, actor.tenantId, scope);
       const nearBreach = await adminRepository.listCasesNearSlaBreach(
         client,
         actor.tenantId,
+        scope,
       );
       // Admin access so the status filter applies, whatever the caller's
       // Knowledge role; what may be read still follows brand access.

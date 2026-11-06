@@ -3,6 +3,7 @@ import { PoolClient } from 'pg';
 import { DatabaseService } from '../database/database.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { requireSupportCase } from './requireSupportCase';
+import { ALL_MACHINES } from '../machineSharing/access/machineScope';
 import { StaffCaseAccess } from './caseAccess.service';
 import { SupportCaseRow } from './types/supportCaseRows';
 
@@ -24,6 +25,7 @@ export const withStaffCase = <T>(
         client,
         access.caseTenantId,
         Number(access.supportCase.case_number),
+        ALL_MACHINES,
       );
       if (
         access.role === 'assignee' &&

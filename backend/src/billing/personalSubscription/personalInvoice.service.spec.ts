@@ -137,6 +137,18 @@ describe('personal payment invoice creation', () => {
       expect.objectContaining({ id: 'invoice-a' }),
       'cus_a',
       'http://localhost:3001',
+      'portal',
+    );
+  });
+
+  it('opens Checkout that returns to the mobile app when it asks', async () => {
+    const { service, checkout } = setup();
+    await service.createPayment(actor, { ...address, returnTo: 'app' });
+    expect(checkout.openCheckout).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'invoice-a' }),
+      'cus_a',
+      'http://localhost:3001',
+      'app',
     );
   });
 

@@ -1,7 +1,12 @@
 import { PoolClient } from 'pg';
+import {
+  MachineScope,
+  linkedMachineVisibleSql,
+} from '../machineSharing/access/machineScope';
 
 // Where each person last read a case's thread, for the unread badge.
-// tenantId is the case's organisation (also for staff).
+// tenantId is the request's organisation: the case's for staff, the
+// reader's own for customers (a shared machine's case is another's).
 export const markCaseRead = async (
   client: PoolClient,
   params: { tenantId: string; caseId: string; userId: string },
@@ -15,15 +20,17 @@ export const markCaseRead = async (
 };
 
 // A customer's badge: cases they raised with a reply (never an internal
-// note) they haven't read yet.
+// note) they haven't read yet, about machines they can still see.
 export const countUnreadCasesForCustomer = async (
   client: PoolClient,
   tenantId: string,
   userId: string,
+  scope: MachineScope,
 ): Promise<number> => {
   const result = await client.query<{ count: string }>(
     `SELECT count(*) FROM support_cases c
-     WHERE c.tenant_id = $1 AND c.created_by = $2 AND c.deleted_at IS NULL
+     WHERE c.created_by = $2 AND c.deleted_at IS NULL
+       AND ${linkedMachineVisibleSql('c.machine_id', 'c.tenant_id', '$1', scope)}
        AND EXISTS (
          SELECT 1 FROM support_updates u
          LEFT JOIN support_case_reads cr ON cr.support_case_id = c.id AND cr.user_id = $2

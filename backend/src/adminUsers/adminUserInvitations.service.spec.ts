@@ -31,11 +31,14 @@ const setup = () => {
   jest
     .mocked(adminUsersRepository.listOrganisations)
     .mockResolvedValue([{ id: 'org-a', name: 'A' }]);
-  jest
-    .mocked(adminRolesRepository.listRoles)
-    .mockResolvedValue([
-      { id: 'role-1', name: 'Field Technician', tenant_id: null } as never,
-    ]);
+  jest.mocked(adminRolesRepository.listRoles).mockResolvedValue([
+    {
+      id: 'role-1',
+      name: 'Field Technician',
+      tenant_id: null,
+      permission_codes: ['machine.view'],
+    } as never,
+  ]);
   jest.mocked(authRepository.findUserByEmailForLogin).mockResolvedValue(null);
   const cognitoUsers = {
     deleteCognitoUsersForEmail: jest.fn().mockResolvedValue(undefined),
@@ -99,6 +102,25 @@ describe('AdminUserInvitationsService.inviteUser', () => {
         organisationId: 'org-b',
       }),
     ).rejects.toMatchObject({ status: 403 });
+    expect(cognito.createInvitedUser).not.toHaveBeenCalled();
+  });
+
+  it("refuses 'groups_only' for an admin role before contacting Cognito", async () => {
+    const { service, cognito } = setup();
+    jest.mocked(adminRolesRepository.listRoles).mockResolvedValue([
+      {
+        id: 'role-1',
+        name: 'Organisation Admin',
+        tenant_id: null,
+        permission_codes: ['admin.manage_users'],
+      } as never,
+    ]);
+    await expect(
+      service.inviteUser(actor, ownerScope, {
+        ...dto,
+        machineAccessMode: 'groups_only',
+      }),
+    ).rejects.toMatchObject({ status: 400 });
     expect(cognito.createInvitedUser).not.toHaveBeenCalled();
   });
 });

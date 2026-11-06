@@ -6,7 +6,8 @@ import { StorageService } from '../storage/storage.service';
 import { IncomingFile, UploadedFile } from '../storage/types/storedFile';
 import * as machineHistoryRepository from './machineHistory.repository';
 import * as historyEntriesRepository from './historyEntries.repository';
-import { assertMachineInTenant } from './machineHistory.service';
+import { assertMachineAccessible } from './assertMachineAccessible';
+import { MachineAccessNeed } from '../machineSharing/access/machineAccess';
 import { toMachinePhoto } from './machinePhotoMapper';
 import { MachinePhoto } from './types/machineHistoryResponse';
 
@@ -20,7 +21,9 @@ interface PhotoTarget {
 
 // Photos on technical history entries. Deleting is a soft delete — the
 // photo disappears from the portal but its row and S3 object stay, since
-// history is part of the machine's compliance/audit record.
+// history is part of the machine's compliance/audit record. On a shared
+// machine, 'contribute' adds photos to the caller's own entries (they
+// belong to the owning organisation); only the owner deletes.
 @Injectable()
 export class MachinePhotosService {
   constructor(
@@ -35,20 +38,24 @@ export class MachinePhotosService {
     target: PhotoTarget,
     file: IncomingFile | undefined,
   ): Promise<{ photo: MachinePhoto; file: UploadedFile }> => {
-    await this.assertEntryInTenant(actor, target);
+    const ownerTenantId = await this.assertEntryOnMachine(
+      actor,
+      target,
+      'contribute',
+    );
     const stored = await this.storageService.uploadMachinePhoto(
       file,
-      actor.tenantId,
+      ownerTenantId,
       target.machineId,
     );
     try {
-      const row = await this.databaseService.withTenant(
-        actor.tenantId,
+      const row = await this.databaseService.withActor(
+        actor,
         async (client) => {
           const inserted = await machineHistoryRepository.insertPhotoAttachment(
             client,
             {
-              tenantId: actor.tenantId,
+              tenantId: ownerTenantId,
               entryId: target.entryId,
               userId: actor.userId,
               bucket: this.storageService.requireBucket(),
@@ -77,7 +84,7 @@ export class MachinePhotosService {
       };
     } catch (error) {
       await this.storageService
-        .deleteFile(stored.key, actor.tenantId)
+        .deleteFile(stored.key, ownerTenantId)
         .catch(() => undefined);
       throw error;
     }
@@ -87,8 +94,8 @@ export class MachinePhotosService {
     actor: AuthenticatedUser,
     target: PhotoTarget & { photoId: string },
   ): Promise<void> => {
-    await this.assertEntryInTenant(actor, target);
-    await this.databaseService.withTenant(actor.tenantId, async (client) => {
+    await this.assertEntryOnMachine(actor, target, 'manage');
+    await this.databaseService.withActor(actor, async (client) => {
       const isDeleted = await machineHistoryRepository.softDeletePhoto(client, {
         tenantId: actor.tenantId,
         ...target,
@@ -105,16 +112,23 @@ export class MachinePhotosService {
     });
   };
 
-  private assertEntryInTenant = (
+  // The machine's owning organisation, once the entry is found on it.
+  private assertEntryOnMachine = (
     actor: AuthenticatedUser,
     target: PhotoTarget,
-  ): Promise<void> =>
-    this.databaseService.withTenant(actor.tenantId, async (client) => {
-      await assertMachineInTenant(client, actor.tenantId, target.machineId);
+    need: MachineAccessNeed,
+  ): Promise<string> =>
+    this.databaseService.withActor(actor, async (client) => {
+      const { access } = await assertMachineAccessible(
+        client,
+        target.machineId,
+        need,
+      );
       const exists = await historyEntriesRepository.historyEntryExists(client, {
-        tenantId: actor.tenantId,
+        tenantId: access.tenantId,
         ...target,
       });
       if (!exists) throw new NotFoundException(ENTRY_NOT_FOUND_MESSAGE);
+      return access.tenantId;
     });
 }

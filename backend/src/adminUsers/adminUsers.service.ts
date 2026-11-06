@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { AdminScope } from '../auth/adminScope/adminScope';
+import { AuthenticatedUser } from '../auth/types/authenticatedUser';
+import { UserMachineAccessService } from '../machineSharing/userAccess/userMachineAccess.service';
 import { StorageService } from '../storage/storage.service';
 import { resolveAvatarUrl } from '../users/resolveAvatarUrl';
 import * as adminUsersRepository from './adminUsers.repository';
@@ -9,6 +11,7 @@ import { AdminUserRow } from './types/adminUserRows';
 import {
   AdminUserListItem,
   AdminUserListResponse,
+  AdminUserWithAccessListResponse,
 } from './types/adminUserListResponse';
 
 const toListItem = async (
@@ -32,6 +35,7 @@ export class AdminUsersService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly storageService: StorageService,
+    private readonly machineAccess: UserMachineAccessService,
   ) {}
 
   listUsers = async (
@@ -62,6 +66,28 @@ export class AdminUsersService {
       total: rows.length ? Number(rows[0].total_count) : 0,
       page: query.page,
       pageSize: query.pageSize,
+    };
+  };
+
+  // The same list with each person's machine access: their mode and the
+  // shared groups assigned to them or their organisation. The caller's
+  // own organisation's people, or anyone's for the platform administrator.
+  listUsersWithMachineAccess = async (
+    actor: AuthenticatedUser,
+    scope: AdminScope,
+    query: ListAdminUsersQueryDto,
+  ): Promise<AdminUserWithAccessListResponse> => {
+    const list = await this.listUsers(scope, query);
+    const access = await this.machineAccess.listAccess(
+      actor,
+      list.users.map((user) => user.id),
+    );
+    return {
+      ...list,
+      users: list.users.map((user) => ({
+        ...user,
+        machineAccess: access.get(user.id) ?? null,
+      })),
     };
   };
 }

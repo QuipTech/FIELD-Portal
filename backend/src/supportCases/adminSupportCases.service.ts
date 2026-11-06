@@ -126,7 +126,11 @@ export class AdminSupportCasesService {
         includeInternal: true,
         since,
       });
-      return this.caseAttachmentsService.toMessages(client, caseTenantId, rows);
+      return this.caseAttachmentsService.toMessages(
+        client,
+        supportCase.id,
+        rows,
+      );
     });
   };
 

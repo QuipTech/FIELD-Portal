@@ -1,3 +1,5 @@
+import { MachineAccessLevel } from '../../machineSharing/access/machineAccess';
+import { MachineGroupRef } from '../../machineSharing/types/machineGroupTypes';
 import {
   LifecycleAction,
   LifecycleState,
@@ -26,6 +28,14 @@ export interface FleetMachine {
   // What the caller may do next (empty without machine.lifecycle).
   availableActions: LifecycleAction[];
   canRequestTransfer: boolean;
+  // Its machine groups the caller may know about.
+  groups: MachineGroupRef[];
+  // The organisation that owns it; isShared when that isn't the caller's.
+  owningOrganisationName: string;
+  isShared: boolean;
+  // 'owner' for the caller's own machines; a shared one's 'view' or
+  // 'contribute' (adds history, photos and cases).
+  accessLevel: MachineAccessLevel;
 }
 
 export interface FeaturedDownMachine {

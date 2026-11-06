@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
@@ -11,6 +12,7 @@ import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { StorageService } from '../storage/storage.service';
 import { CognitoUserDeletionService } from '../users/cognitoUserDeletion.service';
 import * as removalRepository from './adminUserRemoval.repository';
+import { PushDevicesService } from '../notifications/push/pushDevices.service';
 
 const OWN_ACCOUNT_MESSAGE =
   "You can't remove yourself here. Use Settings → Delete account instead.";
@@ -33,6 +35,7 @@ export class AdminUserRemovalService {
     private readonly databaseService: DatabaseService,
     private readonly cognitoUsers: CognitoUserDeletionService,
     private readonly storageService: StorageService,
+    @Optional() private readonly pushDevices?: PushDevicesService,
   ) {}
 
   removeUser = async (
@@ -54,6 +57,8 @@ export class AdminUserRemovalService {
       throw new ConflictException(LAST_OWNER_MESSAGE);
     }
     await this.disableSignIns(userId, target);
+    // Best effort, before the rows that name the endpoints are deleted.
+    await this.pushDevices?.removeAllForUser(userId, target.tenant_id);
 
     const outcome = await removalRepository.removeUser(this.databaseService, {
       userId,

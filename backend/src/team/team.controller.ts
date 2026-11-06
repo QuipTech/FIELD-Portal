@@ -64,6 +64,17 @@ export class TeamController {
     return this.team.changeRole(actor, userId, dto);
   }
 
+  // Read-only: their mode and the shared groups assigned to them or the
+  // organisation. Only the platform administrator changes machine access
+  // (PATCH /admin/users/:userId/machine-access) and assigns groups.
+  @Get(':userId/machine-access')
+  getMachineAccess(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('userId', ParseUUIDPipe) userId: string,
+  ) {
+    return this.team.getMachineAccess(actor, userId);
+  }
+
   @Delete(':userId')
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(

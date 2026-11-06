@@ -22,12 +22,14 @@ import { CorrectIdentifiersDto } from './dto/correctIdentifiersDto';
 import { UpdateMachineDto } from './dto/updateMachineDto';
 import { MachineIdentifiersService } from './machineIdentifiers.service';
 import { MachineDetailsService } from './machineDetails.service';
+import { MachineRegistrationService } from './machineRegistration.service';
 import { RequireFeature } from '../entitlements/requireFeature.guard';
 import { FEATURE_KEYS } from '../entitlements/featureKeys';
 
 // The Machines list, registration and status changes. One machine's
 // details and history (/machines/:machineId…) live in
-// MachineHistoryController.
+// MachineHistoryController; the CSV import in FleetImportController and
+// moving machines between groups in MachineGroupAssignmentController.
 @Controller()
 @UseGuards(JwtAuthGuard, RequirePermissionsGuard)
 export class MachineFleetController {
@@ -35,6 +37,7 @@ export class MachineFleetController {
     private readonly machineFleetService: MachineFleetService,
     private readonly machineIdentifiersService: MachineIdentifiersService,
     private readonly machineDetailsService: MachineDetailsService,
+    private readonly machineRegistrationService: MachineRegistrationService,
   ) {}
 
   @Get('machines')
@@ -53,10 +56,11 @@ export class MachineFleetController {
     @CurrentUser() actor: AuthenticatedUser,
     @Body() dto: RegisterMachineDto,
   ) {
-    return this.machineFleetService.registerMachine(actor, dto);
+    return this.machineRegistrationService.registerMachine(actor, dto);
   }
 
-  // Site, hour-meter reading, cover photo.
+  // Site, hour-meter reading, cover photo; groupId needs an organisation
+  // admin as well.
   @Patch('machines/:machineId')
   @RequirePermissions('machine.manage')
   update(
