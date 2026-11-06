@@ -1,6 +1,7 @@
 import type { UploadedFile } from "./uploadedFile";
 import type { LifecycleState } from "./machineLifecycle";
 import type { MachineSharing } from "./machineGroup";
+import type { MachineDocumentFile } from "./machineDocument";
 
 export type LiveHistoryEntryType = "service" | "repair" | "inspection" | "fault" | "note";
 
@@ -62,6 +63,8 @@ export interface LiveHistoryEntry {
   operatingHours: number | null;
   downtimeHours: number | null;
   photos: MachinePhoto[];
+  // Missing from older backends, which had no machine documents.
+  documents?: MachineDocumentFile[];
 }
 
 export interface MachinePhotoUploadResponse {

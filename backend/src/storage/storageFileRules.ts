@@ -57,6 +57,13 @@ export const CASE_ATTACHMENT_RULE: FileRule = {
   contentTypes: { ...PHOTO_RULE.contentTypes, ...DOCUMENT_RULE.contentTypes },
 };
 
+// Files about one machine: PDF or Word reports, or a scan or photo of one.
+export const MACHINE_DOCUMENT_RULE: FileRule = {
+  label: 'PDF or Word documents, or scans (JPG, PNG, HEIC)',
+  maxBytes: 20 * MB,
+  contentTypes: { ...DOCUMENT_RULE.contentTypes, ...PHOTO_RULE.contentTypes },
+};
+
 const startsWith = (buffer: Buffer, bytes: number[], offset = 0) =>
   bytes.every((byte, index) => buffer[offset + index] === byte);
 

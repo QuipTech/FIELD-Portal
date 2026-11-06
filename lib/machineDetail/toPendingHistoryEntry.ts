@@ -25,6 +25,13 @@ export const toPendingHistoryEntry = (
       contentType: file.type,
       url: URL.createObjectURL(file),
     })),
+    documents: (entry.documents ?? []).map((file, index) => ({
+      id: `${id}-document-${index}`,
+      fileName: file.name,
+      contentType: file.type,
+      url: null,
+      downloadUrl: null,
+    })),
     syncState,
   };
 };

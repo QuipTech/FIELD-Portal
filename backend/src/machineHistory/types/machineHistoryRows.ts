@@ -1,5 +1,6 @@
 import { MachineAccessLevel } from '../../machineSharing/access/machineAccess';
 import { MachineGroupRef } from '../../machineSharing/types/machineGroupTypes';
+import { MachineDocumentType } from '../dto/machineDocumentDtos';
 
 export interface MachineRow {
   id: string;
@@ -60,8 +61,30 @@ export interface HistoryEntryRow {
   downtime_hours: string | null;
   // Live (not soft-deleted) photos, oldest first, as JSON from json_agg.
   photos: PhotoRow[];
+  // Live documents added with the entry, oldest first, also from json_agg.
+  documents: MachineDocumentRow[];
 }
 
 export interface GalleryPhotoRow extends PhotoRow {
   caption: string | null;
+}
+
+export interface MachineDocumentRow {
+  id: string;
+  history_entry_id: string | null;
+  document_type: MachineDocumentType;
+  storage_key: string;
+  file_name: string;
+  content_type: string;
+  // bigint comes back from pg as a string.
+  size_bytes: string | number;
+  uploaded_by: string | null;
+  created_at: Date | string;
+}
+
+export interface MachineDocumentListRow extends MachineDocumentRow {
+  uploader_first_name: string | null;
+  uploader_last_name: string | null;
+  // An uploader in another organisation, whose people the reader can't see.
+  uploader_organisation_name: string | null;
 }

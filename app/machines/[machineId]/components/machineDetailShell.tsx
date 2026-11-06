@@ -26,7 +26,7 @@ import { AppShell } from "@/components/shell/appShell";
 import { isOwnMachine } from "@/lib/machineDetail/machineAccessRules";
 import { MachineSharingPanel } from "./machineSharingPanel";
 
-const ROUTED_TABS: MachineTab[] = ["history", "config-history", "manuals", "cases"];
+const ROUTED_TABS: MachineTab[] = ["history", "documents", "machine-app", "config-history", "manuals", "cases"];
 
 const LIFECYCLE_NOTICES: Record<LifecycleChangeResult["action"], string> = {
   activate: "Machine activated.",

@@ -46,6 +46,8 @@ import { AdminOverviewModule } from './adminOverview/adminOverview.module';
 import { DemoRequestsModule } from './demoRequests/demoRequests.module';
 import { DEMO_REQUEST_THROTTLER } from './demoRequests/demoRequestsThrottle';
 import { BIOMETRIC_SIGN_IN_THROTTLER } from './auth/biometricKeys/biometricSignInThrottle';
+import { DEVICE_PAIRING_THROTTLER } from './machineControl/pairing/devicePairingThrottle';
+import { MachineControlModule } from './machineControl/machineControl.module';
 import { RequestSourceMiddleware } from './common/requestSource/requestSource.middleware';
 
 @Module({
@@ -60,6 +62,7 @@ import { RequestSourceMiddleware } from './common/requestSource/requestSource.mi
     ThrottlerModule.forRoot([
       DEMO_REQUEST_THROTTLER,
       BIOMETRIC_SIGN_IN_THROTTLER,
+      DEVICE_PAIRING_THROTTLER,
     ]),
     DatabaseModule,
     StorageModule,
@@ -71,6 +74,7 @@ import { RequestSourceMiddleware } from './common/requestSource/requestSource.mi
     AdminKnowledgeModule,
     DocumentsModule,
     MachineHistoryModule,
+    MachineControlModule,
     MachineConfigurationModule,
     KnowledgeSearchModule,
     MachineLibraryModule,

@@ -7,6 +7,8 @@ export const machineKeyPrefix = (machineId: string) => `machine:${machineId}:`;
 export const machineCacheKeys = {
   machine: (machineId: string) => `${machineKeyPrefix(machineId)}detail`,
   photos: (machineId: string) => `${machineKeyPrefix(machineId)}photos`,
+  appConnection: (machineId: string) => `${machineKeyPrefix(machineId)}appConnection`,
+  documents: (machineId: string) => `${machineKeyPrefix(machineId)}documents`,
   systems: (machineId: string) => `${machineKeyPrefix(machineId)}systems`,
   components: (machineId: string) => `${machineKeyPrefix(machineId)}components`,
   snapshots: (machineId: string) => `${machineKeyPrefix(machineId)}snapshots`,

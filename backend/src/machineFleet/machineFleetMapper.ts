@@ -48,6 +48,7 @@ export const toFleetMachine = (
     groups: row.groups,
     owningOrganisationName: row.owning_organisation_name,
     isShared: row.is_shared,
+    appConnected: row.app_connected,
     accessLevel: row.access_level,
   };
 };
