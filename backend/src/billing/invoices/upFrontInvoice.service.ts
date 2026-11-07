@@ -80,7 +80,7 @@ export class UpFrontInvoiceService {
     actor: BillingActor | null,
     params: {
       billingAccountId: string;
-      kind: 'annual' | 'onboarding';
+      kind: 'annual' | 'onboarding' | 'machine_final';
       periodStart: string | null;
       periodEnd: string | null;
       lines: CalculatedLine[];

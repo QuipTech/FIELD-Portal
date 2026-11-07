@@ -121,11 +121,19 @@ for crossing the threshold.
 
 2.  **Billable machines = the month\'s peak:** the highest number of
     machines active on any one day of the month. There are no part-month
-    charges.
+    charges, except rule 3a.
 
 3.  A machine activated on any day of the month counts toward that day.
     Deactivating, archiving or selling a machine doesn\'t reduce a peak
     already reached; it lowers next month\'s count.
+
+3a. **Exception for deleted machines:** on a monthly plan, a deactivated
+    machine being deleted pays now for the days it was used this month:
+    monthly rate at the band for the peak so far × days used ÷ days in the
+    month, rounded half-up, counted to the day it was deactivated. It then
+    leaves that month\'s peak, and can\'t be reactivated that month, so the
+    month is never billed twice. Its monthly invoices for earlier months
+    must be paid first. Annual plans wait for the month-end run.
 
 4.  **ASSET_PRO charge** = peak × the rate for the peak\'s band. Every
     machine is charged the same rate.

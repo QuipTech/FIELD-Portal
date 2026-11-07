@@ -8,7 +8,10 @@ import {
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { findUserPermissionCodes } from '../auth/userAccess.repository';
 import { recordBillingAudit } from '../billing/billingAudit/billingAudit';
-import { toBillingDay } from '../billing/billingCalendar/billingDay';
+import {
+  firstDayOfMonth,
+  toBillingDay,
+} from '../billing/billingCalendar/billingDay';
 import { DatabaseService } from '../database/database.service';
 import { ServiceDatabaseService } from '../database/serviceDatabase.service';
 import { toPersonName } from '../machineHistory/machineHistoryMapper';
@@ -23,6 +26,7 @@ import {
   toLifecycleState,
 } from './lifecycleTransitions';
 import { applyMachineTransition } from './machineActivations.repository';
+import { hasLiveFinalCharge } from './machineDeletion.repository';
 import * as lifecycleRepository from './machineLifecycle.repository';
 import { findVisibleLifecycleMachine } from './visibleMachine';
 import {
@@ -40,6 +44,9 @@ const SELL_BY_TRANSFER_MESSAGE =
   'A machine is sold by transferring it to the receiving organisation.';
 const STATE_CHANGED_MESSAGE =
   'This machine changed while you were working on it. Refresh and try again.';
+
+const FINAL_CHARGE_MESSAGE =
+  "This machine has a final charge for this month, so it can't be activated until next month.";
 
 const BECOMES_ACTIVE: LifecycleAction[] = ['activate', 'reactivate'];
 
@@ -113,6 +120,17 @@ export class MachineLifecycleService {
 
     const current = toLifecycleState(machine.lifecycle_state);
     const today = toBillingDay(now, machine.timezone);
+    // It has paid for this month by the day and left the peak: counting it
+    // again would bill the same month twice.
+    if (
+      BECOMES_ACTIVE.includes(action) &&
+      (await hasLiveFinalCharge(
+        this.serviceDatabase,
+        machineId,
+        firstDayOfMonth(today),
+      ))
+    )
+      throw new ConflictException(FINAL_CHARGE_MESSAGE);
     const plan = planTransition(action, current, today);
     if (!plan)
       throw new ConflictException(`A ${current} machine can't be ${action}d.`);

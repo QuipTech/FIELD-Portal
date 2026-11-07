@@ -102,6 +102,17 @@ export class MachineLifecycleController {
     return this.deletionService.checkDeletion(actor, machineId);
   }
 
+  // Raises the days-used charge; pay it, then delete. Safe to repeat.
+  @Post(':machineId/final-charge')
+  @HttpCode(200)
+  @RequirePermissions(MACHINE_LIFECYCLE_PERMISSION)
+  payFinalCharge(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('machineId', ParseUUIDPipe) machineId: string,
+  ) {
+    return this.deletionService.payFinalCharge(actor, machineId);
+  }
+
   // 409 with the blocker until it's out of active and its billing is settled.
   @Delete(':machineId')
   @HttpCode(204)

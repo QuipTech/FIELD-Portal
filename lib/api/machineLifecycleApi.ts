@@ -31,6 +31,10 @@ export const getMachineLifecycleRequest = (accessToken: string, machineId: strin
 export const getMachineDeletionCheckRequest = (accessToken: string, machineId: string) =>
   apiRequest<MachineDeletionCheck>(`/machines/${machineId}/deletion-check`, { headers: authorizationHeader(accessToken) });
 
+// Raises the days-used charge for a machine being deleted; safe to repeat.
+export const payMachineFinalChargeRequest = (accessToken: string, machineId: string) =>
+  apiRequest<MachineDeletionCheck>(`/machines/${machineId}/final-charge`, { method: "POST", headers: authorizationHeader(accessToken) });
+
 // Soft delete; 409 until it's out of active and its billing is settled.
 export const deleteMachineRequest = (accessToken: string, machineId: string, reason: string) =>
   apiRequest<null>(`/machines/${machineId}`, {

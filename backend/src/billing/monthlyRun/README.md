@@ -10,7 +10,8 @@ sections 3 and 9). Each hour, per account and in the account's time zone, it:
    intervals). Missed days are backfilled with the same numbers; a written
    day is never changed.
 2. **Drafts** the closed month's invoice once: ASSET_PRO on the month's peak
-   machines, ASSET_PRO_OVER_COMMIT for annual accounts, TECH on the peak
+   machines (leaving out machines that paid their own final charge before
+   deletion, `machineLifecycle/machineDeletionRules.ts`), ASSET_PRO_OVER_COMMIT for annual accounts, TECH on the peak
    seats (or extra seats above an annual commitment). Every line stores a
    `calc_snapshot` (peak, peak day, pinned price book and bands).
 3. **Finalises** drafts after `INVOICE_REVIEW_HOURS` (24) unless a platform

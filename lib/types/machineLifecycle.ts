@@ -70,7 +70,8 @@ export type MachineDeletionBlocker =
   | "open_cases"
   | "pending_transfer"
   | "awaiting_final_invoice"
-  | "unpaid_invoices";
+  | "unpaid_invoices"
+  | "final_charge_due";
 
 export interface MachineDeletionCheck {
   canDelete: boolean;
@@ -78,7 +79,16 @@ export interface MachineDeletionCheck {
   message: string | null;
   // First day the final invoice can exist, when waiting for it.
   finalInvoiceFrom: string | null;
-  unpaidInvoices: { id: string; periodStart: string; status: string; hostedInvoiceUrl: string | null }[];
+  unpaidInvoices: { id: string; periodStart: string; status: string; hostedInvoiceUrl: string | null; isFinalCharge: boolean }[];
+  // What paying now costs, when the blocker is final_charge_due.
+  finalCharge: {
+    periodStart: string;
+    lastUsedOn: string;
+    daysUsed: number;
+    daysInMonth: number;
+    monthlyRateCents: number;
+    amountCents: number;
+  } | null;
 }
 
 export type TransferStatus = "requested" | "rejected" | "cancelled" | "completed";
