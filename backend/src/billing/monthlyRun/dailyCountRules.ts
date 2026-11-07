@@ -15,3 +15,17 @@ export const buildDailyCounts = (
     activeMachines: countIntervalsOnDay(machines, day),
     techSeats: countIntervalsOnDay(seats, day),
   }));
+
+// The peak's input without machines that paid their own final charge (billing
+// spec section 3, rule 3a). The written snapshots stay as they are.
+export const withoutFinalChargedMachines = (
+  counts: DailyBillableCount[],
+  charged: BillableInterval[],
+): DailyBillableCount[] =>
+  counts.map((count) => ({
+    ...count,
+    activeMachines: Math.max(
+      count.activeMachines - countIntervalsOnDay(charged, count.day),
+      0,
+    ),
+  }));

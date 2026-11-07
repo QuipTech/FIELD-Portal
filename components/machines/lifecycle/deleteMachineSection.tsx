@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirmDialog";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
-import { deleteMachineRequest, getMachineDeletionCheckRequest } from "@/lib/api/machineLifecycleApi";
+import { deleteMachineRequest, getMachineDeletionCheckRequest, payMachineFinalChargeRequest } from "@/lib/api/machineLifecycleApi";
 import { requireAccessToken } from "@/lib/api/requireAccessToken";
+import { audMoney } from "@/lib/format/audMoney";
 import { useApiResource } from "@/lib/hooks/useApiResource";
 import { machineKeyPrefix } from "@/lib/machineDetail/machineDetailCacheKeys";
 import { invalidateCached } from "@/lib/machineDetail/resourceCache";
@@ -26,8 +27,8 @@ const utcDate = (day: string) => new Date(`${day}T00:00:00Z`);
 const formatMonth = (day: string) => utcDate(day).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
 const formatDay = (day: string) => utcDate(day).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
-// Deleting a machine, once it's out of active and its billing is settled. The
-// API decides and enforces that; this shows what's still in the way.
+// Deleting a machine: deactivate it, pay what's billed and the days used this
+// month, then delete. The API decides and enforces that; this shows the next step.
 export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }: DeleteMachineSectionProps) => {
   const router = useRouter();
   const check = useApiResource(
@@ -38,7 +39,25 @@ export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }
   const [isConfirming, setIsConfirming] = useState(false);
   const [typedLabel, setTypedLabel] = useState("");
   const [reason, setReason] = useState("");
+  const [isRaisingCharge, setIsRaisingCharge] = useState(false);
+  const [chargeError, setChargeError] = useState<string | null>(null);
   const result = check.data;
+  const finalCharge = result?.finalCharge ?? null;
+
+  // Raises it and pushes it to Stripe; the reload shows its payment link, or
+  // that it's paid if a card or direct debit on file covered it.
+  const raiseFinalCharge = async () => {
+    setIsRaisingCharge(true);
+    setChargeError(null);
+    try {
+      await payMachineFinalChargeRequest(requireAccessToken(), machineId);
+      check.reload();
+    } catch (error) {
+      setChargeError(toApiErrorMessage(error, "Couldn't raise the final charge. Please try again."));
+    } finally {
+      setIsRaisingCharge(false);
+    }
+  };
   const canConfirm = typedLabel.trim() === machineLabel && reason.trim().length >= MIN_REASON_LENGTH;
 
   return (
@@ -55,11 +74,25 @@ export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }
           Delete machine
         </Button>
       </div>
+      {finalCharge && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-fillGray p-3 text-sm">
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span className="font-medium text-ink">Final charge: {audMoney(finalCharge.amountCents)} + GST</span>
+            <span className="text-bodyGray">
+              {finalCharge.daysUsed} of {finalCharge.daysInMonth} days in {formatMonth(finalCharge.periodStart)}, up to {formatDay(finalCharge.lastUsedOn)}, at {audMoney(finalCharge.monthlyRateCents)} a month. This machine then comes off the month-end invoice, and can&apos;t be reactivated this month.
+            </span>
+          </div>
+          <Button size="sm" variant="primary" className="ml-auto" disabled={isRaisingCharge} onClick={raiseFinalCharge}>
+            {isRaisingCharge ? "Raising charge…" : "Pay final charge"}
+          </Button>
+        </div>
+      )}
+      {chargeError && <span className="text-sm text-danger">{chargeError}</span>}
       {result && result.unpaidInvoices.length > 0 && (
         <ul className="flex flex-col gap-1 text-sm">
           {result.unpaidInvoices.map((invoice) => (
             <li key={invoice.id} className="flex flex-wrap items-center gap-2 text-bodyGray">
-              <span>{formatMonth(invoice.periodStart)} invoice</span>
+              <span>{invoice.isFinalCharge ? `Final charge for ${formatMonth(invoice.periodStart)}` : `${formatMonth(invoice.periodStart)} invoice`}</span>
               {invoice.hostedInvoiceUrl ? (
                 <a href={invoice.hostedInvoiceUrl} target="_blank" rel="noreferrer" className="font-medium text-primary">
                   Pay invoice

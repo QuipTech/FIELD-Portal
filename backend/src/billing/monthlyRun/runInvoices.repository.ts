@@ -50,14 +50,17 @@ export const hasRunInvoice = async (
   return result.rows[0]?.found === true;
 };
 
+// A machine paying for its days used before it is deleted.
+export const MACHINE_FINAL_INVOICE_KIND = 'machine_final';
+
 // kind 'monthly' (the run, in arrears, waits for review), 'annual' (a
-// term's up-front invoice) or 'onboarding' (assisted onboarding on
-// completion); the last two are finalised straight away.
+// term's up-front invoice), 'onboarding' (assisted onboarding on
+// completion) or 'machine_final'; all but monthly are finalised straight away.
 export const insertRunInvoice = async (
   client: PoolClient,
   params: {
     billingAccountId: string;
-    kind?: 'monthly' | 'annual' | 'onboarding';
+    kind?: 'monthly' | 'annual' | 'onboarding' | 'machine_final';
     periodStart: string | null;
     periodEnd: string | null;
     reviewUntil: Date | null;
@@ -111,7 +114,7 @@ export const listInvoicesDueForFinalisation = async (
      WHERE (status = 'draft' AND kind = 'monthly' AND held_at IS NULL
             AND review_until <= $1)
         -- Up-front invoices whose Stripe push failed: retried.
-        OR (status IN ('draft', 'final') AND kind IN ('annual', 'onboarding')
+        OR (status IN ('draft', 'final') AND kind IN ('annual', 'onboarding', 'machine_final')
             AND created_at <= $1::timestamptz - interval '10 minutes')
      ORDER BY coalesce(review_until, created_at), id`,
     [now],
@@ -155,4 +158,33 @@ export const releaseRunInvoice = async (
     [invoiceId],
   );
   return result.rows[0];
+};
+
+// The intervals of machines that paid their own final charge for this month.
+// A void charge doesn't count, so that machine goes back in the peak.
+export const listFinalChargedIntervals = async (
+  client: BillingReader,
+  billingAccountId: string,
+  periodStart: string,
+  periodEnd: string,
+): Promise<{ startedOn: string; billingEnd: string | null }[]> => {
+  const result = await client.query<{
+    started_on: string;
+    billing_end: string | null;
+  }>(
+    `SELECT a.activated_on::text AS started_on, a.billing_end::text AS billing_end
+     FROM billing.machine_final_charges c
+     JOIN billing.invoices i ON i.id = c.invoice_id AND i.status <> 'void'
+     JOIN billing.machine_activations a
+       ON a.machine_id = c.machine_id AND a.billing_account_id = c.billing_account_id
+      AND a.deleted_at IS NULL
+      AND a.activated_on < $3::date
+      AND (a.billing_end IS NULL OR a.billing_end > $2::date)
+     WHERE c.billing_account_id = $1 AND c.period_start = $2::date`,
+    [billingAccountId, periodStart, periodEnd],
+  );
+  return result.rows.map((row) => ({
+    startedOn: row.started_on,
+    billingEnd: row.billing_end,
+  }));
 };

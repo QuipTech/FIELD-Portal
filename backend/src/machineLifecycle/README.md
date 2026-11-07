@@ -17,8 +17,8 @@ machineLifecycle/
 ├── lifecycleTransitions.ts        ← pure: states, the 5 transitions, billing days, available actions
 ├── machineLifecycle.service.ts    ← activate/deactivate/archive/reactivate, bulk, lifecycle history
 ├── machineLifecycle.controller.ts ← /machines/:id/lifecycle, /machines/lifecycle/bulk, /machines/:id/custody, deletion
-├── machineDeletionRules.ts        ← pure: when a machine may be deleted (out of active, billing settled)
-├── machineDeletion.service.ts     ← GET /machines/:id/deletion-check, DELETE /machines/:id (soft delete, audited)
+├── machineDeletionRules.ts        ← pure: when a machine may be deleted, and its days-used final charge
+├── machineDeletion.service.ts     ← GET /machines/:id/deletion-check, POST …/final-charge, DELETE /machines/:id (soft delete, audited)
 ├── machineActivations.repository.ts ← peak-rule count, billing.apply_machine_transition()
 ├── enterpriseThreshold.service.ts ← one sales review task at the Enterprise threshold (T8)
 ├── organisationBillingAccount.service.ts ← self-serve: first activation signs up the organisation (account + monthly ASSET_PRO)
@@ -58,12 +58,15 @@ Part of the API (`npm run start:dev` from `backend/`). Tests:
   deactivate, archive and read everything.
 - Reaching `ENTERPRISE_THRESHOLD_MACHINES` never refuses an activation.
 - Deleting needs `machine.lifecycle` and is a soft delete. The machine must be
-  out of active with no open cases or pending transfer. If it was ever billed,
-  its last billed month must be invoiced and every monthly invoice from its
-  first billed month to its last paid. A month with no invoice counts as settled
-  once the run has processed the following day (Enterprise, internal, within an
-  annual commitment). Deleting disconnects its machine app and frees its serial
-  to register again; its activation intervals and invoices stay.
+  out of active with no open cases or pending transfer. Every monthly invoice
+  from its first billed month to the last closed month must be paid. On a monthly
+  plan the month still open is paid at once: POST `/machines/:id/final-charge`
+  raises a `machine_final` invoice for monthly rate × days used ÷ days in the
+  month, counted to the day it was deactivated at the band for the peak so far.
+  That machine then leaves the month's peak (spec section 3, rule 3a) and can't
+  be reactivated that month. Annual plans wait for the month-end run; Enterprise
+  and internal plans have no machine charge. Deleting disconnects its machine app
+  and frees its serial to register again; intervals and invoices stay.
 - Transfer approval (which moves the machine's records) is not built yet:
   the list of records that move and stay needs sign-off first.
 

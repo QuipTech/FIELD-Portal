@@ -1,18 +1,19 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DeleteMachineSection } from "./deleteMachineSection";
-import { deleteMachineRequest, getMachineDeletionCheckRequest } from "@/lib/api/machineLifecycleApi";
+import { deleteMachineRequest, getMachineDeletionCheckRequest, payMachineFinalChargeRequest } from "@/lib/api/machineLifecycleApi";
 
 const push = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 vi.mock("@/lib/api/machineLifecycleApi", () => ({
   deleteMachineRequest: vi.fn(),
   getMachineDeletionCheckRequest: vi.fn(),
+  payMachineFinalChargeRequest: vi.fn(),
 }));
 vi.mock("@/lib/api/requireAccessToken", () => ({ requireAccessToken: () => "test-token" }));
 afterEach(cleanup);
 
-const allowed = { canDelete: true, blocker: null, message: null, finalInvoiceFrom: null, unpaidInvoices: [] };
+const allowed = { canDelete: true, blocker: null, message: null, finalInvoiceFrom: null, unpaidInvoices: [], finalCharge: null };
 const renderSection = () => render(<DeleteMachineSection machineId="m1" machineLabel="ABC-01" lifecycleState="registered" />);
 const deleteButton = (name = "Delete machine") => screen.getAllByRole("button", { name }).at(-1) as HTMLButtonElement;
 
@@ -43,14 +44,38 @@ describe("deleting a machine", () => {
       blocker: "unpaid_invoices",
       message: "Pay the invoices below to delete this machine.",
       unpaidInvoices: [
-        { id: "i1", periodStart: "2026-10-01", status: "synced", hostedInvoiceUrl: "https://invoice.stripe.com/i/1" },
-        { id: "i2", periodStart: "2026-11-01", status: "draft", hostedInvoiceUrl: null },
+        { id: "i1", periodStart: "2026-10-01", status: "synced", hostedInvoiceUrl: "https://invoice.stripe.com/i/1", isFinalCharge: false },
+        { id: "i2", periodStart: "2026-11-01", status: "draft", hostedInvoiceUrl: null, isFinalCharge: true },
       ],
     });
     renderSection();
     expect(((await screen.findByRole("link", { name: "Pay invoice" })) as HTMLAnchorElement).href).toBe("https://invoice.stripe.com/i/1");
     expect(screen.getByText("October 2026 invoice")).toBeTruthy();
+    expect(screen.getByText("Final charge for November 2026")).toBeTruthy();
     expect((screen.getByRole("link", { name: "View in Billing" }) as HTMLAnchorElement).getAttribute("href")).toBe("/settings/billing");
+  });
+
+  it("shows the days-used charge, raises it, then shows its payment link", async () => {
+    const paid = { id: "f1", periodStart: "2026-11-01", status: "synced", hostedInvoiceUrl: "https://invoice.stripe.com/i/f", isFinalCharge: true };
+    vi.mocked(getMachineDeletionCheckRequest)
+      .mockResolvedValueOnce({
+        ...allowed,
+        canDelete: false,
+        blocker: "final_charge_due",
+        message: "Pay for the days this machine was used this month, then you can delete it.",
+        finalCharge: { periodStart: "2026-11-01", lastUsedOn: "2026-11-07", daysUsed: 7, daysInMonth: 30, monthlyRateCents: 3500, amountCents: 817 },
+      })
+      .mockResolvedValue({ ...allowed, canDelete: false, blocker: "unpaid_invoices", message: "Pay the invoices below, then you can delete this machine.", unpaidInvoices: [paid] });
+    vi.mocked(payMachineFinalChargeRequest).mockResolvedValue({ ...allowed, canDelete: false });
+    renderSection();
+
+    await screen.findByText(/Final charge: .*8\.17/);
+    expect(screen.getByText(/7 of 30 days in November 2026, up to 7 November 2026/)).toBeTruthy();
+    expect(deleteButton().disabled).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Pay final charge" }));
+    expect(((await screen.findByRole("link", { name: "Pay invoice" })) as HTMLAnchorElement).href).toBe("https://invoice.stripe.com/i/f");
+    expect(payMachineFinalChargeRequest).toHaveBeenCalledWith("test-token", "m1");
   });
 
   it("needs the machine's name and a reason, then deletes and leaves the page", async () => {

@@ -1,6 +1,11 @@
 import { MachineDeletionService } from '../../src/machineLifecycle/machineDeletion.service';
+import { PriceBooksService } from '../../src/billing/priceBooks/priceBooks.service';
+import { ASSET_PRO_V1 } from '../../src/billing/pricing/priceBookV1Fixture';
+import { UpFrontInvoiceService } from '../../src/billing/invoices/upFrontInvoice.service';
 import { ListMachinesQueryDto } from '../../src/machineFleet/dto/listMachinesQueryDto';
 import { AuthenticatedUser } from '../../src/auth/types/authenticatedUser';
+import { listFinalChargedIntervals } from '../../src/billing/monthlyRun/runInvoices.repository';
+import { hasLiveFinalCharge } from '../../src/machineLifecycle/machineDeletion.repository';
 import {
   BillingTestDatabase,
   createBillingTestDatabase,
@@ -23,11 +28,45 @@ describe('deleting a machine', () => {
   let actors: ReturnType<typeof actorsOf>;
   let deletion: MachineDeletionService;
   let adminB: AuthenticatedUser;
+  const finalise = jest.fn(async () => undefined);
 
   beforeAll(async () => {
     fixture = await createBillingTestDatabase();
     services = servicesOf(fixture);
-    deletion = new MachineDeletionService(fixture.database);
+    const upFront = {
+      draft: jest.fn(
+        async (
+          client,
+          _actor,
+          params: {
+            billingAccountId: string;
+            periodStart: string;
+            lines: { amountCents: number }[];
+          },
+        ) => {
+          const invoice = await client.query(
+            `INSERT INTO billing.invoices (billing_account_id, currency, total_ex_gst_cents, kind, period_start, period_end, status)
+             VALUES ($1, 'AUD', $2, 'machine_final', $3::date, ($3::date + interval '1 month')::date, 'draft') RETURNING id`,
+            [
+              params.billingAccountId,
+              params.lines[0].amountCents,
+              params.periodStart,
+            ],
+          );
+          return invoice.rows[0].id;
+        },
+      ),
+      finalise,
+    } as unknown as UpFrontInvoiceService;
+    const priceBooks = {
+      getPinnedPriceBook: jest.fn(async () => ASSET_PRO_V1),
+    } as unknown as PriceBooksService;
+    deletion = new MachineDeletionService(
+      fixture.database,
+      fixture.serviceDatabase,
+      priceBooks,
+      upFront,
+    );
   });
   afterAll(() => fixture.db.close());
   beforeEach(async () => {
@@ -48,11 +87,39 @@ describe('deleting a machine', () => {
       machineId(),
       state,
     ]);
-  const addInterval = (activatedOn: string, billingEnd: string | null) =>
+  const addInterval = (
+    activatedOn: string,
+    billingEnd: string | null,
+    deactivatedAt: string | null = null,
+  ) =>
     fixture.query(
-      `INSERT INTO billing.machine_activations (machine_id, billing_account_id, activated_on, billing_end)
-       VALUES ($1, $2, $3, $4)`,
-      [machineId(), fixture.ids.setUpAccount, activatedOn, billingEnd],
+      `INSERT INTO billing.machine_activations (machine_id, billing_account_id, activated_on, billing_end, deactivation_requested_at)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        machineId(),
+        fixture.ids.setUpAccount,
+        activatedOn,
+        billingEnd,
+        deactivatedAt,
+      ],
+    );
+  const setPlan = (term: 'monthly' | 'annual') =>
+    fixture.query(
+      `UPDATE billing.subscriptions SET term = $2::varchar, committed_qty = CASE WHEN $2::varchar = 'annual' THEN 10 END,
+         annual_months_charged = CASE WHEN $2::varchar = 'annual' THEN 10 END
+       WHERE billing_account_id = $1 AND plan_code = 'ASSET_PRO'`,
+      [fixture.ids.setUpAccount, term],
+    );
+  const addPlanIfMissing = () =>
+    fixture.query(
+      `INSERT INTO billing.subscriptions (billing_account_id, plan_code, price_book_id, term, current_period_start, current_period_end)
+       SELECT $1, 'ASSET_PRO', b.id, 'monthly', '2026-01-01', '2027-01-01'
+       FROM billing.price_books b
+       WHERE b.plan_code = 'ASSET_PRO'
+         AND NOT EXISTS (SELECT 1 FROM billing.subscriptions s
+                         WHERE s.billing_account_id = $1 AND s.plan_code = 'ASSET_PRO')
+       ORDER BY b.version DESC LIMIT 1`,
+      [fixture.ids.setUpAccount],
     );
   const addInvoice = (periodStart: string, status: string) =>
     fixture.query(
@@ -127,46 +194,185 @@ describe('deleting a machine', () => {
     await fixture.db.exec('ROLLBACK TO SAVEPOINT duplicate');
   });
 
-  it('keeps the machine until its final invoice is paid', async () => {
-    await setState('registered');
-    await addInterval('2026-10-15', '2026-12-01');
-    await addInvoice('2026-10-01', 'paid');
+  describe('final charge', () => {
+    // Deactivated on 7 Nov (Brisbane), asked on 20 Nov.
+    const NOV_20 = new Date('2026-11-20T02:00:00Z');
+    const setUpDeactivated = async () => {
+      await setState('registered');
+      await addPlanIfMissing();
+      await addInterval('2026-10-25', '2026-12-01', '2026-11-07T02:00:00Z');
+      await addInvoice('2026-10-01', 'paid');
+    };
+    const check = () => deletion.checkDeletion(adminB, machineId(), NOV_20);
+    const pay = () => deletion.payFinalCharge(adminB, machineId(), NOV_20);
+    const markFinalPaid = () =>
+      fixture.query(
+        `UPDATE billing.invoices SET status = 'paid' WHERE kind = 'machine_final'`,
+      );
 
-    expect(
-      (await deletion.checkDeletion(adminB, machineId(), NOW)).blocker,
-    ).toBe('awaiting_final_invoice');
+    it('quotes the days used, then blocks until it is paid, then deletes', async () => {
+      await setUpDeactivated();
 
-    await addInvoice('2026-11-01', 'synced');
-    const unpaid = await deletion.checkDeletion(adminB, machineId(), NOW);
-    expect(unpaid.blocker).toBe('unpaid_invoices');
-    expect(unpaid.unpaidInvoices.map((item) => item.periodStart)).toEqual([
-      '2026-11-01',
-    ]);
-    await expect(remove()).rejects.toMatchObject({ status: 409 });
+      const due = await check();
+      expect(due.blocker).toBe('final_charge_due');
+      expect(due.finalCharge).toMatchObject({
+        daysUsed: 7,
+        daysInMonth: 30,
+        monthlyRateCents: 3500,
+        amountCents: 817,
+      });
+      await expect(
+        deletion.deleteMachine(adminB, machineId(), 'Scrapped', NOV_20),
+      ).rejects.toMatchObject({ status: 409 });
 
-    await fixture.query(
-      `UPDATE billing.invoices SET status = 'paid' WHERE period_start = '2026-11-01'`,
-    );
-    await remove();
-    expect(await listed()).not.toContain(machineId());
-    const intervals = await fixture.query(
-      `SELECT 1 FROM billing.machine_activations WHERE machine_id = $1 AND deleted_at IS NULL`,
-      [machineId()],
-    );
-    expect(intervals.rowCount ?? intervals.rows.length).toBe(1);
-  });
+      const raised = await pay();
+      expect(raised.blocker).toBe('unpaid_invoices');
+      expect(raised.unpaidInvoices[0].isFinalCharge).toBe(true);
+      expect(finalise).toHaveBeenCalled();
+      const charge = await fixture.query(
+        `SELECT days_used, amount_cents, last_used_on::text FROM billing.machine_final_charges WHERE machine_id = $1`,
+        [machineId()],
+      );
+      expect(charge.rows).toEqual([
+        {
+          days_used: 7,
+          amount_cents: expect.anything(),
+          last_used_on: '2026-11-07',
+        },
+      ]);
 
-  it('settles a month with nothing to bill once the run has passed it', async () => {
-    await setState('archived');
-    await addInterval('2026-10-15', '2026-12-01');
-    await fixture.query(
-      `INSERT INTO billing.daily_billable_counts (billing_account_id, day, active_machines, tech_seats)
-       VALUES ($1, '2026-12-01', 0, 0)`,
-      [fixture.ids.setUpAccount],
-    );
-    expect(
-      (await deletion.checkDeletion(adminB, machineId(), NOW)).canDelete,
-    ).toBe(true);
+      await markFinalPaid();
+      expect((await check()).canDelete).toBe(true);
+      await deletion.deleteMachine(adminB, machineId(), 'Scrapped', NOV_20);
+      expect(await listed()).not.toContain(machineId());
+    });
+
+    it('raises one charge however many times it is asked', async () => {
+      await setUpDeactivated();
+      await pay();
+      await pay();
+      const { rows } = await fixture.query(
+        `SELECT count(*)::int AS count FROM billing.machine_final_charges WHERE machine_id = $1`,
+        [machineId()],
+      );
+      expect(rows[0].count).toBe(1);
+    });
+
+    it('asks for an unpaid earlier invoice before charging', async () => {
+      await setState('registered');
+      await addPlanIfMissing();
+      await addInterval('2026-10-25', '2026-12-01', '2026-11-07T02:00:00Z');
+      await addInvoice('2026-10-01', 'synced');
+      const before = await pay();
+      expect(before.blocker).toBe('unpaid_invoices');
+      const { rows } = await fixture.query(
+        `SELECT count(*)::int AS count FROM billing.machine_final_charges WHERE machine_id = $1`,
+        [machineId()],
+      );
+      expect(rows[0].count).toBe(0);
+    });
+
+    it('waits for the month-end run on an annual plan', async () => {
+      await setUpDeactivated();
+      await setPlan('annual');
+      expect((await check()).blocker).toBe('awaiting_final_invoice');
+      await expect(pay()).rejects.toMatchObject({ status: 409 });
+    });
+
+    it('lets a void charge be raised again', async () => {
+      await setUpDeactivated();
+      await pay();
+      await fixture.query(
+        `UPDATE billing.invoices SET status = 'void' WHERE kind = 'machine_final'`,
+      );
+      expect((await check()).blocker).toBe('final_charge_due');
+    });
+
+    it('closed months are settled by paid monthly invoices alone', async () => {
+      await setState('registered');
+      await addPlanIfMissing();
+      await addInterval('2026-10-15', '2026-12-01', '2026-11-05T02:00:00Z');
+      await addInvoice('2026-10-01', 'paid');
+      await addInvoice('2026-11-01', 'synced');
+      expect(
+        (await deletion.checkDeletion(adminB, machineId(), NOW)).blocker,
+      ).toBe('unpaid_invoices');
+      await fixture.query(
+        `UPDATE billing.invoices SET status = 'paid' WHERE period_start = '2026-11-01'`,
+      );
+      await remove();
+      expect(await listed()).not.toContain(machineId());
+      const intervals = await fixture.query(
+        `SELECT 1 FROM billing.machine_activations WHERE machine_id = $1 AND deleted_at IS NULL`,
+        [machineId()],
+      );
+      expect(intervals.rows).toHaveLength(1);
+    });
+
+    it('settles a closed month with nothing to bill once the run passed it', async () => {
+      await setState('archived');
+      await addInterval('2026-10-15', '2026-12-01');
+      await fixture.query(
+        `INSERT INTO billing.daily_billable_counts (billing_account_id, day, active_machines, tech_seats)
+         VALUES ($1, '2026-12-01', 0, 0)`,
+        [fixture.ids.setUpAccount],
+      );
+      expect(
+        (await deletion.checkDeletion(adminB, machineId(), NOW)).canDelete,
+      ).toBe(true);
+    });
+
+    it('leaves the machine out of the month-end peak, unless its charge is void', async () => {
+      await setUpDeactivated();
+      await pay();
+      const intervals = await listFinalChargedIntervals(
+        fixture.serviceDatabase,
+        fixture.ids.setUpAccount,
+        '2026-11-01',
+        '2026-12-01',
+      );
+      expect(intervals).toEqual([
+        { startedOn: '2026-10-25', billingEnd: '2026-12-01' },
+      ]);
+
+      await fixture.query(
+        `UPDATE billing.invoices SET status = 'void' WHERE kind = 'machine_final'`,
+      );
+      expect(
+        await listFinalChargedIntervals(
+          fixture.serviceDatabase,
+          fixture.ids.setUpAccount,
+          '2026-11-01',
+          '2026-12-01',
+        ),
+      ).toEqual([]);
+    });
+
+    it('finds a live charge to stop it being reactivated that month', async () => {
+      await setUpDeactivated();
+      expect(
+        await hasLiveFinalCharge(
+          fixture.serviceDatabase,
+          machineId(),
+          '2026-11-01',
+        ),
+      ).toBe(false);
+      await pay();
+      expect(
+        await hasLiveFinalCharge(
+          fixture.serviceDatabase,
+          machineId(),
+          '2026-11-01',
+        ),
+      ).toBe(true);
+      expect(
+        await hasLiveFinalCharge(
+          fixture.serviceDatabase,
+          machineId(),
+          '2026-12-01',
+        ),
+      ).toBe(false);
+    });
   });
 
   it('blocks on an open support case', async () => {
