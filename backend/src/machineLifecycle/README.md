@@ -65,7 +65,10 @@ Part of the API (`npm run start:dev` from `backend/`). Tests:
   month, each monthly rate × days used ÷ days in the month, counted to the day it
   was deactivated at the band for that month's peak. The machine then leaves
   those months' peaks (spec section 3, rule 3a) and can't be reactivated in the
-  month still open. Annual plans wait for the month-end run; Enterprise
+  month still open. The same call pushes the invoice to Stripe and returns its
+  payment link, or Stripe's error (the invoice stays saved; calling again retries
+  it). The deletion check asks Stripe about unpaid invoices, so a payment counts
+  before its webhook arrives. Annual plans wait for the month-end run; Enterprise
   and internal plans have no machine charge. Deleting disconnects its machine app
   and frees its serial to register again; intervals and invoices stay.
 - Transfer approval (which moves the machine's records) is not built yet:

@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DeleteMachineSection } from "./deleteMachineSection";
+import { ApiError } from "@/lib/api/httpClient";
 import { deleteMachineRequest, getMachineDeletionCheckRequest, payMachineFinalChargeRequest } from "@/lib/api/machineLifecycleApi";
 
 const push = vi.fn();
@@ -37,6 +38,55 @@ describe("deleting a machine", () => {
     expect(deleteButton().disabled).toBe(true);
   });
 
+  describe("paying the final charge", () => {
+    const stuck = { id: "f1", periodStart: "2026-10-01", status: "draft", hostedInvoiceUrl: null, isFinalCharge: true };
+    const unpaid = { ...allowed, canDelete: false, blocker: "unpaid_invoices" as const, message: "Pay the invoices below." };
+    const stripeUrl = "https://invoice.stripe.com/i/f";
+    const paymentTab = { opener: {}, location: { href: "" }, close: vi.fn() };
+
+    beforeEach(() => {
+      paymentTab.location.href = "";
+      paymentTab.close.mockClear();
+      vi.spyOn(window, "open").mockReturnValue(paymentTab as unknown as Window);
+    });
+    afterEach(() => vi.restoreAllMocks());
+
+    it("retries an invoice that never reached Stripe, then opens Stripe", async () => {
+      const synced = { ...unpaid, unpaidInvoices: [{ ...stuck, status: "synced", hostedInvoiceUrl: stripeUrl }] };
+      vi.mocked(getMachineDeletionCheckRequest).mockResolvedValueOnce({ ...unpaid, unpaidInvoices: [stuck] }).mockResolvedValue(synced);
+      vi.mocked(payMachineFinalChargeRequest).mockResolvedValue(synced);
+      renderSection();
+
+      fireEvent.click(await screen.findByRole("button", { name: "Pay invoice" }));
+      await waitFor(() => expect(paymentTab.location.href).toBe(stripeUrl));
+      expect(paymentTab.opener).toBeNull();
+      expect(paymentTab.close).not.toHaveBeenCalled();
+      expect(((await screen.findByRole("link", { name: "Pay invoice" })) as HTMLAnchorElement).href).toBe(stripeUrl);
+    });
+
+    it("shows Stripe's error and closes the tab", async () => {
+      vi.mocked(getMachineDeletionCheckRequest).mockResolvedValue({ ...unpaid, unpaidInvoices: [stuck] });
+      vi.mocked(payMachineFinalChargeRequest).mockRejectedValue(new ApiError("Billing is not configured (STRIPE_SECRET_KEY).", 503));
+      renderSection();
+
+      fireEvent.click(await screen.findByRole("button", { name: "Pay invoice" }));
+      await screen.findByText("Billing is not configured (STRIPE_SECRET_KEY).");
+      expect(paymentTab.close).toHaveBeenCalled();
+      expect(deleteButton().disabled).toBe(true);
+    });
+
+    it("opens nothing if a card on file already paid it", async () => {
+      vi.mocked(getMachineDeletionCheckRequest).mockResolvedValueOnce({ ...unpaid, unpaidInvoices: [stuck] }).mockResolvedValue(allowed);
+      vi.mocked(payMachineFinalChargeRequest).mockResolvedValue(allowed);
+      renderSection();
+
+      fireEvent.click(await screen.findByRole("button", { name: "Pay invoice" }));
+      await screen.findByText(/Billing is settled/);
+      expect(paymentTab.close).toHaveBeenCalled();
+      expect(deleteButton().disabled).toBe(false);
+    });
+  });
+
   it("links each unpaid invoice to its payment page, or to Billing", async () => {
     vi.mocked(getMachineDeletionCheckRequest).mockResolvedValue({
       ...allowed,
@@ -45,13 +95,13 @@ describe("deleting a machine", () => {
       message: "Pay the invoices below to delete this machine.",
       unpaidInvoices: [
         { id: "i1", periodStart: "2026-10-01", status: "synced", hostedInvoiceUrl: "https://invoice.stripe.com/i/1", isFinalCharge: false },
-        { id: "i2", periodStart: "2026-11-01", status: "draft", hostedInvoiceUrl: null, isFinalCharge: true },
+        { id: "i2", periodStart: "2026-11-01", status: "draft", hostedInvoiceUrl: null, isFinalCharge: false },
       ],
     });
     renderSection();
     expect(((await screen.findByRole("link", { name: "Pay invoice" })) as HTMLAnchorElement).href).toBe("https://invoice.stripe.com/i/1");
     expect(screen.getByText("October 2026 invoice")).toBeTruthy();
-    expect(screen.getByText("Final charge from November 2026")).toBeTruthy();
+    expect(screen.getByText("November 2026 invoice")).toBeTruthy();
     expect((screen.getByRole("link", { name: "View in Billing" }) as HTMLAnchorElement).getAttribute("href")).toBe("/settings/billing");
   });
 
@@ -90,6 +140,7 @@ describe("deleting a machine", () => {
     expect(screen.getByText(/November 2026: 7 of 30 days, up to 7 November 2026/)).toBeTruthy();
     expect(deleteButton().disabled).toBe(true);
 
+    vi.spyOn(window, "open").mockReturnValue(null);
     fireEvent.click(screen.getByRole("button", { name: "Pay dues" }));
     expect(((await screen.findByRole("link", { name: "Pay invoice" })) as HTMLAnchorElement).href).toBe("https://invoice.stripe.com/i/f");
     expect(payMachineFinalChargeRequest).toHaveBeenCalledWith("test-token", "m1");
