@@ -8,11 +8,12 @@ import { LifecycleState } from './lifecycleTransitions';
 
 // Whether a machine may be deleted, and what it still owes. Pure, so the rules
 // are testable.
-//   * Months already closed are settled by their monthly invoices: each must be
-//     paid before the machine goes.
-//   * On a monthly plan, the month it is still billed for is paid now at the
-//     daily rate, up to the day it was deactivated, and it then comes off that
-//     month's peak (billing spec section 3, rule 3a).
+//   * A monthly invoice already issued must be paid before the machine goes.
+//   * On a monthly plan, the month still open and last month, if the run hasn't
+//     invoiced it, are paid now at the daily rate, up to the day it was deactivated,
+//     and the machine then comes off those months' peaks (billing spec section 3,
+//     rule 3a). Nobody waits on the run. Older months are left alone: the run only
+//     ever bills the month before, so a gap there predates billing or was waived.
 //   * On an annual plan the term is paid up front, so it waits for the month-end
 //     run, which works out any over-commitment. Enterprise and internal plans
 //     have no machine charge.
@@ -56,6 +57,9 @@ export interface DeletionFacts {
   // This account's monthly invoices and this machine's final charges for the
   // months in billedMonthRange, none void.
   invoices: DeletionInvoice[];
+  // Months this machine has a final charge for, none void. One charge can cover
+  // several months.
+  finalChargedMonths: string[];
   // The run has processed the day after the last closed month, so a month with
   // no invoice had nothing to bill (Enterprise, internal, within a commitment).
   runPassedLastClosedMonth: boolean;
@@ -68,6 +72,12 @@ export interface FinalChargeQuote {
   daysInMonth: number;
   monthlyRateCents: number;
   amountCents: number;
+}
+
+// Everything to pay in one go, oldest month first.
+export interface FinalChargeDue {
+  amountCents: number;
+  months: FinalChargeQuote[];
 }
 
 export interface MachineDeletionCheck {
@@ -83,8 +93,10 @@ export interface MachineDeletionCheck {
     hostedInvoiceUrl: string | null;
     isFinalCharge: boolean;
   }[];
+  // The months paying now would cover, when final_charge_due.
+  monthsDue: string[];
   // What paying now would cost, when final_charge_due.
-  finalCharge: FinalChargeQuote | null;
+  finalCharge: FinalChargeDue | null;
 }
 
 const blocked = (
@@ -97,6 +109,7 @@ const blocked = (
   message,
   finalInvoiceFrom: null,
   unpaidInvoices: [],
+  monthsDue: [],
   finalCharge: null,
   ...details,
 });
@@ -107,6 +120,7 @@ const ALLOWED: MachineDeletionCheck = {
   message: null,
   finalInvoiceFrom: null,
   unpaidInvoices: [],
+  monthsDue: [],
   finalCharge: null,
 };
 
@@ -156,6 +170,17 @@ export const billedMonthRange = (
     billingEnd,
   };
 };
+
+// False for a gap between two periods of use, which has nothing to charge.
+const wasBilledInMonth = (
+  intervals: BillingIntervalUse[],
+  month: string,
+): boolean =>
+  intervals.some(
+    (interval) =>
+      interval.activatedOn < firstDayOfNextMonth(month) &&
+      (interval.billingEnd === null || interval.billingEnd > month),
+  );
 
 export const assessMachineDeletion = (
   facts: DeletionFacts,
@@ -209,15 +234,34 @@ export const assessMachineDeletion = (
     );
   }
 
-  const hasClosedMonth = range.lastClosedMonth >= range.firstMonth;
-  const lastClosedInvoiced = facts.invoices.some(
-    (invoice) => invoice.periodStart === range.lastClosedMonth,
-  );
-  if (
-    hasClosedMonth &&
-    !lastClosedInvoiced &&
-    !facts.runPassedLastClosedMonth
-  ) {
+  const isLastClosedDue =
+    range.lastClosedMonth >= range.firstMonth &&
+    wasBilledInMonth(facts.intervals, range.lastClosedMonth) &&
+    !facts.runPassedLastClosedMonth &&
+    !facts.finalChargedMonths.includes(range.lastClosedMonth) &&
+    !facts.invoices.some(
+      (invoice) =>
+        !invoice.isFinalCharge && invoice.periodStart === range.lastClosedMonth,
+    );
+
+  if (facts.plan === 'monthly') {
+    const isOpenMonthDue =
+      range.isCurrentMonthOpen &&
+      !facts.finalChargedMonths.includes(range.lastMonth);
+    const monthsDue = [
+      ...(isLastClosedDue ? [range.lastClosedMonth] : []),
+      ...(isOpenMonthDue ? [range.lastMonth] : []),
+    ];
+    return monthsDue.length === 0
+      ? ALLOWED
+      : blocked(
+          'final_charge_due',
+          'Pay for the days this machine was used, then you can delete it.',
+          { monthsDue },
+        );
+  }
+
+  if (isLastClosedDue) {
     return blocked(
       'awaiting_final_invoice',
       "Last month's invoice hasn't been issued yet. It can be paid once it is, and then you can delete this machine.",
@@ -226,23 +270,11 @@ export const assessMachineDeletion = (
   }
 
   if (!range.isCurrentMonthOpen || facts.plan === 'none') return ALLOWED;
-  if (facts.plan === 'annual') {
-    return blocked(
-      'awaiting_final_invoice',
-      'This machine is on an annual plan, so it is settled at the end of this month. It can be deleted after that.',
-      { finalInvoiceFrom: range.billingEnd },
-    );
-  }
-  const hasFinalCharge = facts.invoices.some(
-    (invoice) =>
-      invoice.isFinalCharge && invoice.periodStart === range.lastMonth,
+  return blocked(
+    'awaiting_final_invoice',
+    'This machine is on an annual plan, so it is settled at the end of this month. It can be deleted after that.',
+    { finalInvoiceFrom: range.billingEnd },
   );
-  return hasFinalCharge
-    ? ALLOWED
-    : blocked(
-        'final_charge_due',
-        'Pay for the days this machine was used this month, then you can delete it.',
-      );
 };
 
 const daysBetween = (from: string, until: string): number =>
@@ -251,15 +283,15 @@ const daysBetween = (from: string, until: string): number =>
       86_400_000,
   );
 
-// The daily-rate charge for the month `today` falls in: every day from its
+// The daily-rate charge for the month `day` falls in: every day from its
 // activation to the day it was deactivated, both counted, however many times.
 export const quoteFinalCharge = (
   intervals: BillingIntervalUse[],
-  today: string,
+  day: string,
   monthlyRateCents: number,
 ): FinalChargeQuote => {
-  const periodStart = firstDayOfMonth(today);
-  const periodEnd = firstDayOfNextMonth(today);
+  const periodStart = firstDayOfMonth(day);
+  const periodEnd = firstDayOfNextMonth(day);
   const days = new Set<string>();
   let lastUsedOn = periodStart;
   for (const interval of intervals) {

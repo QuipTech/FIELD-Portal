@@ -7,12 +7,15 @@ import { PoolClient } from 'pg';
 import * as authRepository from '../auth/auth.repository';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import {
-  firstDayOfMonth,
+  addDaysToDay,
   firstDayOfNextMonth,
   toBillingDay,
 } from '../billing/billingCalendar/billingDay';
 import { UpFrontInvoiceService } from '../billing/invoices/upFrontInvoice.service';
-import { MACHINE_FINAL_INVOICE_KIND } from '../billing/monthlyRun/runInvoices.repository';
+import {
+  hasRunInvoice,
+  MACHINE_FINAL_INVOICE_KIND,
+} from '../billing/monthlyRun/runInvoices.repository';
 import { findBandRateCents } from '../billing/pricing/fleetPrice';
 import { PriceBooksService } from '../billing/priceBooks/priceBooks.service';
 import { PLAN_CODES } from '../billing/subscriptions/planCodes';
@@ -27,6 +30,7 @@ import {
   assessMachineDeletion,
   billedMonthRange,
   BillingIntervalUse,
+  FinalChargeDue,
   FinalChargeQuote,
   MachineDeletionCheck,
   quoteFinalCharge,
@@ -44,6 +48,12 @@ const NOTHING_TO_PAY_MESSAGE =
   "This machine doesn't have a final charge to pay.";
 
 const formatRate = (cents: number) => `A$${(cents / 100).toFixed(2)}`;
+const formatMonth = (day: string) =>
+  new Date(`${day}T00:00:00Z`).toLocaleDateString('en-AU', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
 
 // Deleting a machine: only the owning organisation, once it's out of active and
 // its billing is settled (machineDeletionRules.ts). A soft delete: the machine
@@ -70,7 +80,7 @@ export class MachineDeletionService {
     if (check.blocker !== 'final_charge_due') return check;
     return {
       ...check,
-      finalCharge: await this.quote(machine, intervals, today),
+      finalCharge: await this.quote(machine, intervals, check.monthsDue, today),
     };
   };
 
@@ -98,60 +108,74 @@ export class MachineDeletionService {
     }
     const billingAccountId = machine.billing_account_id;
     if (!billingAccountId) throw new ConflictException(NOTHING_TO_PAY_MESSAGE);
-    const quote = await this.quote(machine, intervals, today);
+    const { months } = await this.quote(
+      machine,
+      intervals,
+      check.monthsDue,
+      today,
+    );
     const book = await this.pinnedBook(billingAccountId);
     const invoiceId = await this.serviceDatabase.transaction(async (client) => {
       await deletionRepository.lockAccountBilling(client, billingAccountId);
-      if (
-        await deletionRepository.hasLiveFinalCharge(
+      // The run may have invoiced a month since the check: charging it here
+      // too would bill it twice.
+      const toCharge: FinalChargeQuote[] = [];
+      for (const month of months) {
+        if (await hasRunInvoice(client, billingAccountId, month.periodStart)) {
+          throw new ConflictException(STATE_CHANGED_MESSAGE);
+        }
+        const isCharged = await deletionRepository.hasLiveFinalCharge(
           client,
           machineId,
-          quote.periodStart,
-        )
-      )
-        return null;
+          month.periodStart,
+        );
+        if (!isCharged) toCharge.push(month);
+      }
+      if (toCharge.length === 0) return null;
       const invoice = await this.upFrontInvoices.draft(client, actor, {
         billingAccountId,
         kind: MACHINE_FINAL_INVOICE_KIND,
-        periodStart: quote.periodStart,
-        periodEnd: firstDayOfNextMonth(today),
+        periodStart: toCharge[0].periodStart,
+        periodEnd: firstDayOfNextMonth(
+          toCharge[toCharge.length - 1].periodStart,
+        ),
         reason: 'final charge for a machine being deleted',
-        lines: [
-          {
-            lineType: 'ASSET_PRO_FINAL_DAYS',
-            description: `Final charge for ${label}: ${quote.daysUsed} of ${quote.daysInMonth} days at ${formatRate(quote.monthlyRateCents)} a month`,
-            // invoice_lines needs amount = quantity × unit: a daily rate
-            // wouldn't round to the same total, so this is one final charge.
-            quantity: 1,
-            unitCents: quote.amountCents,
-            amountCents: quote.amountCents,
-            calcSnapshot: {
-              formula: 'ASSET_PRO_FINAL_DAYS',
-              subscriptionId: null,
-              periodStart: quote.periodStart,
-              periodEnd: firstDayOfNextMonth(today),
-              peak: 0,
-              peakDay: null,
-              priceBookId: book.id,
-              priceBookVersion: book.version,
-              bands: book.bands,
-              seatCents: null,
-              committedQty: null,
-              monthsCharged: null,
-              machineId,
-              monthlyRateCents: quote.monthlyRateCents,
-              daysUsed: quote.daysUsed,
-              daysInMonth: quote.daysInMonth,
-            },
+        lines: toCharge.map((month) => ({
+          lineType: 'ASSET_PRO_FINAL_DAYS',
+          description: `Final charge for ${label}: ${month.daysUsed} of ${month.daysInMonth} days in ${formatMonth(month.periodStart)} at ${formatRate(month.monthlyRateCents)} a month`,
+          // invoice_lines needs amount = quantity × unit: a daily rate
+          // wouldn't round to the same total, so this is one final charge.
+          quantity: 1,
+          unitCents: month.amountCents,
+          amountCents: month.amountCents,
+          calcSnapshot: {
+            formula: 'ASSET_PRO_FINAL_DAYS',
+            subscriptionId: null,
+            periodStart: month.periodStart,
+            periodEnd: firstDayOfNextMonth(month.periodStart),
+            peak: 0,
+            peakDay: null,
+            priceBookId: book.id,
+            priceBookVersion: book.version,
+            bands: book.bands,
+            seatCents: null,
+            committedQty: null,
+            monthsCharged: null,
+            machineId,
+            monthlyRateCents: month.monthlyRateCents,
+            daysUsed: month.daysUsed,
+            daysInMonth: month.daysInMonth,
           },
-        ],
+        })),
       });
-      await deletionRepository.insertFinalCharge(client, {
-        machineId,
-        billingAccountId,
-        invoiceId: invoice,
-        quote,
-      });
+      for (const month of toCharge) {
+        await deletionRepository.insertFinalCharge(client, {
+          machineId,
+          billingAccountId,
+          invoiceId: invoice,
+          quote: month,
+        });
+      }
       return invoice;
     });
     if (invoiceId) {
@@ -258,6 +282,9 @@ export class MachineDeletionService {
             range.lastMonth,
           )
         : [],
+      finalChargedMonths: range
+        ? await deletionRepository.listFinalChargedMonths(client, machine.id)
+        : [],
       runPassedLastClosedMonth: range
         ? await deletionRepository.hasDailySnapshot(
             client,
@@ -268,23 +295,41 @@ export class MachineDeletionService {
     return { check, intervals, today };
   };
 
-  // The rate is the band for the account's peak so far this month.
+  // Each month's rate is the band for the account's peak that month, so far if
+  // it's still open.
   private quote = async (
     machine: LifecycleMachineRow,
     intervals: BillingIntervalUse[],
+    months: string[],
     today: string,
-  ): Promise<FinalChargeQuote> => {
+  ): Promise<FinalChargeDue> => {
     const billingAccountId = machine.billing_account_id;
     if (!billingAccountId) throw new ConflictException(NOTHING_TO_PAY_MESSAGE);
     const book = await this.pinnedBook(billingAccountId);
-    const peak = await this.serviceDatabase.transaction((client) =>
-      findPeakSoFar(client, billingAccountId, firstDayOfMonth(today), today),
-    );
-    return quoteFinalCharge(
-      intervals,
-      today,
-      findBandRateCents(book.bands, Math.max(peak, 1)),
-    );
+    const quotes = await this.serviceDatabase.transaction(async (client) => {
+      const results: FinalChargeQuote[] = [];
+      for (const month of months) {
+        const lastDay = addDaysToDay(firstDayOfNextMonth(month), -1);
+        const peak = await findPeakSoFar(
+          client,
+          billingAccountId,
+          month,
+          lastDay < today ? lastDay : today,
+        );
+        results.push(
+          quoteFinalCharge(
+            intervals,
+            month,
+            findBandRateCents(book.bands, Math.max(peak, 1)),
+          ),
+        );
+      }
+      return results;
+    });
+    return {
+      amountCents: quotes.reduce((sum, month) => sum + month.amountCents, 0),
+      months: quotes,
+    };
   };
 
   private pinnedBook = async (billingAccountId: string) => {

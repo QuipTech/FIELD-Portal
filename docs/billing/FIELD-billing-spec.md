@@ -128,12 +128,14 @@ for crossing the threshold.
     already reached; it lowers next month\'s count.
 
 3a. **Exception for deleted machines:** on a monthly plan, a deactivated
-    machine being deleted pays now for the days it was used this month:
-    monthly rate at the band for the peak so far × days used ÷ days in the
-    month, rounded half-up, counted to the day it was deactivated. It then
-    leaves that month\'s peak, and can\'t be reactivated that month, so the
-    month is never billed twice. Its monthly invoices for earlier months
-    must be paid first. Annual plans wait for the month-end run.
+    machine being deleted pays now for the days it was used in the month
+    still open, and last month if not yet invoiced, on one invoice: each
+    month\'s rate at the band for its peak (so far, if still open) × days
+    used ÷ days in the month,
+    rounded half-up, counted to the day it was deactivated. It then leaves
+    those months\' peaks, and can\'t be reactivated in the month still open,
+    so no month is billed twice. Monthly invoices already issued must be
+    paid first. Annual plans wait for the month-end run.
 
 4.  **ASSET_PRO charge** = peak × the rate for the peak\'s band. Every
     machine is charged the same rate.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -27,8 +27,9 @@ const utcDate = (day: string) => new Date(`${day}T00:00:00Z`);
 const formatMonth = (day: string) => utcDate(day).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
 const formatDay = (day: string) => utcDate(day).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
-// Deleting a machine: deactivate it, pay what's billed and the days used this
-// month, then delete. The API decides and enforces that; this shows the next step.
+// Deleting a machine: deactivate it, pay what's billed and the days used since
+// the last invoice, then delete. The API decides and enforces that; this shows
+// the next step.
 export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }: DeleteMachineSectionProps) => {
   const router = useRouter();
   const check = useApiResource(
@@ -43,6 +44,15 @@ export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }
   const [chargeError, setChargeError] = useState<string | null>(null);
   const result = check.data;
   const finalCharge = result?.finalCharge ?? null;
+  const isAwaitingPayment = result?.blocker === "unpaid_invoices";
+  const { reload } = check;
+
+  // Invoices are paid in another tab, so look again on coming back to this one.
+  useEffect(() => {
+    if (!isAwaitingPayment) return;
+    window.addEventListener("focus", reload);
+    return () => window.removeEventListener("focus", reload);
+  }, [isAwaitingPayment, reload]);
 
   // Raises it and pushes it to Stripe; the reload shows its payment link, or
   // that it's paid if a card or direct debit on file covered it.
@@ -53,7 +63,7 @@ export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }
       await payMachineFinalChargeRequest(requireAccessToken(), machineId);
       check.reload();
     } catch (error) {
-      setChargeError(toApiErrorMessage(error, "Couldn't raise the final charge. Please try again."));
+      setChargeError(toApiErrorMessage(error, "Couldn't raise the invoice for what's due. Please try again."));
     } finally {
       setIsRaisingCharge(false);
     }
@@ -77,13 +87,16 @@ export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }
       {finalCharge && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg bg-fillGray p-3 text-sm">
           <div className="flex min-w-0 flex-col gap-0.5">
-            <span className="font-medium text-ink">Final charge: {audMoney(finalCharge.amountCents)} + GST</span>
-            <span className="text-bodyGray">
-              {finalCharge.daysUsed} of {finalCharge.daysInMonth} days in {formatMonth(finalCharge.periodStart)}, up to {formatDay(finalCharge.lastUsedOn)}, at {audMoney(finalCharge.monthlyRateCents)} a month. This machine then comes off the month-end invoice, and can&apos;t be reactivated this month.
-            </span>
+            <span className="font-medium text-ink">Amount due: {audMoney(finalCharge.amountCents)} + GST</span>
+            {finalCharge.months.map((month) => (
+              <span key={month.periodStart} className="text-bodyGray">
+                {formatMonth(month.periodStart)}: {month.daysUsed} of {month.daysInMonth} days, up to {formatDay(month.lastUsedOn)}, at {audMoney(month.monthlyRateCents)} a month: {audMoney(month.amountCents)}
+              </span>
+            ))}
+            <span className="text-xs text-mutedGray">This machine then comes off the monthly invoice for these months, and can&apos;t be reactivated this month. You delete it once this is paid.</span>
           </div>
           <Button size="sm" variant="primary" className="ml-auto" disabled={isRaisingCharge} onClick={raiseFinalCharge}>
-            {isRaisingCharge ? "Raising charge…" : "Pay final charge"}
+            {isRaisingCharge ? "Raising invoice…" : "Pay dues"}
           </Button>
         </div>
       )}
@@ -92,7 +105,7 @@ export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }
         <ul className="flex flex-col gap-1 text-sm">
           {result.unpaidInvoices.map((invoice) => (
             <li key={invoice.id} className="flex flex-wrap items-center gap-2 text-bodyGray">
-              <span>{invoice.isFinalCharge ? `Final charge for ${formatMonth(invoice.periodStart)}` : `${formatMonth(invoice.periodStart)} invoice`}</span>
+              <span>{invoice.isFinalCharge ? `Final charge from ${formatMonth(invoice.periodStart)}` : `${formatMonth(invoice.periodStart)} invoice`}</span>
               {invoice.hostedInvoiceUrl ? (
                 <a href={invoice.hostedInvoiceUrl} target="_blank" rel="noreferrer" className="font-medium text-primary">
                   Pay invoice

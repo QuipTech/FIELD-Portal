@@ -5,6 +5,7 @@ import { UpFrontInvoiceService } from '../../src/billing/invoices/upFrontInvoice
 import { ListMachinesQueryDto } from '../../src/machineFleet/dto/listMachinesQueryDto';
 import { AuthenticatedUser } from '../../src/auth/types/authenticatedUser';
 import { listFinalChargedIntervals } from '../../src/billing/monthlyRun/runInvoices.repository';
+import * as deletionRepository from '../../src/machineLifecycle/machineDeletion.repository';
 import { hasLiveFinalCharge } from '../../src/machineLifecycle/machineDeletion.repository';
 import {
   BillingTestDatabase,
@@ -49,7 +50,7 @@ describe('deleting a machine', () => {
              VALUES ($1, 'AUD', $2, 'machine_final', $3::date, ($3::date + interval '1 month')::date, 'draft') RETURNING id`,
             [
               params.billingAccountId,
-              params.lines[0].amountCents,
+              params.lines.reduce((sum, line) => sum + line.amountCents, 0),
               params.periodStart,
             ],
           );
@@ -216,10 +217,15 @@ describe('deleting a machine', () => {
       const due = await check();
       expect(due.blocker).toBe('final_charge_due');
       expect(due.finalCharge).toMatchObject({
-        daysUsed: 7,
-        daysInMonth: 30,
-        monthlyRateCents: 3500,
         amountCents: 817,
+        months: [
+          {
+            daysUsed: 7,
+            daysInMonth: 30,
+            monthlyRateCents: 3500,
+            amountCents: 817,
+          },
+        ],
       });
       await expect(
         deletion.deleteMachine(adminB, machineId(), 'Scrapped', NOV_20),
@@ -245,6 +251,64 @@ describe('deleting a machine', () => {
       expect((await check()).canDelete).toBe(true);
       await deletion.deleteMachine(adminB, machineId(), 'Scrapped', NOV_20);
       expect(await listed()).not.toContain(machineId());
+    });
+
+    describe("when last month's invoice hasn't been issued", () => {
+      const setUpWithoutOctoberInvoice = async () => {
+        await setState('registered');
+        await addPlanIfMissing();
+        await addInterval('2026-10-25', '2026-12-01', '2026-11-07T02:00:00Z');
+      };
+
+      it('takes both months on one invoice, then deletes', async () => {
+        await setUpWithoutOctoberInvoice();
+        const due = await check();
+        expect(due.blocker).toBe('final_charge_due');
+        expect(due.finalCharge?.amountCents).toBe(1607);
+
+        const raised = await pay();
+        expect(raised.unpaidInvoices).toHaveLength(1);
+        const { rows } = await fixture.query(
+          `SELECT c.period_start::text, c.days_used, c.amount_cents, i.total_ex_gst_cents
+           FROM billing.machine_final_charges c
+           JOIN billing.invoices i ON i.id = c.invoice_id
+           WHERE c.machine_id = $1 ORDER BY c.period_start`,
+          [machineId()],
+        );
+        expect(rows.map((row) => row.period_start)).toEqual([
+          '2026-10-01',
+          '2026-11-01',
+        ]);
+        expect(rows.map((row) => Number(row.amount_cents))).toEqual([790, 817]);
+        expect(Number(rows[0].total_ex_gst_cents)).toBe(1607);
+
+        await pay();
+        const again = await fixture.query(
+          `SELECT count(*)::int AS count FROM billing.invoices WHERE kind = 'machine_final'`,
+        );
+        expect(again.rows[0].count).toBe(1);
+
+        await markFinalPaid();
+        expect((await check()).canDelete).toBe(true);
+        await deletion.deleteMachine(adminB, machineId(), 'Scrapped', NOV_20);
+        expect(await listed()).not.toContain(machineId());
+      });
+
+      it('charges nothing if the run invoices the month while paying', async () => {
+        await setUpWithoutOctoberInvoice();
+        const lock = jest
+          .spyOn(deletionRepository, 'lockAccountBilling')
+          .mockImplementationOnce(async () => {
+            await addInvoice('2026-10-01', 'draft');
+          });
+        await expect(pay()).rejects.toMatchObject({ status: 409 });
+        lock.mockRestore();
+        const { rows } = await fixture.query(
+          `SELECT count(*)::int AS count FROM billing.machine_final_charges WHERE machine_id = $1`,
+          [machineId()],
+        );
+        expect(rows[0].count).toBe(0);
+      });
     });
 
     it('raises one charge however many times it is asked', async () => {

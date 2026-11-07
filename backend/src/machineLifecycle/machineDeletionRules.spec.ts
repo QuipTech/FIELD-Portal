@@ -13,6 +13,7 @@ const facts = (overrides: Partial<DeletionFacts> = {}): DeletionFacts => ({
   plan: 'monthly',
   intervals: [],
   invoices: [],
+  finalChargedMonths: [],
   runPassedLastClosedMonth: false,
   ...overrides,
 });
@@ -79,25 +80,81 @@ describe('assessMachineDeletion', () => {
     ]);
   });
 
-  it("waits when last month's invoice hasn't been issued", () => {
+  it("adds last month to what's due when its invoice hasn't been issued", () => {
     const check = assessMachineDeletion(facts(billed));
-    expect(check.blocker).toBe('awaiting_final_invoice');
-    expect(check.finalInvoiceFrom).toBe('2026-11-01');
+    expect(check.blocker).toBe('final_charge_due');
+    expect(check.monthsDue).toEqual(['2026-10-01', '2026-11-01']);
+  });
+
+  it('leaves months older than last month alone', () => {
+    const check = assessMachineDeletion(
+      facts({
+        intervals: [
+          {
+            activatedOn: '2026-01-10',
+            billingEnd: '2026-12-01',
+            lastUsedOn: '2026-11-07',
+          },
+        ],
+      }),
+    );
+    expect(check.monthsDue).toEqual(['2026-10-01', '2026-11-01']);
+  });
+
+  it('charges only this month when last month was a gap in use', () => {
+    const check = assessMachineDeletion(
+      facts({
+        intervals: [
+          {
+            activatedOn: '2026-07-20',
+            billingEnd: '2026-08-01',
+            lastUsedOn: '2026-07-25',
+          },
+          {
+            activatedOn: '2026-11-02',
+            billingEnd: '2026-12-01',
+            lastUsedOn: '2026-11-07',
+          },
+        ],
+      }),
+    );
+    expect(check.monthsDue).toEqual(['2026-11-01']);
   });
 
   it('treats a closed month with nothing to bill as settled once the run passed it', () => {
     expect(
       assessMachineDeletion(
         facts({ ...billed, runPassedLastClosedMonth: true }),
-      ).blocker,
-    ).toBe('final_charge_due');
+      ).monthsDue,
+    ).toEqual(['2026-11-01']);
   });
 
   it('asks a monthly plan to pay for the days used this month', () => {
+    const check = assessMachineDeletion(
+      facts({ ...billed, invoices: [octoberPaid] }),
+    );
+    expect(check.blocker).toBe('final_charge_due');
+    expect(check.monthsDue).toEqual(['2026-11-01']);
+  });
+
+  it('allows the delete once one paid charge covers every month due', () => {
     expect(
-      assessMachineDeletion(facts({ ...billed, invoices: [octoberPaid] }))
-        .blocker,
-    ).toBe('final_charge_due');
+      assessMachineDeletion(
+        facts({
+          ...billed,
+          invoices: [
+            invoice('2026-10-01', 'paid', { id: 'final', isFinalCharge: true }),
+          ],
+          finalChargedMonths: ['2026-10-01', '2026-11-01'],
+        }),
+      ).canDelete,
+    ).toBe(true);
+  });
+
+  it("makes an annual plan wait for last month's run", () => {
+    const check = assessMachineDeletion(facts({ ...billed, plan: 'annual' }));
+    expect(check.blocker).toBe('awaiting_final_invoice');
+    expect(check.finalInvoiceFrom).toBe('2026-11-01');
   });
 
   it('skips last month for a machine first activated this month', () => {
@@ -118,13 +175,21 @@ describe('assessMachineDeletion', () => {
 
   it('lists an unpaid final charge until it is paid, then allows', () => {
     const unpaid = assessMachineDeletion(
-      facts({ ...billed, invoices: [octoberPaid, finalCharge('synced')] }),
+      facts({
+        ...billed,
+        invoices: [octoberPaid, finalCharge('synced')],
+        finalChargedMonths: ['2026-11-01'],
+      }),
     );
     expect(unpaid.blocker).toBe('unpaid_invoices');
     expect(unpaid.unpaidInvoices[0].isFinalCharge).toBe(true);
     expect(
       assessMachineDeletion(
-        facts({ ...billed, invoices: [octoberPaid, finalCharge('paid')] }),
+        facts({
+          ...billed,
+          invoices: [octoberPaid, finalCharge('paid')],
+          finalChargedMonths: ['2026-11-01'],
+        }),
       ).canDelete,
     ).toBe(true);
   });
@@ -178,16 +243,36 @@ describe('assessMachineDeletion', () => {
       ).toBe(true);
     });
 
-    it("waits when the run hasn't issued its final invoice", () => {
+    it("charges the month the run hasn't invoiced on a monthly plan", () => {
+      const check = assessMachineDeletion(
+        facts({ ...closed, invoices: [octoberPaid] }),
+      );
+      expect(check.blocker).toBe('final_charge_due');
+      expect(check.monthsDue).toEqual(['2026-11-01']);
+    });
+
+    it("waits when the run hasn't issued the invoice on an annual plan", () => {
       expect(
-        assessMachineDeletion(facts({ ...closed, invoices: [octoberPaid] }))
-          .blocker,
+        assessMachineDeletion(
+          facts({ ...closed, plan: 'annual', invoices: [octoberPaid] }),
+        ).blocker,
       ).toBe('awaiting_final_invoice');
     });
   });
 });
 
 describe('quoteFinalCharge', () => {
+  it('splits a machine used across two months by each month', () => {
+    const october = quoteFinalCharge(billed.intervals, '2026-10-01', 3500);
+    expect(october).toMatchObject({
+      periodStart: '2026-10-01',
+      lastUsedOn: '2026-10-31',
+      daysUsed: 7,
+      daysInMonth: 31,
+      amountCents: 790,
+    });
+  });
+
   it('charges the days from the 1st to the day it was deactivated, both counted', () => {
     expect(quoteFinalCharge(billed.intervals, '2026-11-20', 3500)).toEqual({
       periodStart: '2026-11-01',
