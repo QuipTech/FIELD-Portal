@@ -8,8 +8,9 @@ import {
   IsString,
   IsUUID,
   MaxLength,
+  MinLength,
 } from 'class-validator';
-import { trimToUndefined } from '../../common/utils/trimTransforms';
+import { trimString, trimToUndefined } from '../../common/utils/trimTransforms';
 import {
   DIRECT_LIFECYCLE_ACTIONS,
   LifecycleAction,
@@ -17,6 +18,7 @@ import {
 
 const MAX_REASON_LENGTH = 500;
 const MAX_BULK_MACHINES = 200;
+const MIN_DELETE_REASON_LENGTH = 3;
 
 export class ApplyLifecycleActionDto {
   @IsIn(DIRECT_LIFECYCLE_ACTIONS)
@@ -35,4 +37,12 @@ export class BulkLifecycleActionDto extends ApplyLifecycleActionDto {
   @ArrayUnique()
   @IsUUID('4', { each: true })
   machineIds: string[];
+}
+
+export class DeleteMachineDto {
+  @Transform(trimString)
+  @IsString()
+  @MinLength(MIN_DELETE_REASON_LENGTH)
+  @MaxLength(MAX_REASON_LENGTH)
+  reason: string;
 }

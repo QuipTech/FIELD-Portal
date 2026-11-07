@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -17,8 +18,10 @@ import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import {
   ApplyLifecycleActionDto,
   BulkLifecycleActionDto,
+  DeleteMachineDto,
 } from './dto/lifecycleActionDtos';
 import { MACHINE_LIFECYCLE_PERMISSION } from './lifecycleTransitions';
+import { MachineDeletionService } from './machineDeletion.service';
 import { MachineLifecycleService } from './machineLifecycle.service';
 import { ActivationQuoteService } from './activationQuote.service';
 import { ActivationQuoteQueryDto } from './dto/activationQuoteQueryDto';
@@ -34,6 +37,7 @@ export class MachineLifecycleController {
     private readonly lifecycleService: MachineLifecycleService,
     private readonly transfersService: MachineTransfersService,
     private readonly activationQuoteService: ActivationQuoteService,
+    private readonly deletionService: MachineDeletionService,
   ) {}
 
   // What activating machines adds to this month's bill, shown before the
@@ -86,6 +90,28 @@ export class MachineLifecycleController {
       dto.action,
       dto.reason ?? null,
     );
+  }
+
+  // Whether it can be deleted yet, and what's in the way.
+  @Get(':machineId/deletion-check')
+  @RequirePermissions(MACHINE_LIFECYCLE_PERMISSION)
+  deletionCheck(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('machineId', ParseUUIDPipe) machineId: string,
+  ) {
+    return this.deletionService.checkDeletion(actor, machineId);
+  }
+
+  // 409 with the blocker until it's out of active and its billing is settled.
+  @Delete(':machineId')
+  @HttpCode(204)
+  @RequirePermissions(MACHINE_LIFECYCLE_PERMISSION)
+  deleteMachine(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('machineId', ParseUUIDPipe) machineId: string,
+    @Body() dto: DeleteMachineDto,
+  ) {
+    return this.deletionService.deleteMachine(actor, machineId, dto.reason);
   }
 
   @Get(':machineId/custody')

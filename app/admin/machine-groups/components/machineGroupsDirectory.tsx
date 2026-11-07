@@ -11,12 +11,15 @@ import { SavedToast } from "@/components/ui/savedToast";
 import { SkeletonBar } from "@/components/ui/skeletonBar";
 import { ClickableRow } from "@/components/ui/clickableRow";
 import { Table, TableCell, TableHeaderCell, TableHeaderRow } from "@/components/ui/table";
+import { Modal } from "@/components/ui/modal";
 import { MachineGroupBadge } from "@/components/machines/machineGroupBadge";
+import { ManageMachineGroupsModal } from "@/components/machines/manageMachineGroupsModal";
 import { useApiResource } from "@/lib/hooks/useApiResource";
 import { listMachineGroupsRequest } from "@/lib/api/adminMachineGroupsApi";
-import type { MachineGroup } from "@/lib/types/machineGroup";
+import type { MachineGroup, PlatformMachine } from "@/lib/types/machineGroup";
 import { MachineGroupFormModal } from "./machineGroupFormModal";
 import { DeleteMachineGroupDialog } from "./deleteMachineGroupDialog";
+import { PlatformMachinePicker } from "./platformMachinePicker";
 
 const SKELETON_ROWS = 4;
 
@@ -27,6 +30,8 @@ export const MachineGroupsDirectory = () => {
   const groups = useApiResource(listMachineGroupsRequest, [], "Couldn't load machine groups.");
   const [editing, setEditing] = useState<MachineGroup | "new" | null>(null);
   const [deleting, setDeleting] = useState<MachineGroup | null>(null);
+  const [isFindingMachine, setIsFindingMachine] = useState(false);
+  const [managing, setManaging] = useState<PlatformMachine | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const dismissToast = useCallback(() => setToast(null), []);
   const list = groups.data ?? [];
@@ -89,7 +94,11 @@ export const MachineGroupsDirectory = () => {
             Share machines from any organisation with organisations or individual people.
           </p>
         </div>
-        <Button variant="primary" className="ml-auto" onClick={() => setEditing("new")}>
+        <Button variant="ghost" className="ml-auto" onClick={() => setIsFindingMachine(true)}>
+          <Icon name="search" />
+          Find a machine
+        </Button>
+        <Button variant="primary" onClick={() => setEditing("new")}>
           <Icon name="plus" />
           New group
         </Button>
@@ -127,6 +136,31 @@ export const MachineGroupsDirectory = () => {
             groups.reload();
           }}
           onClose={() => setDeleting(null)}
+        />
+      )}
+      {isFindingMachine && (
+        <Modal title="Find a machine" onClose={() => setIsFindingMachine(false)} widthClassName="w-[620px]">
+          <div className="p-5">
+            <PlatformMachinePicker
+              chooseOne={{
+                label: "Manage groups",
+                onChoose: (machine) => {
+                  setIsFindingMachine(false);
+                  setManaging(machine);
+                },
+              }}
+            />
+          </div>
+        </Modal>
+      )}
+      {managing && (
+        <ManageMachineGroupsModal
+          machine={managing}
+          onSaved={(message) => {
+            setToast(message);
+            groups.reload();
+          }}
+          onClose={() => setManaging(null)}
         />
       )}
       {toast && <SavedToast message={toast} onDismiss={dismissToast} />}

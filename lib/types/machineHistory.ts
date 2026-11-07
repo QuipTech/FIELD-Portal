@@ -40,6 +40,8 @@ export interface GalleryPhotoResponse {
   contentType: string | null;
   uploadedAt: string;
   signedUrl: string;
+  canDelete: boolean;
+  isCover: boolean;
 }
 
 export interface MachinePhoto {

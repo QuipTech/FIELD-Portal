@@ -14,6 +14,11 @@ export interface FleetMachine extends MachineSharing {
   machineClass: string | null;
   site: string | null;
   operatingHours: number | null;
+  // Signed for 15 minutes: the cover photo, else the newest. Machine list only.
+  photoUrl?: string | null;
+  // The photos the list row slides through, cover first. Empty where the
+  // gallery is unavailable (e.g. an inactive machine): photoUrl still applies.
+  photoUrls?: string[];
   status: OperatingStatus;
   // Missing from older backends, which had no lifecycle.
   lifecycleState?: LifecycleState;
@@ -76,4 +81,6 @@ export interface NewMachine {
 export interface MachineDetailsChanges {
   site?: string | null;
   operatingHours?: number;
+  // One of the machine's gallery photos; null goes back to the newest.
+  coverPhotoId?: string | null;
 }

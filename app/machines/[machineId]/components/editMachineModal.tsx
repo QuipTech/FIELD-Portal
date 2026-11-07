@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { FormField } from "@/components/ui/formField";
-import { updateMachineDetailsRequest } from "@/lib/api/machineFleetApi";
+import { EMPTY_MACHINE_FILTERS, listMachinesRequest, updateMachineDetailsRequest } from "@/lib/api/machineFleetApi";
+import { useApiResource } from "@/lib/hooks/useApiResource";
 import { requireAccessToken } from "@/lib/api/requireAccessToken";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import type { Machine } from "@/lib/types/machine";
@@ -18,13 +19,16 @@ interface EditMachineModalProps {
 }
 
 // Site and a new hour-meter reading. Only changed fields are sent. Serial and Plant ID have
-// their own audited change flow.
+// their own audited change flow. Existing sites are suggested so a machine moving to one
+// isn't filed under a misspelling; a new site can still be typed.
 export const EditMachineModal = ({ machine, onSaved, onClose }: EditMachineModalProps) => {
   const [site, setSite] = useState(machine.site ?? "");
   const [hours, setHours] = useState(machine.operatingHours === null ? "" : String(machine.operatingHours));
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const isHoursValid = hours === "" || /^\d+$/.test(hours);
+  const siteListId = useId();
+  const fleet = useApiResource((token) => listMachinesRequest(token, EMPTY_MACHINE_FILTERS, ""), [], "Couldn't load sites.");
 
   const collectChanges = (): MachineDetailsChanges => {
     const changes: MachineDetailsChanges = {};
@@ -53,7 +57,17 @@ export const EditMachineModal = ({ machine, onSaved, onClose }: EditMachineModal
       <div className="flex flex-col gap-3.5 p-5">
         <div className="flex gap-2.5">
           <FormField className="flex-1" label="Site">
-            <Input value={site} onChange={(event) => setSite(event.target.value)} placeholder="e.g. Pit 4" maxLength={100} />
+            <Input
+              value={site}
+              onChange={(event) => setSite(event.target.value)}
+              placeholder="e.g. Pit 4"
+              maxLength={100}
+              list={siteListId}
+              autoComplete="off"
+            />
+            <datalist id={siteListId}>
+              {fleet.data?.facets.sites.map((option) => <option key={option} value={option} />)}
+            </datalist>
           </FormField>
           <FormField className="flex-1" label="Hours">
             <Input value={hours} onChange={(event) => setHours(event.target.value)} inputMode="numeric" />

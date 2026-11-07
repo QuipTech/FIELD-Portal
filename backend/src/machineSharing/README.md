@@ -116,6 +116,8 @@ interface MachineAccess {
 | POST | `/admin/machine-groups/:groupId/assignments` | `{ targetType, targetId, accessLevel }` | `GroupAssignment[]`; an existing target gets the new level; 400 unknown target |
 | DELETE | `/admin/machine-groups/:groupId/assignments/:assignmentId` | `{ reason }` (3–500 chars) | 204 |
 | GET | `/admin/machines/search` | `?search=&limit=` (≤ 100, default 25): plant ID, fleet number, serial, VIN or organisation name | `(Omit<GroupMachine,'addedAt'> & { registrationNumber })[]` |
+| GET | `/admin/machines/:machineId/groups` | – | `{ id, name }[]`, the machine's live groups; 404 unknown machine |
+| PUT | `/admin/machines/:machineId/groups` | `{ groupIds: string[] }` (≤ 200; empty leaves all) | `{ id, name }[]`; one transaction, audited per changed group; 404 if the machine or an added group is unknown (nothing changes) |
 | GET | `/admin/users/:userId/machine-access` | – | `MachineAccess` (changed) |
 | PATCH | `/admin/users/:userId/machine-access` | `{ machineAccessMode, organisationId? }` (the person's organisation) | `MachineAccess`; 400 `groups_only` for an admin (changed: no `groupIds`) |
 

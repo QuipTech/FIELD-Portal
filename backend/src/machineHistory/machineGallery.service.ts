@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import * as authRepository from '../auth/auth.repository';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
@@ -10,9 +10,12 @@ import { GalleryPhotoRow } from './types/machineHistoryRows';
 import { GalleryPhoto } from './types/machineHistoryResponse';
 
 const MAX_CAPTION_LENGTH = 200;
+const PHOTO_NOT_FOUND_MESSAGE = 'Photo not found.';
 
 // A machine's own photos (the detail screen's gallery), as opposed to
-// photos on its history entries (MachinePhotosService).
+// photos on its history entries (MachinePhotosService). A 'contribute' share
+// adds photos and deletes only what it uploaded; the owner deletes any.
+// Deleting is a soft delete, since this is the machine's record.
 @Injectable()
 export class MachineGalleryService {
   constructor(
@@ -24,15 +27,25 @@ export class MachineGalleryService {
     actor: AuthenticatedUser,
     machineId: string,
   ): Promise<GalleryPhoto[]> => {
-    const rows = await this.databaseService.withActor(actor, async (client) => {
-      const { access } = await assertMachineAccessible(client, machineId);
-      return machineGalleryRepository.listGalleryPhotos(
-        client,
-        access.tenantId,
-        machineId,
-      );
-    });
-    return Promise.all(rows.map(this.toGalleryPhoto));
+    const { rows, isShared } = await this.databaseService.withActor(
+      actor,
+      async (client) => {
+        const { access } = await assertMachineAccessible(client, machineId);
+        return {
+          isShared: access.tenantId !== actor.tenantId,
+          rows: await machineGalleryRepository.listGalleryPhotos(
+            client,
+            access.tenantId,
+            machineId,
+          ),
+        };
+      },
+    );
+    return Promise.all(
+      rows.map((row) =>
+        this.toGalleryPhoto(row, !isShared || row.uploaded_by === actor.userId),
+      ),
+    );
   };
 
   // Checks the machine before touching S3; if the row can't be written
@@ -77,7 +90,7 @@ export class MachineGalleryService {
           return inserted;
         },
       );
-      return this.toGalleryPhoto(row);
+      return this.toGalleryPhoto(row, true);
     } catch (error) {
       await this.storageService
         .deleteFile(stored.key, access.tenantId)
@@ -86,8 +99,38 @@ export class MachineGalleryService {
     }
   };
 
+  deletePhoto = (
+    actor: AuthenticatedUser,
+    machineId: string,
+    photoId: string,
+  ): Promise<void> =>
+    this.databaseService.withActor(actor, async (client) => {
+      const { access } = await assertMachineAccessible(
+        client,
+        machineId,
+        'contribute',
+      );
+      const isShared = access.tenantId !== actor.tenantId;
+      const scope = { tenantId: access.tenantId, machineId, photoId };
+      const deleted = await machineGalleryRepository.softDeleteGalleryPhoto(
+        client,
+        { ...scope, uploadedBy: isShared ? actor.userId : null },
+      );
+      if (!deleted) throw new NotFoundException(PHOTO_NOT_FOUND_MESSAGE);
+      await machineGalleryRepository.clearCoverPhoto(client, scope);
+      await authRepository.insertAuditLog(client, {
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+        action: 'delete',
+        entityType: 'machine_gallery_photo',
+        entityId: photoId,
+        metadata: { machineId, fileName: deleted.file_name },
+      });
+    });
+
   private toGalleryPhoto = async (
     row: GalleryPhotoRow,
+    canDelete: boolean,
   ): Promise<GalleryPhoto> => ({
     id: row.id,
     caption: row.caption ?? row.file_name,
@@ -95,5 +138,7 @@ export class MachineGalleryService {
     uploadedAt: new Date(row.created_at).toISOString(),
     signedUrl: (await this.storageService.getSignedDownloadUrl(row.storage_key))
       .url,
+    canDelete,
+    isCover: row.is_cover,
   });
 }

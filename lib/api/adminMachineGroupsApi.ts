@@ -6,6 +6,7 @@ import type {
   GroupMachine,
   MachineGroup,
   MachineGroupChanges,
+  MachineGroupMembership,
   PlatformMachine,
   ShareAccessLevel,
 } from "../types/machineGroup";
@@ -92,4 +93,17 @@ export const revokeGroupAssignmentRequest = (
 export const searchPlatformMachinesRequest = (accessToken: string, search: string) =>
   apiRequest<PlatformMachine[]>(`/admin/machines/search?${new URLSearchParams({ search, limit: "50" })}`, {
     headers: authorizationHeader(accessToken),
+  });
+
+export const getMachineGroupsRequest = (accessToken: string, machineId: string) =>
+  apiRequest<MachineGroupMembership[]>(`/admin/machines/${machineId}/groups`, {
+    headers: authorizationHeader(accessToken),
+  });
+
+// Makes the machine's groups exactly these, in one go; empty leaves them all.
+export const setMachineGroupsRequest = (accessToken: string, machineId: string, groupIds: string[]) =>
+  apiRequest<MachineGroupMembership[]>(`/admin/machines/${machineId}/groups`, {
+    method: "PUT",
+    headers: authorizationHeader(accessToken),
+    body: JSON.stringify({ groupIds }),
   });
