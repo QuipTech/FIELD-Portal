@@ -3,7 +3,7 @@ import { toRangeStart } from "@/lib/machineDetail/historyDateRange";
 import { requireAccessToken } from "../requireAccessToken";
 import { ApiError } from "../httpClient";
 import { NO_LONGER_ACCESSIBLE_MESSAGE } from "../../machineDetail/machineAccessRules";
-import { updateMachineStatusRequest } from "../machineFleetApi";
+import { updateMachineDetailsRequest, updateMachineStatusRequest } from "../machineFleetApi";
 import {
   createHistoryEntryRequest,
   deleteMachinePhotoRequest,
@@ -16,6 +16,7 @@ import {
   exportSnapshotDiffRequest,
   getSnapshotDiffRequest,
   listComponentsRequest,
+  deleteGalleryPhotoRequest,
   listGalleryPhotosRequest,
   listSnapshotsRequest,
   listSystemsRequest,
@@ -58,6 +59,14 @@ export const machineDetailService: MachineDetailService = {
     (await emptyWhenMissing(listGalleryPhotosRequest(requireAccessToken(), machineId))).map(toGalleryPhoto),
 
   uploadPhoto: async (machineId, file) => toGalleryPhoto(await uploadGalleryPhotoRequest(requireAccessToken(), machineId, file)),
+
+  deletePhoto: async (machineId, photoId) => {
+    await deleteGalleryPhotoRequest(requireAccessToken(), machineId, photoId);
+  },
+
+  setCoverPhoto: async (machineId, photoId) => {
+    await updateMachineDetailsRequest(requireAccessToken(), machineId, { coverPhotoId: photoId });
+  },
 
   listSystems: (machineId) => emptyWhenMissing(listSystemsRequest(requireAccessToken(), machineId)),
 

@@ -4,6 +4,7 @@ import type {
   BulkLifecycleResult,
   LifecycleAction,
   LifecycleChangeResult,
+  MachineDeletionCheck,
   MachineLifecycle,
   MachineTransfer,
 } from "../types/machineLifecycle";
@@ -26,6 +27,17 @@ export const applyLifecycleActionRequest = (
 
 export const getMachineLifecycleRequest = (accessToken: string, machineId: string) =>
   apiRequest<MachineLifecycle>(`/machines/${machineId}/lifecycle`, { headers: authorizationHeader(accessToken) });
+
+export const getMachineDeletionCheckRequest = (accessToken: string, machineId: string) =>
+  apiRequest<MachineDeletionCheck>(`/machines/${machineId}/deletion-check`, { headers: authorizationHeader(accessToken) });
+
+// Soft delete; 409 until it's out of active and its billing is settled.
+export const deleteMachineRequest = (accessToken: string, machineId: string, reason: string) =>
+  apiRequest<null>(`/machines/${machineId}`, {
+    method: "DELETE",
+    headers: authorizationHeader(accessToken),
+    body: JSON.stringify({ reason }),
+  });
 
 // Up to 200 machines at once; each one succeeds or fails on its own.
 export const applyBulkLifecycleActionRequest = (

@@ -99,6 +99,8 @@ session (set per-request by `DatabaseService.withTenant`).
 | `0120` | Machine documents: `machine_documents` (service reports, inspections, certificates and others, on a machine or on one of its history entries). Soft delete, storage metering, RLS as for photos: readable through a share, `contribute` adds, the owner changes |
 | `0121` | Machine Control pairing: `mc_devices` (one live per machine), `mc_pairing_codes` (6 digits, 15 minutes, live codes unique across organisations), `mc_device_credentials` (hashed tokens); SECURITY DEFINER `mc_issue_pairing_code`, `mc_pair_device` (a signed-out tablet has no organisation), `mc_disconnect_machine_app`. RLS: devices readable by the owner and through a share; codes and credentials only through the functions |
 | `0122` | A `contribute` person may soft delete the machine documents they uploaded themselves |
+| `0123` | A `contribute` person may soft delete the gallery photos they uploaded themselves |
+| `0124` | Machine soft delete: a machine's serial is unique only among live machines (`uq_machines_tenant_serial_live` replaces the table constraint), and `accessible_machines()` leaves out the organisation's deleted machines |
 
 See [Knowledge rollout](../../src/knowledgeBrands/README.md) for deployment order and compatibility.
 

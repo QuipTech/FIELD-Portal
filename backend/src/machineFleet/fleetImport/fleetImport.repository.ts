@@ -49,7 +49,8 @@ export const findRegisteredSerials = async (
 ): Promise<Set<string>> => {
   const result = await client.query<{ serial: string }>(
     `SELECT lower(serial_number) AS serial FROM machines
-     WHERE tenant_id = $1 AND lower(serial_number) = ANY($2::text[])`,
+     WHERE tenant_id = $1 AND deleted_at IS NULL
+       AND lower(serial_number) = ANY($2::text[])`,
     [tenantId, serials.map((serial) => serial.toLowerCase())],
   );
   return new Set(result.rows.map((row) => row.serial));

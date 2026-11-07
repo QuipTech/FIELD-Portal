@@ -63,6 +63,24 @@ export interface MachineLifecycle {
   events: LifecycleEvent[];
 }
 
+// GET /machines/:machineId/deletion-check.
+export type MachineDeletionBlocker =
+  | "needs_deactivation"
+  | "sold"
+  | "open_cases"
+  | "pending_transfer"
+  | "awaiting_final_invoice"
+  | "unpaid_invoices";
+
+export interface MachineDeletionCheck {
+  canDelete: boolean;
+  blocker: MachineDeletionBlocker | null;
+  message: string | null;
+  // First day the final invoice can exist, when waiting for it.
+  finalInvoiceFrom: string | null;
+  unpaidInvoices: { id: string; periodStart: string; status: string; hostedInvoiceUrl: string | null }[];
+}
+
 export type TransferStatus = "requested" | "rejected" | "cancelled" | "completed";
 
 export interface MachineTransfer {

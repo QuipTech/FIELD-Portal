@@ -3,7 +3,6 @@
 import { useState, type MouseEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Icon } from "@/components/icons/icon";
 import { Tag } from "@/components/ui/tag";
 import { Button } from "@/components/ui/button";
 import { MachineSharingBadges } from "@/components/machines/machineSharingBadges";
@@ -15,6 +14,7 @@ import { getMachineStatusMeta, toMachineStatus } from "@/lib/format/machineStatu
 import { canContributeTo } from "@/lib/machineDetail/machineAccessRules";
 import { machineAppPagePath } from "@/lib/types/machineAppConnection";
 import type { FleetMachine } from "@/lib/types/machineFleet";
+import { MachineRowPhotos } from "./machineRowPhotos";
 import { MachinesBulkBar } from "./machinesBulkBar";
 import { ConnectMachineAppButton } from "./connectMachineAppButton";
 
@@ -108,9 +108,7 @@ export const MachinesTable = ({ machines, emptyMessage, onChanged }: MachinesTab
                         className="h-4 w-4 flex-none accent-primary"
                       />
                     )}
-                    <span className="flex h-8 w-11 flex-none items-center justify-center rounded-lg border border-borderGrayStrong bg-fillGray text-mutedGray">
-                      <Icon name="image" className="h-3.5 w-3.5" />
-                    </span>
+                    <MachineRowPhotos machine={machine} />
                     <span className="truncate font-medium">{machine.label}</span>
                     {isInactive && <Tag tone="amber">Not active</Tag>}
                   </TableCell>

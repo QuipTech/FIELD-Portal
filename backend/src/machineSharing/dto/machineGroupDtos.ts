@@ -27,6 +27,7 @@ import {
 const HEX_COLOUR = /^#[0-9A-Fa-f]{6}$/;
 const HEX_COLOUR_MESSAGE = 'colour must be a hex colour like #4A34C7';
 export const MAX_MACHINES_PER_ADD = 500;
+const MAX_GROUPS_PER_MACHINE = 200;
 
 // Blank or null clears an optional field.
 const trimToNull = ({ value }: { value: unknown }) =>
@@ -112,6 +113,16 @@ export class RevokeShareDto {
   @MinLength(3)
   @MaxLength(500)
   reason: string;
+}
+
+// PUT /admin/machines/:machineId/groups: every group the machine should be in;
+// empty takes it out of all of them.
+export class SetMachineGroupsDto {
+  @IsArray()
+  @ArrayMaxSize(MAX_GROUPS_PER_MACHINE)
+  @ArrayUnique()
+  @IsUUID('all', { each: true })
+  groupIds: string[];
 }
 
 // GET /admin/machines/search: plant ID, serial, VIN or organisation name.

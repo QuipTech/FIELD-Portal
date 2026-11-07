@@ -16,7 +16,9 @@ receiving organisation's approval.
 machineLifecycle/
 ├── lifecycleTransitions.ts        ← pure: states, the 5 transitions, billing days, available actions
 ├── machineLifecycle.service.ts    ← activate/deactivate/archive/reactivate, bulk, lifecycle history
-├── machineLifecycle.controller.ts ← /machines/:id/lifecycle, /machines/lifecycle/bulk, /machines/:id/custody
+├── machineLifecycle.controller.ts ← /machines/:id/lifecycle, /machines/lifecycle/bulk, /machines/:id/custody, deletion
+├── machineDeletionRules.ts        ← pure: when a machine may be deleted (out of active, billing settled)
+├── machineDeletion.service.ts     ← GET /machines/:id/deletion-check, DELETE /machines/:id (soft delete, audited)
 ├── machineActivations.repository.ts ← peak-rule count, billing.apply_machine_transition()
 ├── enterpriseThreshold.service.ts ← one sales review task at the Enterprise threshold (T8)
 ├── organisationBillingAccount.service.ts ← self-serve: first activation signs up the organisation (account + monthly ASSET_PRO)
@@ -55,6 +57,13 @@ Part of the API (`npm run start:dev` from `backend/`). Tests:
 - A suspended account can't activate or reactivate; it can still
   deactivate, archive and read everything.
 - Reaching `ENTERPRISE_THRESHOLD_MACHINES` never refuses an activation.
+- Deleting needs `machine.lifecycle` and is a soft delete. The machine must be
+  out of active with no open cases or pending transfer. If it was ever billed,
+  its last billed month must be invoiced and every monthly invoice from its
+  first billed month to its last paid. A month with no invoice counts as settled
+  once the run has processed the following day (Enterprise, internal, within an
+  annual commitment). Deleting disconnects its machine app and frees its serial
+  to register again; its activation intervals and invoices stay.
 - Transfer approval (which moves the machine's records) is not built yet:
   the list of records that move and stay needs sign-off first.
 

@@ -24,6 +24,35 @@ export const MACHINE_PHOTO_KEY_SQL = `(
   ORDER BY (p.id = m.cover_photo_id) IS TRUE DESC, p.created_at DESC
   LIMIT 1)`;
 
+// The photos each machine's list row can slide through, up to `limit` each:
+// its cover, then newest first. HEIC is left out, as browsers can't show it.
+export const listRowPhotoKeys = async (
+  client: PoolClient,
+  machineIds: string[],
+  limit: number,
+): Promise<{ machine_id: string; storage_key: string }[]> => {
+  const result = await client.query<{
+    machine_id: string;
+    storage_key: string;
+  }>(
+    `SELECT machine_id, storage_key FROM (
+       SELECT p.machine_id, p.storage_key,
+              row_number() OVER (
+                PARTITION BY p.machine_id
+                ORDER BY (p.id = m.cover_photo_id) IS TRUE DESC, p.created_at DESC
+              ) AS position
+       FROM machine_photos p
+       JOIN machines m ON m.id = p.machine_id AND m.tenant_id = p.tenant_id
+       WHERE p.machine_id = ANY($1::uuid[]) AND p.deleted_at IS NULL
+         AND COALESCE(lower(p.content_type), '') <> 'image/heic'
+     ) ranked
+     WHERE position <= $2
+     ORDER BY machine_id, position`,
+    [machineIds, limit],
+  );
+  return result.rows;
+};
+
 export const FLEET_COLUMNS = `
   m.id, ${MACHINE_LABEL_SQL} AS label, m.serial_number,
   mf.name AS manufacturer_name, mm.name AS model_name, mm.product_family,

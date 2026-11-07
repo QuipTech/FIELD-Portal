@@ -57,3 +57,10 @@ export const listGalleryPhotosRequest = (accessToken: string, machineId: string)
 // Needs machine.manage. JPG/PNG/HEIC up to 10 MB.
 export const uploadGalleryPhotoRequest = (accessToken: string, machineId: string, file: File) =>
   uploadMultipart<GalleryPhotoResponse>(`/machines/${machineId}/photos`, { accessToken, file });
+
+// Needs machine.manage; a "contribute" share deletes only its own uploads.
+export const deleteGalleryPhotoRequest = (accessToken: string, machineId: string, photoId: string) =>
+  apiRequest<null>(`/machines/${machineId}/photos/${photoId}`, {
+    method: "DELETE",
+    headers: authorizationHeader(accessToken),
+  });

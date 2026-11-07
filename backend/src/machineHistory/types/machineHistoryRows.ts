@@ -67,6 +67,8 @@ export interface HistoryEntryRow {
 
 export interface GalleryPhotoRow extends PhotoRow {
   caption: string | null;
+  uploaded_by: string | null;
+  is_cover: boolean;
 }
 
 export interface MachineDocumentRow {

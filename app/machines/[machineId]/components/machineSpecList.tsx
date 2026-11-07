@@ -3,6 +3,9 @@
 import { useState, type ReactNode } from "react";
 import { Avatar } from "@/components/ui/avatar";
 import { PermissionButton } from "@/components/auth/permissionButton";
+import { Button } from "@/components/ui/button";
+import { ManageMachineGroupsModal } from "@/components/machines/manageMachineGroupsModal";
+import { usePermissions } from "@/lib/auth/usePermissions";
 import { MachineSharingBadges } from "@/components/machines/machineSharingBadges";
 import { PERMISSIONS } from "@/lib/auth/permissionCodes";
 import { getInitials } from "@/lib/format/nameInitials";
@@ -47,6 +50,9 @@ const CopyButton = ({ value, what }: { value: string; what: string }) => {
 export const MachineSpecList = () => {
   const { machine, reloadMachine, notify } = useMachineDetail();
   const [isEditing, setIsEditing] = useState(false);
+  const [isManagingGroups, setIsManagingGroups] = useState(false);
+  const { isLoaded, can } = usePermissions();
+  const canManageGroups = isLoaded && can(PERMISSIONS.managePlatform);
   if (!machine) return <SkeletonBar className="h-[260px] min-w-[280px] flex-1 rounded-xl" />;
 
   return (
@@ -73,12 +79,29 @@ export const MachineSpecList = () => {
         value={machine.isShared ? machine.owningOrganisationName : (machine.owner?.name ?? "Unassigned")}
         aside={machine.owner && <Avatar initials={getInitials(machine.owner.name)} imageSrc={machine.owner.avatarUrl ?? undefined} size="sm" />}
       />
-      {isOwnMachine(machine) && (
-        <div className="flex py-2.5">
-          <PermissionButton permission={PERMISSIONS.manageMachine} size="sm" className="ml-auto" onClick={() => setIsEditing(true)}>
-            Edit machine
-          </PermissionButton>
+      {(isOwnMachine(machine) || canManageGroups) && (
+        <div className="flex justify-end gap-2 py-2.5">
+          {canManageGroups && (
+            <Button size="sm" variant="ghost" onClick={() => setIsManagingGroups(true)}>
+              Manage groups
+            </Button>
+          )}
+          {isOwnMachine(machine) && (
+            <PermissionButton permission={PERMISSIONS.manageMachine} size="sm" onClick={() => setIsEditing(true)}>
+              Edit machine
+            </PermissionButton>
+          )}
         </div>
+      )}
+      {isManagingGroups && (
+        <ManageMachineGroupsModal
+          machine={{ id: machine.id, label: machine.plantId ?? machine.serialNumber }}
+          onSaved={(message) => {
+            reloadMachine();
+            notify(message);
+          }}
+          onClose={() => setIsManagingGroups(false)}
+        />
       )}
       {isEditing && (
         <EditMachineModal

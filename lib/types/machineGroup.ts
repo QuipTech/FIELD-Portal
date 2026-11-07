@@ -66,6 +66,12 @@ export interface GroupMachine {
 // GET /admin/machines/search.
 export type PlatformMachine = Omit<GroupMachine, "addedAt"> & { registrationNumber: string | null };
 
+// GET and PUT /admin/machines/:machineId/groups.
+export interface MachineGroupMembership {
+  id: string;
+  name: string;
+}
+
 export interface GroupAssignment {
   id: string;
   targetType: AssignmentTargetType;

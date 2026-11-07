@@ -1,10 +1,17 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { PoolClient } from 'pg';
 import { DatabaseService } from '../database/database.service';
 import { StorageService } from '../storage/storage.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { runAuditedChange } from '../common/audit/runAuditedChange';
 import { findUserPermissionCodes } from '../auth/userAccess.repository';
-import { MACHINE_LIFECYCLE_PERMISSION } from '../machineLifecycle/lifecycleTransitions';
+import {
+  hasFullMachineAccess,
+  MACHINE_LIFECYCLE_PERMISSION,
+  toLifecycleState,
+} from '../machineLifecycle/lifecycleTransitions';
+import { readFeatureKeys } from '../entitlements/entitlements.service';
+import { FEATURE_KEYS } from '../entitlements/featureKeys';
 import { ACCESSIBLE_MACHINES } from '../machineSharing/access/machineScope';
 import * as fleetRepository from './machineFleet.repository';
 import * as catalogRepository from './machineCatalog.repository';
@@ -20,8 +27,11 @@ import {
   MachineCatalogMake,
   MachineFleetList,
 } from './types/machineFleetResponse';
+import { FleetMachineRow } from './types/machineFleetRows';
 
 const MACHINE_NOT_FOUND_MESSAGE = 'Machine not found.';
+// Most photos a list row slides through; the gallery shows the rest.
+const MAX_ROW_PHOTOS = 10;
 
 // The caller's machines: the Machines list (their organisation's plus
 // shared ones) and changing a machine's operating status (own organisation
@@ -61,15 +71,22 @@ export class MachineFleetService {
       const canManageLifecycle = (
         await findUserPermissionCodes(client, actor.userId)
       ).includes(MACHINE_LIFECYCLE_PERMISSION);
+      const rowPhotoKeys = await this.readRowPhotoKeys(client, rows);
       return {
         items: await Promise.all(
-          rows.map((row) =>
-            toFleetMachineWithPhoto(
+          rows.map(async (row) => ({
+            ...(await toFleetMachineWithPhoto(
               this.storageService,
               row,
               canManageLifecycle,
+            )),
+            photoUrls: await Promise.all(
+              (rowPhotoKeys.get(row.id) ?? []).map(
+                async (key) =>
+                  (await this.storageService.getSignedDownloadUrl(key)).url,
+              ),
             ),
-          ),
+          })),
         ),
         total,
         page: filters.page,
@@ -141,4 +158,33 @@ export class MachineFleetService {
         };
       },
     );
+
+  // Only for machines whose gallery the caller may open, the same rule as
+  // RequireActiveMachineGuard: active, and on the owner's current plan unless
+  // it's shared (the owner pays for those). Others keep their single photoUrl.
+  private readRowPhotoKeys = async (
+    client: PoolClient,
+    rows: FleetMachineRow[],
+  ): Promise<Map<string, string[]>> => {
+    const active = rows.filter((row) =>
+      hasFullMachineAccess(toLifecycleState(row.lifecycle_state)),
+    );
+    const hasPlan =
+      active.some((row) => !row.is_shared) &&
+      (await readFeatureKeys(client)).has(FEATURE_KEYS.assetHistory);
+    const machineIds = active
+      .filter((row) => row.is_shared || hasPlan)
+      .map((row) => row.id);
+    const keys = new Map<string, string[]>();
+    if (machineIds.length === 0) return keys;
+    const found = await fleetRepository.listRowPhotoKeys(
+      client,
+      machineIds,
+      MAX_ROW_PHOTOS,
+    );
+    for (const { machine_id: machineId, storage_key: key } of found) {
+      keys.set(machineId, [...(keys.get(machineId) ?? []), key]);
+    }
+    return keys;
+  };
 }
