@@ -54,15 +54,25 @@ export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }
     return () => window.removeEventListener("focus", reload);
   }, [isAwaitingPayment, reload]);
 
-  // Raises it and pushes it to Stripe; the reload shows its payment link, or
-  // that it's paid if a card or direct debit on file covered it.
+  // Raises it, pushes it to Stripe and opens its payment page. No page if a
+  // card or direct debit on file covered it. The tab has to open before the
+  // request, or the browser blocks it as a pop-up.
   const raiseFinalCharge = async () => {
     setIsRaisingCharge(true);
     setChargeError(null);
+    const paymentTab = window.open("", "_blank");
     try {
-      await payMachineFinalChargeRequest(requireAccessToken(), machineId);
+      const next = await payMachineFinalChargeRequest(requireAccessToken(), machineId);
+      const paymentUrl = next.unpaidInvoices.find((invoice) => invoice.isFinalCharge && invoice.hostedInvoiceUrl)?.hostedInvoiceUrl;
+      if (paymentTab && paymentUrl) {
+        paymentTab.opener = null;
+        paymentTab.location.href = paymentUrl;
+      } else {
+        paymentTab?.close();
+      }
       check.reload();
     } catch (error) {
+      paymentTab?.close();
       setChargeError(toApiErrorMessage(error, "Couldn't raise the invoice for what's due. Please try again."));
     } finally {
       setIsRaisingCharge(false);
@@ -96,7 +106,7 @@ export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }
             <span className="text-xs text-mutedGray">This machine then comes off the monthly invoice for these months, and can&apos;t be reactivated this month. You delete it once this is paid.</span>
           </div>
           <Button size="sm" variant="primary" className="ml-auto" disabled={isRaisingCharge} onClick={raiseFinalCharge}>
-            {isRaisingCharge ? "Raising invoice…" : "Pay dues"}
+            {isRaisingCharge ? "Creating invoice…" : "Pay dues"}
           </Button>
         </div>
       )}
@@ -110,6 +120,10 @@ export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }
                 <a href={invoice.hostedInvoiceUrl} target="_blank" rel="noreferrer" className="font-medium text-primary">
                   Pay invoice
                 </a>
+              ) : invoice.isFinalCharge ? (
+                <Button size="sm" variant="primary" disabled={isRaisingCharge} onClick={raiseFinalCharge}>
+                  {isRaisingCharge ? "Creating invoice…" : "Pay invoice"}
+                </Button>
               ) : (
                 <Link href="/settings/billing" className="font-medium text-primary">
                   View in Billing

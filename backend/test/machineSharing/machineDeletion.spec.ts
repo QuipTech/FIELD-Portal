@@ -30,6 +30,7 @@ describe('deleting a machine', () => {
   let deletion: MachineDeletionService;
   let adminB: AuthenticatedUser;
   const finalise = jest.fn(async () => undefined);
+  const refreshPaid = jest.fn(async () => false);
 
   beforeAll(async () => {
     fixture = await createBillingTestDatabase();
@@ -57,7 +58,8 @@ describe('deleting a machine', () => {
           return invoice.rows[0].id;
         },
       ),
-      finalise,
+      finaliseNow: finalise,
+      refreshPaid,
     } as unknown as UpFrontInvoiceService;
     const priceBooks = {
       getPinnedPriceBook: jest.fn(async () => ASSET_PRO_V1),
@@ -251,6 +253,57 @@ describe('deleting a machine', () => {
       expect((await check()).canDelete).toBe(true);
       await deletion.deleteMachine(adminB, machineId(), 'Scrapped', NOV_20);
       expect(await listed()).not.toContain(machineId());
+    });
+
+    describe('when the invoice reaches Stripe', () => {
+      const setUnpaidLink = (url: string) =>
+        fixture.query(
+          `UPDATE billing.invoices SET status = 'synced', hosted_invoice_url = $1 WHERE kind = 'machine_final'`,
+          [url],
+        );
+
+      it("passes on Stripe's failure, keeps the invoice, and retries it on the next click", async () => {
+        await setUpDeactivated();
+        finalise.mockRejectedValueOnce(new Error('Stripe is down'));
+        await expect(pay()).rejects.toThrow('Stripe is down');
+        expect((await check()).unpaidInvoices).toHaveLength(1);
+
+        finalise.mockClear();
+        const retried = await pay();
+        expect(finalise).toHaveBeenCalledTimes(1);
+        expect(retried.blocker).toBe('unpaid_invoices');
+        const { rows } = await fixture.query(
+          `SELECT count(*)::int AS count FROM billing.invoices WHERE kind = 'machine_final'`,
+        );
+        expect(rows[0].count).toBe(1);
+      });
+
+      it("doesn't push an invoice that already has its payment link", async () => {
+        await setUpDeactivated();
+        await pay();
+        await setUnpaidLink('https://invoice.stripe.com/i/f');
+        finalise.mockClear();
+
+        const again = await pay();
+        expect(finalise).not.toHaveBeenCalled();
+        expect(again.unpaidInvoices[0].hostedInvoiceUrl).toBe(
+          'https://invoice.stripe.com/i/f',
+        );
+      });
+
+      it('allows the delete once Stripe says it was paid, before any webhook', async () => {
+        await setUpDeactivated();
+        await pay();
+        await setUnpaidLink('https://invoice.stripe.com/i/f');
+        refreshPaid.mockClear();
+        refreshPaid.mockImplementationOnce(async () => {
+          await markFinalPaid();
+          return true;
+        });
+
+        expect((await check()).canDelete).toBe(true);
+        expect(refreshPaid).toHaveBeenCalledTimes(1);
+      });
     });
 
     describe("when last month's invoice hasn't been issued", () => {

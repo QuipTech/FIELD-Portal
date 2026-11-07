@@ -7,6 +7,8 @@ import {
   createFakeBillingDatabase,
   FakeBillingState,
 } from '../billingFakeDatabase';
+import { ServiceDatabaseService } from '../../database/serviceDatabase.service';
+import { InvoiceRow } from './types/invoiceRows';
 import { InvoiceStripeSyncService } from './invoiceStripeSync.service';
 
 // A fake Stripe that, like the real one, answers a repeated idempotency
@@ -148,5 +150,58 @@ describe('InvoiceStripeSyncService', () => {
       service.pushInvoice(state.invoices[0]),
     ).resolves.toBeUndefined();
     expect(state.invoices[0]).toMatchObject({ status: 'synced' });
+  });
+
+  describe('refreshPaidStatus', () => {
+    const query = jest.fn().mockResolvedValue({ rowCount: 1 });
+    const retrieveInvoice = jest.fn();
+    const paidService = new InvoiceStripeSyncService(
+      {
+        transaction: (work: (client: unknown) => unknown) => work({ query }),
+      } as unknown as ServiceDatabaseService,
+      {} as BillingAccountsService,
+      { retrieveInvoice } as unknown as StripeService,
+      {} as BillingConfigService,
+    );
+    const onStripe = {
+      ...buildInvoiceRow(),
+      status: 'synced',
+      stripe_invoice_id: 'in_1',
+    } as InvoiceRow;
+
+    beforeEach(() => jest.clearAllMocks());
+
+    it('applies a paid invoice as the webhook would', async () => {
+      retrieveInvoice.mockResolvedValue({
+        id: 'in_1',
+        status: 'paid',
+        metadata: {},
+        total: 1100,
+        amount_paid: 1100,
+        hosted_invoice_url: 'https://invoice.stripe.com/i/1',
+      });
+      await expect(paidService.refreshPaidStatus(onStripe)).resolves.toBe(true);
+      expect(query).toHaveBeenCalledTimes(1);
+      const params = query.mock.calls[0][1] as unknown[];
+      expect(params[3]).toBe('paid');
+    });
+
+    it('changes nothing while it is still open', async () => {
+      retrieveInvoice.mockResolvedValue({ id: 'in_1', status: 'open' });
+      await expect(paidService.refreshPaidStatus(onStripe)).resolves.toBe(
+        false,
+      );
+      expect(query).not.toHaveBeenCalled();
+    });
+
+    it("doesn't ask Stripe about an invoice that never reached it", async () => {
+      await expect(
+        paidService.refreshPaidStatus({
+          ...onStripe,
+          stripe_invoice_id: null,
+        }),
+      ).resolves.toBe(false);
+      expect(retrieveInvoice).not.toHaveBeenCalled();
+    });
   });
 });

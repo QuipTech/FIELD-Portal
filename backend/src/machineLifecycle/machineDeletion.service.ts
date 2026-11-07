@@ -77,6 +77,15 @@ export class MachineDeletionService {
       machineId,
       now,
     );
+    if (check.blocker === 'unpaid_invoices') {
+      // Back from paying: Stripe may know before its webhook has told us.
+      const onStripe = check.unpaidInvoices
+        .filter((invoice) => invoice.hostedInvoiceUrl)
+        .map((invoice) => invoice.id);
+      return (await this.upFrontInvoices.refreshPaid(onStripe))
+        ? this.checkDeletion(actor, machineId, now)
+        : check;
+    }
     if (check.blocker !== 'final_charge_due') return check;
     return {
       ...check,
@@ -86,8 +95,9 @@ export class MachineDeletionService {
 
   // Raises the machine's final charge and pushes it to Stripe, which charges a
   // card or direct debit on file at once; otherwise the customer pays the
-  // invoice link shown on the machine. The answer shows where that leaves it.
-  // Safe to repeat: a second call finds the first charge.
+  // invoice link in the answer. If Stripe fails they get the error, and the
+  // invoice stays saved. Safe to repeat: a second call finds the first charge
+  // and pushes it again if it never reached Stripe.
   payFinalCharge = async (
     actor: AuthenticatedUser,
     machineId: string,
@@ -98,8 +108,20 @@ export class MachineDeletionService {
       machineId,
       now,
     );
+    if (check.blocker === 'unpaid_invoices') {
+      const notOnStripe = check.unpaidInvoices.filter(
+        (invoice) => invoice.isFinalCharge && !invoice.hostedInvoiceUrl,
+      );
+      for (const invoice of notOnStripe) {
+        await this.upFrontInvoices.finaliseNow(
+          invoice.id,
+          machine.billing_account_id as string,
+        );
+      }
+      return this.checkDeletion(actor, machineId, now);
+    }
     if (check.blocker !== 'final_charge_due') {
-      if (check.blocker === 'unpaid_invoices' || check.canDelete) return check;
+      if (check.canDelete) return check;
       throw new ConflictException({
         statusCode: 409,
         code: check.blocker,
@@ -179,7 +201,7 @@ export class MachineDeletionService {
       return invoice;
     });
     if (invoiceId) {
-      await this.upFrontInvoices.finalise(invoiceId, billingAccountId);
+      await this.upFrontInvoices.finaliseNow(invoiceId, billingAccountId);
     }
     return this.checkDeletion(actor, machineId, now);
   };

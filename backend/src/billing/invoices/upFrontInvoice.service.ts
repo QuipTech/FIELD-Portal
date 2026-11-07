@@ -117,13 +117,34 @@ export class UpFrontInvoiceService {
   // the hourly billing job.
   finalise = async (invoiceId: string, billingAccountId: string) => {
     try {
-      const account =
-        await this.billingAccounts.requireAccount(billingAccountId);
-      await this.invoices.finaliseInvoice(invoiceId, account.billing_email);
+      await this.finaliseNow(invoiceId, billingAccountId);
     } catch (error) {
       this.logger.warn(
         `Invoice ${invoiceId} saved; Stripe push will be retried: ${String(error)}`,
       );
     }
+  };
+
+  // For a customer waiting to pay: a failure reaches them, and the invoice
+  // stays saved so they can try again.
+  finaliseNow = async (invoiceId: string, billingAccountId: string) => {
+    const account = await this.billingAccounts.requireAccount(billingAccountId);
+    await this.invoices.finaliseInvoice(invoiceId, account.billing_email);
+  };
+
+  // True if Stripe says any of them has been paid. A failure only means the
+  // webhook has to bring the news instead.
+  refreshPaid = async (invoiceIds: string[]): Promise<boolean> => {
+    let isAnyPaid = false;
+    for (const invoiceId of invoiceIds) {
+      try {
+        if (await this.invoices.refreshPaidStatus(invoiceId)) isAnyPaid = true;
+      } catch (error) {
+        this.logger.warn(
+          `Couldn't read invoice ${invoiceId} from Stripe: ${String(error)}`,
+        );
+      }
+    }
+    return isAnyPaid;
   };
 }
