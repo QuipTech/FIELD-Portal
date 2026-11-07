@@ -51,8 +51,18 @@ describe("deleting a machine", () => {
     renderSection();
     expect(((await screen.findByRole("link", { name: "Pay invoice" })) as HTMLAnchorElement).href).toBe("https://invoice.stripe.com/i/1");
     expect(screen.getByText("October 2026 invoice")).toBeTruthy();
-    expect(screen.getByText("Final charge for November 2026")).toBeTruthy();
+    expect(screen.getByText("Final charge from November 2026")).toBeTruthy();
     expect((screen.getByRole("link", { name: "View in Billing" }) as HTMLAnchorElement).getAttribute("href")).toBe("/settings/billing");
+  });
+
+  it("looks again on coming back from paying in another tab", async () => {
+    const unpaid = { ...allowed, canDelete: false, blocker: "unpaid_invoices" as const, message: "Pay the invoices below.", unpaidInvoices: [{ id: "f1", periodStart: "2026-10-01", status: "synced", hostedInvoiceUrl: "https://invoice.stripe.com/i/f", isFinalCharge: true }] };
+    vi.mocked(getMachineDeletionCheckRequest).mockResolvedValueOnce(unpaid).mockResolvedValue(allowed);
+    renderSection();
+    await screen.findByRole("link", { name: "Pay invoice" });
+    fireEvent.focus(window);
+    await screen.findByText(/Billing is settled/);
+    expect(deleteButton().disabled).toBe(false);
   });
 
   it("shows the days-used charge, raises it, then shows its payment link", async () => {
@@ -62,18 +72,25 @@ describe("deleting a machine", () => {
         ...allowed,
         canDelete: false,
         blocker: "final_charge_due",
-        message: "Pay for the days this machine was used this month, then you can delete it.",
-        finalCharge: { periodStart: "2026-11-01", lastUsedOn: "2026-11-07", daysUsed: 7, daysInMonth: 30, monthlyRateCents: 3500, amountCents: 817 },
+        message: "Pay for the days this machine was used, then you can delete it.",
+        finalCharge: {
+          amountCents: 1607,
+          months: [
+            { periodStart: "2026-10-01", lastUsedOn: "2026-10-31", daysUsed: 7, daysInMonth: 31, monthlyRateCents: 3500, amountCents: 790 },
+            { periodStart: "2026-11-01", lastUsedOn: "2026-11-07", daysUsed: 7, daysInMonth: 30, monthlyRateCents: 3500, amountCents: 817 },
+          ],
+        },
       })
       .mockResolvedValue({ ...allowed, canDelete: false, blocker: "unpaid_invoices", message: "Pay the invoices below, then you can delete this machine.", unpaidInvoices: [paid] });
     vi.mocked(payMachineFinalChargeRequest).mockResolvedValue({ ...allowed, canDelete: false });
     renderSection();
 
-    await screen.findByText(/Final charge: .*8\.17/);
-    expect(screen.getByText(/7 of 30 days in November 2026, up to 7 November 2026/)).toBeTruthy();
+    await screen.findByText(/Amount due: .*16\.07/);
+    expect(screen.getByText(/October 2026: 7 of 31 days, up to 31 October 2026/)).toBeTruthy();
+    expect(screen.getByText(/November 2026: 7 of 30 days, up to 7 November 2026/)).toBeTruthy();
     expect(deleteButton().disabled).toBe(true);
 
-    fireEvent.click(screen.getByRole("button", { name: "Pay final charge" }));
+    fireEvent.click(screen.getByRole("button", { name: "Pay dues" }));
     expect(((await screen.findByRole("link", { name: "Pay invoice" })) as HTMLAnchorElement).href).toBe("https://invoice.stripe.com/i/f");
     expect(payMachineFinalChargeRequest).toHaveBeenCalledWith("test-token", "m1");
   });

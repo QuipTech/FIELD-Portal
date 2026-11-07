@@ -80,14 +80,18 @@ export interface MachineDeletionCheck {
   // First day the final invoice can exist, when waiting for it.
   finalInvoiceFrom: string | null;
   unpaidInvoices: { id: string; periodStart: string; status: string; hostedInvoiceUrl: string | null; isFinalCharge: boolean }[];
-  // What paying now costs, when the blocker is final_charge_due.
+  // What paying now costs, when the blocker is final_charge_due: one invoice
+  // for this month and last month, if that isn't invoiced yet.
   finalCharge: {
-    periodStart: string;
-    lastUsedOn: string;
-    daysUsed: number;
-    daysInMonth: number;
-    monthlyRateCents: number;
     amountCents: number;
+    months: {
+      periodStart: string;
+      lastUsedOn: string;
+      daysUsed: number;
+      daysInMonth: number;
+      monthlyRateCents: number;
+      amountCents: number;
+    }[];
   } | null;
 }
 

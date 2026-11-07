@@ -101,6 +101,7 @@ session (set per-request by `DatabaseService.withTenant`).
 | `0122` | A `contribute` person may soft delete the machine documents they uploaded themselves |
 | `0123` | A `contribute` person may soft delete the gallery photos they uploaded themselves |
 | `0125` | Machine final charges: `billing.machine_final_charges` (a machine being deleted pays for the days used this month; RLS own account, service role writes) and invoice kind `machine_final`. The monthly run leaves a machine with a non-void charge out of that month's peak |
+| `0126` | One final-charge invoice can cover several months: one `billing.machine_final_charges` row per month, unique on invoice and month |
 | `0124` | Machine soft delete: a machine's serial is unique only among live machines (`uq_machines_tenant_serial_live` replaces the table constraint), and `accessible_machines()` leaves out the organisation's deleted machines |
 
 See [Knowledge rollout](../../src/knowledgeBrands/README.md) for deployment order and compatibility.

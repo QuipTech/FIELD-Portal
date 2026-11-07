@@ -103,10 +103,10 @@ describe('a machine final charge and the month-end invoice', () => {
   });
   afterEach(() => fixture.db.exec('ROLLBACK'));
 
-  const monthlyLine = async () => {
+  const monthlyLine = async (at = DEC_1) => {
     const invoiceId = await run.runAccount(
       { id: fixture.ids.setUpAccount, timezone: 'Australia/Brisbane' },
-      DEC_1,
+      at,
     );
     expect(invoiceId).not.toBeNull();
     const { rows } = await fixture.query(
@@ -141,7 +141,9 @@ describe('a machine final charge and the month-end invoice', () => {
     expect(rows[0]).toMatchObject({ kind: 'machine_final', status: 'draft' });
     // A$35.00 × 6 ÷ 30.
     expect(Number(rows[0].amount_cents)).toBe(700);
-    expect(rows[0].description).toContain('6 of 30 days at A$35.00 a month');
+    expect(rows[0].description).toContain(
+      '6 of 30 days in November 2026 at A$35.00 a month',
+    );
 
     expect(await monthlyLine()).toEqual({ quantity: 2, amountCents: 7000 });
   });
@@ -152,6 +154,31 @@ describe('a machine final charge and the month-end invoice', () => {
       `UPDATE billing.invoices SET status = 'void' WHERE kind = 'machine_final'`,
     );
     expect(await monthlyLine()).toEqual({ quantity: 3, amountCents: 10500 });
+  });
+
+  it('leaves a charged closed month off its invoice when the run reaches it late', async () => {
+    await fixture.query(
+      `UPDATE billing.machine_activations
+       SET activated_on = CASE WHEN machine_id = $1 THEN '2026-10-25'::date ELSE '2026-10-01'::date END
+       WHERE billing_account_id = $2`,
+      [world.ownB.id, fixture.ids.setUpAccount],
+    );
+    await deletion.payFinalCharge(admin, world.ownB.id, NOV_20);
+    const { rows } = await fixture.query(
+      `SELECT period_start::text FROM billing.machine_final_charges
+       WHERE machine_id = $1 ORDER BY period_start`,
+      [world.ownB.id],
+    );
+    expect(rows.map((row) => row.period_start)).toEqual([
+      '2026-10-01',
+      '2026-11-01',
+    ]);
+    // October's invoice arrives after the charge, then November's.
+    expect(await monthlyLine(NOV_20)).toEqual({
+      quantity: 2,
+      amountCents: 7000,
+    });
+    expect(await monthlyLine()).toEqual({ quantity: 2, amountCents: 7000 });
   });
 
   it('lets the machine go once paid, and still bills the month correctly after', async () => {

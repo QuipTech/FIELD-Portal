@@ -137,6 +137,20 @@ export const hasDailySnapshot = async (
   return (result.rowCount ?? 0) > 0;
 };
 
+export const listFinalChargedMonths = async (
+  client: PoolClient,
+  machineId: string,
+): Promise<string[]> => {
+  const result = await client.query<{ period_start: string }>(
+    `SELECT c.period_start::text AS period_start
+     FROM billing.machine_final_charges c
+     JOIN billing.invoices i ON i.id = c.invoice_id AND i.status <> 'void'
+     WHERE c.machine_id = $1`,
+    [machineId],
+  );
+  return result.rows.map((row) => row.period_start);
+};
+
 // False if the machine has changed state since it was checked.
 export const softDeleteMachine = async (
   client: PoolClient,
