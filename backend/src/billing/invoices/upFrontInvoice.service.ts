@@ -1,4 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { PersonalCheckoutService } from '../personalSubscription/personalCheckout.service';
+import { toStripeGatewayError } from '../stripe/stripeErrors';
+import { findInvoice } from './invoices.repository';
 import { ServiceDatabaseService } from '../../database/serviceDatabase.service';
 import { BillingAccountsService } from '../billingAccounts/billingAccounts.service';
 import { BillingActor, recordBillingAudit } from '../billingAudit/billingAudit';
@@ -23,6 +26,7 @@ export class UpFrontInvoiceService {
     private readonly billingAccounts: BillingAccountsService,
     private readonly priceBooks: PriceBooksService,
     private readonly invoices: InvoicesService,
+    private readonly checkout: PersonalCheckoutService,
   ) {}
 
   // Once per annual term (uq_invoices_account_annual_term). The invoice
@@ -117,7 +121,9 @@ export class UpFrontInvoiceService {
   // the hourly billing job.
   finalise = async (invoiceId: string, billingAccountId: string) => {
     try {
-      await this.finaliseNow(invoiceId, billingAccountId);
+      const account =
+        await this.billingAccounts.requireAccount(billingAccountId);
+      await this.invoices.finaliseInvoice(invoiceId, account.billing_email);
     } catch (error) {
       this.logger.warn(
         `Invoice ${invoiceId} saved; Stripe push will be retried: ${String(error)}`,
@@ -125,11 +131,75 @@ export class UpFrontInvoiceService {
     }
   };
 
-  // For a customer waiting to pay: a failure reaches them, and the invoice
-  // stays saved so they can try again.
-  finaliseNow = async (invoiceId: string, billingAccountId: string) => {
-    const account = await this.billingAccounts.requireAccount(billingAccountId);
-    await this.invoices.finaliseInvoice(invoiceId, account.billing_email);
+  // Paying an invoice on the spot (a machine's final charge) with Stripe
+  // Checkout instead of pushing it as a Stripe invoice: Checkout shows the
+  // total, asks for the billing address (so Stripe Tax can add GST) and
+  // creates the paid Stripe invoice itself. The Checkout URL, or null when
+  // it's already paid. A failure reaches the payer; the invoice stays saved.
+  openCheckout = async (
+    invoiceId: string,
+    options: { returnPage: string; keyScope: string; description: string },
+  ): Promise<string | null> => {
+    try {
+      const invoice = await this.requireInvoiceRow(invoiceId);
+      const account = await this.billingAccounts.ensureStripeCustomer(
+        await this.billingAccounts.requireAccount(invoice.billing_account_id),
+      );
+      // A Stripe invoice from an earlier, failed push was never finalised:
+      // drop the link so Checkout's paid invoice is the one matched to ours.
+      if (invoice.stripe_invoice_id && !invoice.hosted_invoice_url) {
+        await this.serviceDatabase.query(
+          `UPDATE billing.invoices SET stripe_invoice_id = NULL
+           WHERE id = $1 AND hosted_invoice_url IS NULL`,
+          [invoice.id],
+        );
+        invoice.stripe_invoice_id = null;
+      }
+      return await this.checkout.openCheckoutAt(
+        invoice,
+        account.stripe_customer_id as string,
+        { ...options, collectBillingAddress: true },
+      );
+    } catch (error) {
+      throw toStripeGatewayError(error);
+    }
+  };
+
+  // True if a Checkout payment was found for any of them and recorded, for a
+  // payer back from Checkout before its webhook. A failure only means the
+  // webhook has to bring the news instead.
+  confirmCheckouts = async (
+    invoiceIds: string[],
+    billingAccountId: string,
+  ): Promise<boolean> => {
+    if (invoiceIds.length === 0) return false;
+    let isAnyPaid = false;
+    try {
+      const account =
+        await this.billingAccounts.requireAccount(billingAccountId);
+      if (!account.stripe_customer_id) return false;
+      for (const invoiceId of invoiceIds) {
+        const invoice = await this.requireInvoiceRow(invoiceId);
+        if (
+          await this.checkout.confirmPayment(
+            invoice,
+            account.stripe_customer_id,
+          )
+        )
+          isAnyPaid = true;
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Couldn't check Stripe Checkout for invoices ${invoiceIds.join(', ')}: ${String(error)}`,
+      );
+    }
+    return isAnyPaid;
+  };
+
+  private requireInvoiceRow = async (invoiceId: string) => {
+    const invoice = await findInvoice(this.serviceDatabase, invoiceId);
+    if (!invoice) throw new NotFoundException('Invoice not found.');
+    return invoice;
   };
 
   // True if Stripe says any of them has been paid. A failure only means the

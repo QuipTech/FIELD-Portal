@@ -40,50 +40,82 @@ describe("deleting a machine", () => {
 
   describe("paying the final charge", () => {
     const stuck = { id: "f1", periodStart: "2026-10-01", status: "draft", hostedInvoiceUrl: null, isFinalCharge: true };
-    const unpaid = { ...allowed, canDelete: false, blocker: "unpaid_invoices" as const, message: "Pay the invoices below." };
-    const stripeUrl = "https://invoice.stripe.com/i/f";
-    const paymentTab = { opener: {}, location: { href: "" }, close: vi.fn() };
+    const unpaid = { ...allowed, canDelete: false, blocker: "unpaid_invoices" as const, message: "Pay the invoices below.", unpaidInvoices: [stuck] };
+    const checkoutUrl = "https://checkout.stripe.com/c/pay/final";
+    const assign = vi.fn();
 
     beforeEach(() => {
-      paymentTab.location.href = "";
-      paymentTab.close.mockClear();
-      vi.spyOn(window, "open").mockReturnValue(paymentTab as unknown as Window);
+      assign.mockClear();
+      vi.stubGlobal("location", { ...window.location, origin: "http://localhost:3000", assign });
     });
-    afterEach(() => vi.restoreAllMocks());
+    afterEach(() => vi.unstubAllGlobals());
 
-    it("retries an invoice that never reached Stripe, then opens Stripe", async () => {
-      const synced = { ...unpaid, unpaidInvoices: [{ ...stuck, status: "synced", hostedInvoiceUrl: stripeUrl }] };
-      vi.mocked(getMachineDeletionCheckRequest).mockResolvedValueOnce({ ...unpaid, unpaidInvoices: [stuck] }).mockResolvedValue(synced);
-      vi.mocked(payMachineFinalChargeRequest).mockResolvedValue(synced);
+    it("goes to Stripe Checkout for an invoice not paid yet", async () => {
+      vi.mocked(getMachineDeletionCheckRequest).mockResolvedValue(unpaid);
+      vi.mocked(payMachineFinalChargeRequest).mockResolvedValue({ ...unpaid, paymentUrl: checkoutUrl });
       renderSection();
 
       fireEvent.click(await screen.findByRole("button", { name: "Pay invoice" }));
-      await waitFor(() => expect(paymentTab.location.href).toBe(stripeUrl));
-      expect(paymentTab.opener).toBeNull();
-      expect(paymentTab.close).not.toHaveBeenCalled();
-      expect(((await screen.findByRole("link", { name: "Pay invoice" })) as HTMLAnchorElement).href).toBe(stripeUrl);
+      await waitFor(() => expect(assign).toHaveBeenCalledWith(checkoutUrl));
+      expect(payMachineFinalChargeRequest).toHaveBeenCalledWith("test-token", "m1", "http://localhost:3000");
     });
 
-    it("shows Stripe's error and closes the tab", async () => {
-      vi.mocked(getMachineDeletionCheckRequest).mockResolvedValue({ ...unpaid, unpaidInvoices: [stuck] });
+    it("refuses a payment link that isn't Stripe's", async () => {
+      vi.mocked(getMachineDeletionCheckRequest).mockResolvedValue(unpaid);
+      vi.mocked(payMachineFinalChargeRequest).mockResolvedValue({ ...unpaid, paymentUrl: "https://evil.example/pay" });
+      renderSection();
+
+      fireEvent.click(await screen.findByRole("button", { name: "Pay invoice" }));
+      await screen.findByText(/payment link could not be verified/);
+      expect(assign).not.toHaveBeenCalled();
+    });
+
+    it("shows Stripe's error", async () => {
+      vi.mocked(getMachineDeletionCheckRequest).mockResolvedValue(unpaid);
       vi.mocked(payMachineFinalChargeRequest).mockRejectedValue(new ApiError("Billing is not configured (STRIPE_SECRET_KEY).", 503));
       renderSection();
 
       fireEvent.click(await screen.findByRole("button", { name: "Pay invoice" }));
       await screen.findByText("Billing is not configured (STRIPE_SECRET_KEY).");
-      expect(paymentTab.close).toHaveBeenCalled();
+      expect(assign).not.toHaveBeenCalled();
       expect(deleteButton().disabled).toBe(true);
     });
 
-    it("opens nothing if a card on file already paid it", async () => {
-      vi.mocked(getMachineDeletionCheckRequest).mockResolvedValueOnce({ ...unpaid, unpaidInvoices: [stuck] }).mockResolvedValue(allowed);
-      vi.mocked(payMachineFinalChargeRequest).mockResolvedValue(allowed);
+    it("goes nowhere if it was already paid", async () => {
+      vi.mocked(getMachineDeletionCheckRequest).mockResolvedValueOnce(unpaid).mockResolvedValue(allowed);
+      vi.mocked(payMachineFinalChargeRequest).mockResolvedValue({ ...allowed, paymentUrl: null });
       renderSection();
 
       fireEvent.click(await screen.findByRole("button", { name: "Pay invoice" }));
       await screen.findByText(/Billing is settled/);
-      expect(paymentTab.close).toHaveBeenCalled();
+      expect(assign).not.toHaveBeenCalled();
       expect(deleteButton().disabled).toBe(false);
+    });
+
+    it("shows the total due, then goes to Checkout from Pay dues", async () => {
+      vi.mocked(getMachineDeletionCheckRequest).mockResolvedValue({
+        ...allowed,
+        canDelete: false,
+        blocker: "final_charge_due",
+        message: "Pay for the days this machine was used, then you can delete it.",
+        finalCharge: {
+          amountCents: 1607,
+          months: [
+            { periodStart: "2026-10-01", lastUsedOn: "2026-10-31", daysUsed: 7, daysInMonth: 31, monthlyRateCents: 3500, amountCents: 790 },
+            { periodStart: "2026-11-01", lastUsedOn: "2026-11-07", daysUsed: 7, daysInMonth: 30, monthlyRateCents: 3500, amountCents: 817 },
+          ],
+        },
+      });
+      vi.mocked(payMachineFinalChargeRequest).mockResolvedValue({ ...unpaid, paymentUrl: checkoutUrl });
+      renderSection();
+
+      await screen.findByText(/Amount due: .*16\.07/);
+      expect(screen.getByText(/October 2026: 7 of 31 days, up to 31 October 2026/)).toBeTruthy();
+      expect(screen.getByText(/November 2026: 7 of 30 days, up to 7 November 2026/)).toBeTruthy();
+      expect(deleteButton().disabled).toBe(true);
+
+      fireEvent.click(screen.getByRole("button", { name: "Pay dues" }));
+      await waitFor(() => expect(assign).toHaveBeenCalledWith(checkoutUrl));
     });
   });
 
@@ -113,37 +145,6 @@ describe("deleting a machine", () => {
     fireEvent.focus(window);
     await screen.findByText(/Billing is settled/);
     expect(deleteButton().disabled).toBe(false);
-  });
-
-  it("shows the days-used charge, raises it, then shows its payment link", async () => {
-    const paid = { id: "f1", periodStart: "2026-11-01", status: "synced", hostedInvoiceUrl: "https://invoice.stripe.com/i/f", isFinalCharge: true };
-    vi.mocked(getMachineDeletionCheckRequest)
-      .mockResolvedValueOnce({
-        ...allowed,
-        canDelete: false,
-        blocker: "final_charge_due",
-        message: "Pay for the days this machine was used, then you can delete it.",
-        finalCharge: {
-          amountCents: 1607,
-          months: [
-            { periodStart: "2026-10-01", lastUsedOn: "2026-10-31", daysUsed: 7, daysInMonth: 31, monthlyRateCents: 3500, amountCents: 790 },
-            { periodStart: "2026-11-01", lastUsedOn: "2026-11-07", daysUsed: 7, daysInMonth: 30, monthlyRateCents: 3500, amountCents: 817 },
-          ],
-        },
-      })
-      .mockResolvedValue({ ...allowed, canDelete: false, blocker: "unpaid_invoices", message: "Pay the invoices below, then you can delete this machine.", unpaidInvoices: [paid] });
-    vi.mocked(payMachineFinalChargeRequest).mockResolvedValue({ ...allowed, canDelete: false });
-    renderSection();
-
-    await screen.findByText(/Amount due: .*16\.07/);
-    expect(screen.getByText(/October 2026: 7 of 31 days, up to 31 October 2026/)).toBeTruthy();
-    expect(screen.getByText(/November 2026: 7 of 30 days, up to 7 November 2026/)).toBeTruthy();
-    expect(deleteButton().disabled).toBe(true);
-
-    vi.spyOn(window, "open").mockReturnValue(null);
-    fireEvent.click(screen.getByRole("button", { name: "Pay dues" }));
-    expect(((await screen.findByRole("link", { name: "Pay invoice" })) as HTMLAnchorElement).href).toBe("https://invoice.stripe.com/i/f");
-    expect(payMachineFinalChargeRequest).toHaveBeenCalledWith("test-token", "m1");
   });
 
   it("needs the machine's name and a reason, then deletes and leaves the page", async () => {

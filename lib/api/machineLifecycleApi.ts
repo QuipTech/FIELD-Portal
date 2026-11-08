@@ -2,6 +2,7 @@ import { apiRequest } from "./httpClient";
 import type {
   ActivationQuote,
   BulkLifecycleResult,
+  FinalChargePayment,
   LifecycleAction,
   LifecycleChangeResult,
   MachineDeletionCheck,
@@ -31,9 +32,15 @@ export const getMachineLifecycleRequest = (accessToken: string, machineId: strin
 export const getMachineDeletionCheckRequest = (accessToken: string, machineId: string) =>
   apiRequest<MachineDeletionCheck>(`/machines/${machineId}/deletion-check`, { headers: authorizationHeader(accessToken) });
 
-// Raises the days-used charge for a machine being deleted; safe to repeat.
-export const payMachineFinalChargeRequest = (accessToken: string, machineId: string) =>
-  apiRequest<MachineDeletionCheck>(`/machines/${machineId}/final-charge`, { method: "POST", headers: authorizationHeader(accessToken) });
+// Raises the days-used charge for a machine being deleted and returns the
+// Stripe Checkout URL to pay it, which comes back to the machine's page on
+// returnOrigin (only a portal origin is accepted). Safe to repeat.
+export const payMachineFinalChargeRequest = (accessToken: string, machineId: string, returnOrigin: string) =>
+  apiRequest<FinalChargePayment>(`/machines/${machineId}/final-charge`, {
+    method: "POST",
+    headers: authorizationHeader(accessToken),
+    body: JSON.stringify({ returnOrigin }),
+  });
 
 // Soft delete; 409 until it's out of active and its billing is settled.
 export const deleteMachineRequest = (accessToken: string, machineId: string, reason: string) =>

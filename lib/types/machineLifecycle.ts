@@ -95,6 +95,10 @@ export interface MachineDeletionCheck {
   } | null;
 }
 
+// POST /machines/:machineId/final-charge: the check, and where to pay (Stripe
+// Checkout); paymentUrl is null once nothing is left to pay there.
+export type FinalChargePayment = MachineDeletionCheck & { paymentUrl: string | null };
+
 export type TransferStatus = "requested" | "rejected" | "cancelled" | "completed";
 
 export interface MachineTransfer {

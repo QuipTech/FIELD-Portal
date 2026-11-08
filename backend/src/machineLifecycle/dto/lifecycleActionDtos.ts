@@ -39,6 +39,15 @@ export class BulkLifecycleActionDto extends ApplyLifecycleActionDto {
   machineIds: string[];
 }
 
+export class PayFinalChargeDto {
+  // The portal origin Stripe Checkout returns to; only a configured
+  // PORTAL_ORIGIN is used (toReturnOrigin).
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  returnOrigin?: string;
+}
+
 export class DeleteMachineDto {
   @Transform(trimString)
   @IsString()

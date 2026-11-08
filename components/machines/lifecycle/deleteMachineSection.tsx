@@ -21,6 +21,8 @@ interface DeleteMachineSectionProps {
 }
 
 const MIN_REASON_LENGTH = 3;
+const STRIPE_PAYMENT_HOSTS = ["checkout.stripe.com", "invoice.stripe.com"];
+const UNVERIFIED_LINK_MESSAGE = "The payment link could not be verified. Please contact support.";
 const fieldClasses = "h-10 rounded-lg border border-borderGrayStrong bg-surface px-3 text-[15px] text-ink outline-none";
 
 const utcDate = (day: string) => new Date(`${day}T00:00:00Z`);
@@ -54,28 +56,26 @@ export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }
     return () => window.removeEventListener("focus", reload);
   }, [isAwaitingPayment, reload]);
 
-  // Raises it, pushes it to Stripe and opens its payment page. No page if a
-  // card or direct debit on file covered it. The tab has to open before the
-  // request, or the browser blocks it as a pop-up.
+  // Raises the invoice for the total due and goes to Stripe Checkout, which
+  // takes the billing address, adds GST and comes back here once paid.
   const raiseFinalCharge = async () => {
     setIsRaisingCharge(true);
     setChargeError(null);
-    const paymentTab = window.open("", "_blank");
+    let isRedirecting = false;
     try {
-      const next = await payMachineFinalChargeRequest(requireAccessToken(), machineId);
-      const paymentUrl = next.unpaidInvoices.find((invoice) => invoice.isFinalCharge && invoice.hostedInvoiceUrl)?.hostedInvoiceUrl;
-      if (paymentTab && paymentUrl) {
-        paymentTab.opener = null;
-        paymentTab.location.href = paymentUrl;
-      } else {
-        paymentTab?.close();
+      const next = await payMachineFinalChargeRequest(requireAccessToken(), machineId, window.location.origin);
+      if (next.paymentUrl) {
+        const url = new URL(next.paymentUrl);
+        if (url.protocol !== "https:" || !STRIPE_PAYMENT_HOSTS.includes(url.hostname)) throw new Error(UNVERIFIED_LINK_MESSAGE);
+        isRedirecting = true;
+        window.location.assign(url.href);
+        return;
       }
       check.reload();
     } catch (error) {
-      paymentTab?.close();
-      setChargeError(toApiErrorMessage(error, "Couldn't raise the invoice for what's due. Please try again."));
+      setChargeError(error instanceof Error && error.message === UNVERIFIED_LINK_MESSAGE ? UNVERIFIED_LINK_MESSAGE : toApiErrorMessage(error, "Couldn't open the payment. Please try again."));
     } finally {
-      setIsRaisingCharge(false);
+      if (!isRedirecting) setIsRaisingCharge(false);
     }
   };
   const canConfirm = typedLabel.trim() === machineLabel && reason.trim().length >= MIN_REASON_LENGTH;
