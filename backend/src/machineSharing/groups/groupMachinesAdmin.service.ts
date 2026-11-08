@@ -169,39 +169,77 @@ export class GroupMachinesAdminService {
   ): Promise<{ id: string; name: string }[]> =>
     this.databaseService.withActor(actor, async (client) => {
       const machine = await this.requireMachine(client, machineId);
-      const current = await machinesRepository.listMachineGroups(
-        client,
-        machineId,
-      );
-      const currentIds = new Set(current.map((group) => group.id));
-      const wanted = new Set(groupIds);
-      const writeAudit = async (entry: AuditEntry) => {
-        await insertAuditLog(client, {
-          ...entry,
-          tenantId: actor.tenantId,
-          userId: actor.userId,
-        });
-        await auditForMachineOwners(client, actor, [machine.tenant_id], entry);
-      };
-
-      for (const groupId of groupIds.filter((id) => !currentIds.has(id))) {
-        const group = await requireGroup(client, groupId);
-        await machinesRepository.insertGroupMachines(client, {
-          groupId,
-          machineIds: [machineId],
-          addedBy: actor.userId,
-        });
-        await writeAudit(machinesAddedAudit(group, [machine]));
-      }
-      for (const group of current.filter((row) => !wanted.has(row.id))) {
-        await machinesRepository.deleteGroupMachine(client, {
-          groupId: group.id,
-          machineId,
-        });
-        await writeAudit(machineRemovedAudit(group, machineId, machine));
-      }
+      await this.applyGroups(client, actor, machine, groupIds);
       return machinesRepository.listMachineGroups(client, machineId);
     });
+
+  // "Move to group" on the Machines list: each machine leaves every group it
+  // is in and joins groupId, all in one transaction. An unknown machine or
+  // group is a 404 and nothing moves. The count is of machines that changed.
+  moveMachinesToGroup = (
+    actor: AuthenticatedUser,
+    machineIds: string[],
+    groupId: string,
+  ): Promise<{ moved: number; group: { id: string; name: string } }> =>
+    this.databaseService.withActor(actor, async (client) => {
+      const group = await requireGroup(client, groupId);
+      const machines = await machinesRepository.findPlatformMachines(
+        client,
+        machineIds,
+      );
+      if (machines.length !== new Set(machineIds).size) {
+        throw new NotFoundException(MACHINE_NOT_FOUND_MESSAGE);
+      }
+      let moved = 0;
+      for (const machine of machines) {
+        if (await this.applyGroups(client, actor, machine, [groupId])) moved++;
+      }
+      return { moved, group: { id: group.id, name: group.name } };
+    });
+
+  // True if the machine's groups changed.
+  private applyGroups = async (
+    client: PoolClient,
+    actor: AuthenticatedUser,
+    machine: AuditedMachine,
+    groupIds: string[],
+  ): Promise<boolean> => {
+    const machineId = machine.id;
+    const current = await machinesRepository.listMachineGroups(
+      client,
+      machineId,
+    );
+    const currentIds = new Set(current.map((group) => group.id));
+    const wanted = new Set(groupIds);
+    const writeAudit = async (entry: AuditEntry) => {
+      await insertAuditLog(client, {
+        ...entry,
+        tenantId: actor.tenantId,
+        userId: actor.userId,
+      });
+      await auditForMachineOwners(client, actor, [machine.tenant_id], entry);
+    };
+
+    const toAdd = groupIds.filter((id) => !currentIds.has(id));
+    const toRemove = current.filter((row) => !wanted.has(row.id));
+    for (const groupId of toAdd) {
+      const group = await requireGroup(client, groupId);
+      await machinesRepository.insertGroupMachines(client, {
+        groupId,
+        machineIds: [machineId],
+        addedBy: actor.userId,
+      });
+      await writeAudit(machinesAddedAudit(group, [machine]));
+    }
+    for (const group of toRemove) {
+      await machinesRepository.deleteGroupMachine(client, {
+        groupId: group.id,
+        machineId,
+      });
+      await writeAudit(machineRemovedAudit(group, machineId, machine));
+    }
+    return toAdd.length > 0 || toRemove.length > 0;
+  };
 
   private requireMachine = async (
     client: PoolClient,

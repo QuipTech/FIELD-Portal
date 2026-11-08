@@ -102,6 +102,50 @@ describe('machine documents', () => {
     ).toEqual([]);
   });
 
+  describe('in every lifecycle state', () => {
+    const setState = (machineId: string, state: string) =>
+      fixture.query(`UPDATE machines SET lifecycle_state = $2 WHERE id = $1`, [
+        machineId,
+        state,
+      ]);
+
+    it.each(['registered', 'archived'])(
+      'adds, lists and deletes on a %s machine',
+      async (state) => {
+        await setState(world.shared1.id, state);
+        const saved = await upload(actors.adminA, world.shared1.id);
+        expect(
+          await documents.listDocuments(actors.techA, world.shared1.id, null),
+        ).toHaveLength(1);
+        await documents.deleteDocument(
+          actors.adminA,
+          world.shared1.id,
+          saved.id,
+        );
+        expect(
+          await documents.listDocuments(actors.techA, world.shared1.id, null),
+        ).toHaveLength(0);
+      },
+    );
+
+    it("keeps a sold machine's documents readable but unchanged", async () => {
+      const saved = await upload(actors.adminA, world.shared1.id);
+      await setState(world.shared1.id, 'sold');
+      storage.uploadMachineDocument.mockClear();
+
+      expect(
+        await documents.listDocuments(actors.techA, world.shared1.id, null),
+      ).toHaveLength(1);
+      await expect(
+        upload(actors.adminA, world.shared1.id),
+      ).rejects.toMatchObject({ status: 403 });
+      expect(storage.uploadMachineDocument).not.toHaveBeenCalled();
+      await expect(
+        documents.deleteDocument(actors.adminA, world.shared1.id, saved.id),
+      ).rejects.toMatchObject({ status: 403 });
+    });
+  });
+
   it('keeps another organisation out', async () => {
     await upload(actors.adminA, world.private3.id);
     await expect(

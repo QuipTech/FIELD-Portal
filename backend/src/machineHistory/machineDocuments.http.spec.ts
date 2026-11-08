@@ -10,7 +10,6 @@ import * as request from 'supertest';
 import { JwtAuthGuard } from '../auth/guards/jwtAuthGuard';
 import { RequirePermissionsGuard } from '../auth/guards/requirePermissions.guard';
 import { IdempotencyInterceptor } from '../idempotency/idempotency.interceptor';
-import { RequireActiveMachineGuard } from '../machineLifecycle/activeMachine/requireActiveMachine.guard';
 import { MachineDocumentsController } from './machineDocuments.controller';
 import { MachineDocumentsService } from './machineDocuments.service';
 
@@ -48,8 +47,6 @@ describe('machine documents routes', () => {
       .overrideGuard(JwtAuthGuard)
       .useValue(allow)
       .overrideGuard(RequirePermissionsGuard)
-      .useValue({ canActivate: () => true })
-      .overrideGuard(RequireActiveMachineGuard)
       .useValue({ canActivate: () => true })
       .overrideInterceptor(IdempotencyInterceptor)
       .useValue({ intercept: (_context: unknown, next: any) => next.handle() })

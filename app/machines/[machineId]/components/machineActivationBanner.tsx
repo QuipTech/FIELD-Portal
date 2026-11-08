@@ -33,7 +33,7 @@ export const MachineActivationBanner = ({ machine, onActivated }: MachineActivat
         <span className="text-sm font-medium text-ink">{STATE_MESSAGES[machine.lifecycleState]}</span>
         <span className="text-xs text-bodyGray">
           {action
-            ? "Activate it to open its history, components, photos, AI and support, here and in the mobile app."
+            ? "Activate it to open its history, components, photos, AI and support, here and in the mobile app. Documents can be added any time."
             : "Its history now belongs to the new owner."}
         </span>
       </div>

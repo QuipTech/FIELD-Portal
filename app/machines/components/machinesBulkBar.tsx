@@ -7,6 +7,8 @@ interface MachinesBulkBarProps {
   // Shown once the last bulk action is done and nothing is ticked.
   notice: string | null;
   onActivate: () => void;
+  // Platform administrators only; omitted for everyone else.
+  onMoveToGroup?: () => void;
   onClear: () => void;
 }
 
@@ -16,6 +18,7 @@ export const MachinesBulkBar = ({
   activatableCount,
   notice,
   onActivate,
+  onMoveToGroup,
   onClear,
 }: MachinesBulkBarProps) => {
   if (selectedCount === 0 && !notice) return null;
@@ -28,6 +31,11 @@ export const MachinesBulkBar = ({
           {activatableCount > 0 && (
             <Button size="sm" variant="primary" onClick={onActivate}>
               Activate {activatableCount}
+            </Button>
+          )}
+          {onMoveToGroup && (
+            <Button size="sm" variant="default" onClick={onMoveToGroup}>
+              Move to group
             </Button>
           )}
           <button type="button" className="underline" onClick={onClear}>

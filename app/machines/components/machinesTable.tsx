@@ -10,6 +10,9 @@ import { Table, TableHeaderRow, TableHeaderCell, TableRow, TableCell } from "@/c
 import { ActivateMachineDialog, activationActionFor } from "@/components/machines/activateMachineDialog";
 import { BulkActivateDialog } from "@/components/machines/bulkActivateDialog";
 import { ConnectMachineAppDialog } from "@/components/machines/machineApp/connectMachineAppDialog";
+import { MoveToGroupDialog } from "@/components/machines/moveToGroupDialog";
+import { PERMISSIONS } from "@/lib/auth/permissionCodes";
+import { usePermissions } from "@/lib/auth/usePermissions";
 import { getMachineStatusMeta, toMachineStatus } from "@/lib/format/machineStatus";
 import { canContributeTo } from "@/lib/machineDetail/machineAccessRules";
 import { machineAppPagePath } from "@/lib/types/machineAppConnection";
@@ -22,7 +25,7 @@ interface MachinesTableProps {
   machines: FleetMachine[];
   // Shown in place of the rows when there are none.
   emptyMessage: string;
-  // After machines are activated.
+  // After machines are activated or moved between groups.
   onChanged: () => void;
 }
 
@@ -40,7 +43,12 @@ export const MachinesTable = ({ machines, emptyMessage, onChanged }: MachinesTab
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkActivating, setIsBulkActivating] = useState(false);
   const [bulkNotice, setBulkNotice] = useState<string | null>(null);
-  const isSelectable = canActivate;
+  // Machines to move between groups; platform administrators only.
+  const [moving, setMoving] = useState<FleetMachine[] | null>(null);
+  const { isLoaded, can } = usePermissions();
+  const canMoveGroups = isLoaded && can(PERMISSIONS.managePlatform);
+  // Ticked for activating together, or (platform administrators) moving.
+  const isSelectable = (machine: FleetMachine) => canMoveGroups || canActivate(machine);
   const selected = machines.filter((machine) => selectedIds.has(machine.id) && isSelectable(machine));
   const selectedToActivate = selected.filter(canActivate);
 
@@ -66,6 +74,11 @@ export const MachinesTable = ({ machines, emptyMessage, onChanged }: MachinesTab
     event.stopPropagation();
     setActivating(machine);
   };
+  const startMoving = (event: MouseEvent, machine: FleetMachine) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setMoving([machine]);
+  };
 
   return (
     <>
@@ -74,6 +87,7 @@ export const MachinesTable = ({ machines, emptyMessage, onChanged }: MachinesTab
         activatableCount={selectedToActivate.length}
         notice={bulkNotice}
         onActivate={() => setIsBulkActivating(true)}
+        onMoveToGroup={canMoveGroups ? () => setMoving(selected) : undefined}
         onClear={() => setSelectedIds(new Set())}
       />
       <Table className="flex-1">
@@ -129,6 +143,11 @@ export const MachinesTable = ({ machines, emptyMessage, onChanged }: MachinesTab
                         Activate
                       </Button>
                     )}
+                    {canMoveGroups && (
+                      <Button size="sm" variant="ghost" onClick={(event) => startMoving(event, machine)}>
+                        Move to group
+                      </Button>
+                    )}
                     {canContributeTo(machine) && (
                       <ConnectMachineAppButton
                         isConnected={Boolean(machine.appConnected)}
@@ -148,6 +167,13 @@ export const MachinesTable = ({ machines, emptyMessage, onChanged }: MachinesTab
           machineLabel={connecting.label}
           onConnected={() => router.push(machineAppPagePath(connecting.id))}
           onClose={() => setConnecting(null)}
+        />
+      )}
+      {moving && (
+        <MoveToGroupDialog
+          machines={moving.map((machine) => ({ id: machine.id, label: machine.label }))}
+          onMoved={finishBulkAction}
+          onClose={() => setMoving(null)}
         />
       )}
       {isBulkActivating && (

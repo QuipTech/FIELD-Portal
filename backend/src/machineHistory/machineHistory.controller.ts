@@ -73,11 +73,20 @@ export class MachineHistoryController {
     @Query() query: ExportHistoryQueryDto,
     @Res() response: Response,
   ) {
-    const file = await this.historyExportService.exportHistory(user, machineId, query);
+    const file = await this.historyExportService.exportHistory(
+      user,
+      machineId,
+      query,
+    );
     response.setHeader('Content-Type', file.contentType);
-    response.setHeader('Content-Disposition', `attachment; filename="${file.fileName}"`);
+    response.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${file.fileName}"`,
+    );
     response.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
-    response.send(typeof file.body === 'string' ? file.body : Buffer.from(file.body));
+    response.send(
+      typeof file.body === 'string' ? file.body : Buffer.from(file.body),
+    );
   }
 
   // Everyone who has written on this machine's history (author filter).

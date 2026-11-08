@@ -187,7 +187,7 @@ VIN/PIN/serials are searchable identifiers, never keys.
 
 **Machine lifecycle (4 states, 5 transitions).** A machine is billed only while active; charges stop from the next month.
 
-- Registered (inactive): free, stays in the register, identity and summary only
+- Registered (inactive): free, stays in the register, identity, summary and documents only
 - Active: counts in the month's peak from the activation day
 - Archived: charge stops next month, records kept
 - Sold / transferred: charge stops next month, machine facts move, private notes stay
@@ -264,7 +264,9 @@ plan-name comparison in code.
 
 **Inactive machines** stay in the fleet register and show identity and
 summary only; full history, AI context and remote sessions need the
-machine to be active.
+machine to be active. Documents (service reports, inspections,
+certificates) are the exception: they can be added, read and removed in
+every state, except that a sold machine's are read-only.
 
 ### Users
 

@@ -28,7 +28,8 @@ export const findMachine = async (
   const result = await client.query<MachineRow>(
     `SELECT m.id, m.serial_number, m.fleet_number, m.status,
             ${MACHINE_LABEL_SQL} AS label, m.site, m.operating_hours,
-            mf.name AS manufacturer_name, mm.name AS model_name
+            mf.name AS manufacturer_name, mm.name AS model_name,
+            m.lifecycle_state
      FROM machines m
      JOIN machine_manufacturers mf ON mf.id = m.manufacturer_id
      JOIN machine_models mm ON mm.id = m.model_id
