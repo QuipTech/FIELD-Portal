@@ -47,6 +47,10 @@ const NO_PRICE_MESSAGE =
 const NOTHING_TO_PAY_MESSAGE =
   "This machine doesn't have a final charge to pay.";
 
+export type FinalChargePayment = MachineDeletionCheck & {
+  paymentUrl: string | null;
+};
+
 const formatRate = (cents: number) => `A$${(cents / 100).toFixed(2)}`;
 const formatMonth = (day: string) =>
   new Date(`${day}T00:00:00Z`).toLocaleDateString('en-AU', {
@@ -82,9 +86,17 @@ export class MachineDeletionService {
       const onStripe = check.unpaidInvoices
         .filter((invoice) => invoice.hostedInvoiceUrl)
         .map((invoice) => invoice.id);
-      return (await this.upFrontInvoices.refreshPaid(onStripe))
-        ? this.checkDeletion(actor, machineId, now)
-        : check;
+      const viaCheckout = check.unpaidInvoices
+        .filter((invoice) => invoice.isFinalCharge && !invoice.hostedInvoiceUrl)
+        .map((invoice) => invoice.id);
+      const isAnyPaid =
+        (await this.upFrontInvoices.refreshPaid(onStripe)) ||
+        (machine.billing_account_id !== null &&
+          (await this.upFrontInvoices.confirmCheckouts(
+            viaCheckout,
+            machine.billing_account_id,
+          )));
+      return isAnyPaid ? this.checkDeletion(actor, machineId, now) : check;
     }
     if (check.blocker !== 'final_charge_due') return check;
     return {
@@ -93,35 +105,27 @@ export class MachineDeletionService {
     };
   };
 
-  // Raises the machine's final charge and pushes it to Stripe, which charges a
-  // card or direct debit on file at once; otherwise the customer pays the
-  // invoice link in the answer. If Stripe fails they get the error, and the
-  // invoice stays saved. Safe to repeat: a second call finds the first charge
-  // and pushes it again if it never reached Stripe.
+  // Raises the machine's final charge (the total of what's due) and opens
+  // Stripe Checkout to pay it: paymentUrl is where to send the payer, who
+  // comes back to returnPage. Null once nothing is left to pay here. If Stripe
+  // fails they get the error, and the invoice stays saved. Safe to repeat: a
+  // second call finds the first charge and its open Checkout.
   payFinalCharge = async (
     actor: AuthenticatedUser,
     machineId: string,
+    returnPage: string,
     now = new Date(),
-  ): Promise<MachineDeletionCheck> => {
+  ): Promise<FinalChargePayment> => {
     const { check, machine, intervals, today, label } = await this.readCheck(
       actor,
       machineId,
       now,
     );
     if (check.blocker === 'unpaid_invoices') {
-      const notOnStripe = check.unpaidInvoices.filter(
-        (invoice) => invoice.isFinalCharge && !invoice.hostedInvoiceUrl,
-      );
-      for (const invoice of notOnStripe) {
-        await this.upFrontInvoices.finaliseNow(
-          invoice.id,
-          machine.billing_account_id as string,
-        );
-      }
-      return this.checkDeletion(actor, machineId, now);
+      return this.openPayment(actor, machineId, label, returnPage, now);
     }
     if (check.blocker !== 'final_charge_due') {
-      if (check.canDelete) return check;
+      if (check.canDelete) return { ...check, paymentUrl: null };
       throw new ConflictException({
         statusCode: 409,
         code: check.blocker,
@@ -137,7 +141,8 @@ export class MachineDeletionService {
       today,
     );
     const book = await this.pinnedBook(billingAccountId);
-    const invoiceId = await this.serviceDatabase.transaction(async (client) => {
+    // The invoice is found again by openPayment, with any raised earlier.
+    await this.serviceDatabase.transaction(async (client) => {
       await deletionRepository.lockAccountBilling(client, billingAccountId);
       // The run may have invoiced a month since the check: charging it here
       // too would bill it twice.
@@ -200,10 +205,36 @@ export class MachineDeletionService {
       }
       return invoice;
     });
-    if (invoiceId) {
-      await this.upFrontInvoices.finaliseNow(invoiceId, billingAccountId);
+    return this.openPayment(actor, machineId, label, returnPage, now);
+  };
+
+  // The payment page for the machine's unpaid final charge: its Stripe
+  // invoice page if an earlier push made one, otherwise Checkout. Monthly
+  // invoices are paid from Billing, so they get none here.
+  private openPayment = async (
+    actor: AuthenticatedUser,
+    machineId: string,
+    label: string,
+    returnPage: string,
+    now: Date,
+  ): Promise<FinalChargePayment> => {
+    const check = await this.checkDeletion(actor, machineId, now);
+    const finalCharge = check.unpaidInvoices.find(
+      (invoice) => invoice.isFinalCharge,
+    );
+    if (!finalCharge) return { ...check, paymentUrl: null };
+    if (finalCharge.hostedInvoiceUrl) {
+      return { ...check, paymentUrl: finalCharge.hostedInvoiceUrl };
     }
-    return this.checkDeletion(actor, machineId, now);
+    const paymentUrl = await this.upFrontInvoices.openCheckout(finalCharge.id, {
+      returnPage,
+      keyScope: returnPage,
+      description: `Final charge for ${label}`,
+    });
+    // Null: Checkout was already paid, and is now recorded.
+    return paymentUrl
+      ? { ...check, paymentUrl }
+      : { ...(await this.checkDeletion(actor, machineId, now)), paymentUrl };
   };
 
   // Checked again inside the transaction, whatever the screen showed.

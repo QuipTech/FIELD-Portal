@@ -29,7 +29,12 @@ describe('deleting a machine', () => {
   let actors: ReturnType<typeof actorsOf>;
   let deletion: MachineDeletionService;
   let adminB: AuthenticatedUser;
-  const finalise = jest.fn(async () => undefined);
+  const CHECKOUT_URL = 'https://checkout.stripe.com/c/pay/final';
+  const RETURN_PAGE = 'http://localhost:3000/machines/m';
+  const openCheckout = jest.fn(
+    async (): Promise<string | null> => CHECKOUT_URL,
+  );
+  const confirmCheckouts = jest.fn(async () => false);
   const refreshPaid = jest.fn(async () => false);
 
   beforeAll(async () => {
@@ -58,7 +63,8 @@ describe('deleting a machine', () => {
           return invoice.rows[0].id;
         },
       ),
-      finaliseNow: finalise,
+      openCheckout,
+      confirmCheckouts,
       refreshPaid,
     } as unknown as UpFrontInvoiceService;
     const priceBooks = {
@@ -207,7 +213,8 @@ describe('deleting a machine', () => {
       await addInvoice('2026-10-01', 'paid');
     };
     const check = () => deletion.checkDeletion(adminB, machineId(), NOV_20);
-    const pay = () => deletion.payFinalCharge(adminB, machineId(), NOV_20);
+    const pay = () =>
+      deletion.payFinalCharge(adminB, machineId(), RETURN_PAGE, NOV_20);
     const markFinalPaid = () =>
       fixture.query(
         `UPDATE billing.invoices SET status = 'paid' WHERE kind = 'machine_final'`,
@@ -236,7 +243,11 @@ describe('deleting a machine', () => {
       const raised = await pay();
       expect(raised.blocker).toBe('unpaid_invoices');
       expect(raised.unpaidInvoices[0].isFinalCharge).toBe(true);
-      expect(finalise).toHaveBeenCalled();
+      expect(raised.paymentUrl).toBe(CHECKOUT_URL);
+      expect(openCheckout).toHaveBeenCalledWith(
+        raised.unpaidInvoices[0].id,
+        expect.objectContaining({ returnPage: RETURN_PAGE }),
+      );
       const charge = await fixture.query(
         `SELECT days_used, amount_cents, last_used_on::text FROM billing.machine_final_charges WHERE machine_id = $1`,
         [machineId()],
@@ -255,54 +266,62 @@ describe('deleting a machine', () => {
       expect(await listed()).not.toContain(machineId());
     });
 
-    describe('when the invoice reaches Stripe', () => {
-      const setUnpaidLink = (url: string) =>
-        fixture.query(
-          `UPDATE billing.invoices SET status = 'synced', hosted_invoice_url = $1 WHERE kind = 'machine_final'`,
-          [url],
-        );
+    describe('paying through Stripe Checkout', () => {
+      beforeEach(() => {
+        openCheckout.mockImplementation(async () => CHECKOUT_URL);
+        confirmCheckouts.mockImplementation(async () => false);
+      });
 
-      it("passes on Stripe's failure, keeps the invoice, and retries it on the next click", async () => {
+      it("passes on Stripe's failure, keeps the invoice, and opens Checkout on the next click", async () => {
         await setUpDeactivated();
-        finalise.mockRejectedValueOnce(new Error('Stripe is down'));
+        openCheckout.mockRejectedValueOnce(new Error('Stripe is down'));
         await expect(pay()).rejects.toThrow('Stripe is down');
         expect((await check()).unpaidInvoices).toHaveLength(1);
 
-        finalise.mockClear();
+        openCheckout.mockClear();
         const retried = await pay();
-        expect(finalise).toHaveBeenCalledTimes(1);
-        expect(retried.blocker).toBe('unpaid_invoices');
+        expect(openCheckout).toHaveBeenCalledTimes(1);
+        expect(retried.paymentUrl).toBe(CHECKOUT_URL);
         const { rows } = await fixture.query(
           `SELECT count(*)::int AS count FROM billing.invoices WHERE kind = 'machine_final'`,
         );
         expect(rows[0].count).toBe(1);
       });
 
-      it("doesn't push an invoice that already has its payment link", async () => {
+      it('uses the Stripe invoice page of an invoice pushed before', async () => {
         await setUpDeactivated();
         await pay();
-        await setUnpaidLink('https://invoice.stripe.com/i/f');
-        finalise.mockClear();
-
-        const again = await pay();
-        expect(finalise).not.toHaveBeenCalled();
-        expect(again.unpaidInvoices[0].hostedInvoiceUrl).toBe(
-          'https://invoice.stripe.com/i/f',
+        await fixture.query(
+          `UPDATE billing.invoices SET status = 'synced', hosted_invoice_url = 'https://invoice.stripe.com/i/f' WHERE kind = 'machine_final'`,
         );
+        openCheckout.mockClear();
+
+        expect((await pay()).paymentUrl).toBe('https://invoice.stripe.com/i/f');
+        expect(openCheckout).not.toHaveBeenCalled();
       });
 
-      it('allows the delete once Stripe says it was paid, before any webhook', async () => {
+      it('allows the delete once Checkout was paid, before any webhook', async () => {
         await setUpDeactivated();
         await pay();
-        await setUnpaidLink('https://invoice.stripe.com/i/f');
-        refreshPaid.mockClear();
-        refreshPaid.mockImplementationOnce(async () => {
+        confirmCheckouts.mockImplementationOnce(async () => {
           await markFinalPaid();
           return true;
         });
 
         expect((await check()).canDelete).toBe(true);
-        expect(refreshPaid).toHaveBeenCalledTimes(1);
+      });
+
+      it('sends nobody to Checkout once it is paid', async () => {
+        await setUpDeactivated();
+        await pay();
+        openCheckout.mockImplementationOnce(async () => {
+          await markFinalPaid();
+          return null;
+        });
+
+        const paid = await pay();
+        expect(paid.paymentUrl).toBeNull();
+        expect(paid.canDelete).toBe(true);
       });
     });
 

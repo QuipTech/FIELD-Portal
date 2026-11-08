@@ -19,7 +19,9 @@ import {
   ApplyLifecycleActionDto,
   BulkLifecycleActionDto,
   DeleteMachineDto,
+  PayFinalChargeDto,
 } from './dto/lifecycleActionDtos';
+import { toReturnOrigin } from '../billing/personalSubscription/personalCheckout.service';
 import { MACHINE_LIFECYCLE_PERMISSION } from './lifecycleTransitions';
 import { MachineDeletionService } from './machineDeletion.service';
 import { MachineLifecycleService } from './machineLifecycle.service';
@@ -102,15 +104,21 @@ export class MachineLifecycleController {
     return this.deletionService.checkDeletion(actor, machineId);
   }
 
-  // Raises the days-used charge; pay it, then delete. Safe to repeat.
+  // Raises the days-used charge and returns the Stripe Checkout URL to pay
+  // it; Checkout returns to the machine's page. Then delete. Safe to repeat.
   @Post(':machineId/final-charge')
   @HttpCode(200)
   @RequirePermissions(MACHINE_LIFECYCLE_PERMISSION)
   payFinalCharge(
     @CurrentUser() actor: AuthenticatedUser,
     @Param('machineId', ParseUUIDPipe) machineId: string,
+    @Body() dto: PayFinalChargeDto,
   ) {
-    return this.deletionService.payFinalCharge(actor, machineId);
+    return this.deletionService.payFinalCharge(
+      actor,
+      machineId,
+      `${toReturnOrigin(dto.returnOrigin)}/machines/${machineId}`,
+    );
   }
 
   // 409 with the blocker until it's out of active and its billing is settled.

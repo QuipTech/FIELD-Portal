@@ -3,6 +3,7 @@ import { BillingConfigService } from '../../src/billing/billingConfig/billingCon
 import { InvoicesService } from '../../src/billing/invoices/invoices.service';
 import { UpFrontInvoiceService } from '../../src/billing/invoices/upFrontInvoice.service';
 import { MonthlyRunService } from '../../src/billing/monthlyRun/monthlyRun.service';
+import { PersonalCheckoutService } from '../../src/billing/personalSubscription/personalCheckout.service';
 import { PriceBooksService } from '../../src/billing/priceBooks/priceBooks.service';
 import { StripeService } from '../../src/billing/stripe/stripe.service';
 import { AuthenticatedUser } from '../../src/auth/types/authenticatedUser';
@@ -23,6 +24,10 @@ describe('a machine final charge and the month-end invoice', () => {
   let run: MonthlyRunService;
   let admin: AuthenticatedUser;
   const finaliseInvoice = jest.fn(async () => undefined);
+  const RETURN_PAGE = 'http://localhost:3000/machines/m';
+  const openCheckoutAt = jest.fn(
+    async () => 'https://checkout.stripe.com/c/pay/x',
+  );
   const NOV_20 = new Date('2026-11-20T02:00:00Z');
   const DEC_1 = new Date('2026-12-01T02:00:00Z');
 
@@ -37,9 +42,23 @@ describe('a machine final charge and the month-end invoice', () => {
       {} as StripeService,
       config,
     );
-    const upFront = new UpFrontInvoiceService(db, accounts, priceBooks, {
-      finaliseInvoice,
-    } as unknown as InvoicesService);
+    jest
+      .spyOn(accounts, 'ensureStripeCustomer')
+      .mockImplementation(async (account) => ({
+        ...account,
+        stripe_customer_id: 'cus_test',
+      }));
+    const upFront = new UpFrontInvoiceService(
+      db,
+      accounts,
+      priceBooks,
+      {
+        finaliseInvoice,
+      } as unknown as InvoicesService,
+      {
+        openCheckoutAt,
+      } as unknown as PersonalCheckoutService,
+    );
     deletion = new MachineDeletionService(
       fixture.database,
       db,
@@ -125,9 +144,17 @@ describe('a machine final charge and the month-end invoice', () => {
   });
 
   it('charges 6 of 30 days now, and bills only the other two at month end', async () => {
-    const raised = await deletion.payFinalCharge(admin, world.ownB.id, NOV_20);
+    const raised = await deletion.payFinalCharge(
+      admin,
+      world.ownB.id,
+      RETURN_PAGE,
+      NOV_20,
+    );
     expect(raised.blocker).toBe('unpaid_invoices');
-    expect(finaliseInvoice).toHaveBeenCalledTimes(1);
+    // Paid through Checkout, never pushed as a Stripe invoice too.
+    expect(raised.paymentUrl).toBe('https://checkout.stripe.com/c/pay/x');
+    expect(openCheckoutAt).toHaveBeenCalledTimes(1);
+    expect(finaliseInvoice).not.toHaveBeenCalled();
 
     const { rows } = await fixture.query(
       `SELECT i.kind, i.status, i.total_ex_gst_cents, l.description, l.amount_cents
@@ -149,7 +176,7 @@ describe('a machine final charge and the month-end invoice', () => {
   });
 
   it('counts the machine again if its charge was voided', async () => {
-    await deletion.payFinalCharge(admin, world.ownB.id, NOV_20);
+    await deletion.payFinalCharge(admin, world.ownB.id, RETURN_PAGE, NOV_20);
     await fixture.query(
       `UPDATE billing.invoices SET status = 'void' WHERE kind = 'machine_final'`,
     );
@@ -163,7 +190,7 @@ describe('a machine final charge and the month-end invoice', () => {
        WHERE billing_account_id = $2`,
       [world.ownB.id, fixture.ids.setUpAccount],
     );
-    await deletion.payFinalCharge(admin, world.ownB.id, NOV_20);
+    await deletion.payFinalCharge(admin, world.ownB.id, RETURN_PAGE, NOV_20);
     const { rows } = await fixture.query(
       `SELECT period_start::text FROM billing.machine_final_charges
        WHERE machine_id = $1 ORDER BY period_start`,
@@ -182,7 +209,7 @@ describe('a machine final charge and the month-end invoice', () => {
   });
 
   it('lets the machine go once paid, and still bills the month correctly after', async () => {
-    await deletion.payFinalCharge(admin, world.ownB.id, NOV_20);
+    await deletion.payFinalCharge(admin, world.ownB.id, RETURN_PAGE, NOV_20);
     await fixture.query(
       `UPDATE billing.invoices SET status = 'paid' WHERE kind = 'machine_final'`,
     );
