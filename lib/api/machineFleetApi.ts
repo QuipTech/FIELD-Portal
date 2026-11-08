@@ -56,6 +56,20 @@ export const updateMachineDetailsRequest = (accessToken: string, machineId: stri
     body: JSON.stringify(changes),
   });
 
+// Needs machine.manage. Plant ID (assetNumber; null clears it) and serial
+// corrections, audited with the reason. 409 if another machine in the
+// organisation already has the serial.
+export const correctMachineIdentifiersRequest = (
+  accessToken: string,
+  machineId: string,
+  changes: { serialNumber?: string; assetNumber?: string | null; reason: string },
+) =>
+  apiRequest<unknown>(`/machines/${machineId}/identifiers`, {
+    method: "PATCH",
+    headers: authorizationHeader(accessToken),
+    body: JSON.stringify(changes),
+  });
+
 // Needs machine.manage. Each change feeds the dashboard's fleet uptime.
 export const updateMachineStatusRequest = (accessToken: string, machineId: string, status: OperatingStatus) =>
   apiRequest<FleetMachine>(`/machines/${machineId}/status`, {
