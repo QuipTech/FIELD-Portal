@@ -13,6 +13,8 @@ export interface MachineRow {
   status: string;
   manufacturer_name: string;
   model_name: string;
+  // registered, active, archived or sold.
+  lifecycle_state: string;
 }
 
 export interface MachineDetailRow extends MachineRow {

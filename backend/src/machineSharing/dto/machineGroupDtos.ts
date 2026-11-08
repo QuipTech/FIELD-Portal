@@ -125,6 +125,20 @@ export class SetMachineGroupsDto {
   groupIds: string[];
 }
 
+// POST /admin/machines/move-to-group: these machines leave their groups and
+// join this one.
+export class MoveMachinesToGroupDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MAX_MACHINES_PER_ADD)
+  @ArrayUnique()
+  @IsUUID('all', { each: true })
+  machineIds: string[];
+
+  @IsUUID()
+  groupId: string;
+}
+
 // GET /admin/machines/search: plant ID, serial, VIN or organisation name.
 export class SearchMachinesQueryDto {
   @IsOptional()

@@ -109,6 +109,90 @@ describe("setting a machine's groups", () => {
     expect(await groupIdsOf(world.shared1.id)).toEqual([]);
   });
 
+  describe('moving several machines to one group', () => {
+    it('takes each out of its groups and into the new one, at once', async () => {
+      const from = await createSharedGroup(services, actors.owner, world);
+      const to = await newGroup('Site two');
+      const other = await newGroup('Other');
+      await services.groupMachines.setMachineGroups(
+        actors.owner,
+        world.private3.id,
+        [other.id, to.id],
+      );
+
+      const result = await services.groupMachines.moveMachinesToGroup(
+        actors.owner,
+        [world.shared1.id, world.private3.id],
+        to.id,
+      );
+
+      expect(result).toEqual({
+        moved: 2,
+        group: { id: to.id, name: 'Site two' },
+      });
+      expect(await groupIdsOf(world.shared1.id)).toEqual([to.id]);
+      expect(await groupIdsOf(world.private3.id)).toEqual([to.id]);
+      expect((await groupIdsOf(world.shared1.id)).includes(from.id)).toBe(
+        false,
+      );
+    });
+
+    it("doesn't count a machine already only in that group", async () => {
+      const to = await newGroup('Site two');
+      await services.groupMachines.setMachineGroups(
+        actors.owner,
+        world.shared1.id,
+        [to.id],
+      );
+      const result = await services.groupMachines.moveMachinesToGroup(
+        actors.owner,
+        [world.shared1.id],
+        to.id,
+      );
+      expect(result.moved).toBe(0);
+    });
+
+    it('moves nothing when a machine or the group is unknown', async () => {
+      const group = await createSharedGroup(services, actors.owner, world);
+      const to = await newGroup('Site two');
+      await fixture.db.exec('SAVEPOINT attempt');
+      await expect(
+        services.groupMachines.moveMachinesToGroup(
+          actors.owner,
+          [world.shared1.id, UNKNOWN_ID],
+          to.id,
+        ),
+      ).rejects.toMatchObject({ status: 404 });
+      await fixture.db.exec('ROLLBACK TO SAVEPOINT attempt');
+      expect(await groupIdsOf(world.shared1.id)).toEqual([group.id]);
+
+      await fixture.db.exec('SAVEPOINT unknown_group');
+      await expect(
+        services.groupMachines.moveMachinesToGroup(
+          actors.owner,
+          [world.shared1.id],
+          UNKNOWN_ID,
+        ),
+      ).rejects.toMatchObject({ status: 404 });
+      await fixture.db.exec('ROLLBACK TO SAVEPOINT unknown_group');
+      expect(await groupIdsOf(world.shared1.id)).toEqual([group.id]);
+    });
+
+    it('refuses anyone but the platform administrator', async () => {
+      const to = await newGroup('Admins only');
+      await fixture.db.exec('SAVEPOINT attempt');
+      await expect(
+        services.groupMachines.moveMachinesToGroup(
+          actors.adminA,
+          [world.shared1.id],
+          to.id,
+        ),
+      ).rejects.toBeDefined();
+      await fixture.db.exec('ROLLBACK TO SAVEPOINT attempt');
+      expect(await groupIdsOf(world.shared1.id)).toEqual([]);
+    });
+  });
+
   it('audits each changed group for the administrator and the owner', async () => {
     const from = await createSharedGroup(services, actors.owner, world);
     const to = await newGroup('Site two');

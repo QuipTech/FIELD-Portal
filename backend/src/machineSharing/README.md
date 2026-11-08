@@ -118,6 +118,7 @@ interface MachineAccess {
 | GET | `/admin/machines/search` | `?search=&limit=` (≤ 100, default 25): plant ID, fleet number, serial, VIN or organisation name | `(Omit<GroupMachine,'addedAt'> & { registrationNumber })[]` |
 | GET | `/admin/machines/:machineId/groups` | – | `{ id, name }[]`, the machine's live groups; 404 unknown machine |
 | PUT | `/admin/machines/:machineId/groups` | `{ groupIds: string[] }` (≤ 200; empty leaves all) | `{ id, name }[]`; one transaction, audited per changed group; 404 if the machine or an added group is unknown (nothing changes) |
+| POST | `/admin/machines/move-to-group` | `{ machineIds: string[] (1–500), groupId }` | `{ moved, group: { id, name } }`; each machine leaves all its groups and joins `groupId`, one transaction, audited like PUT above; `moved` counts machines that changed; 404 if a machine or the group is unknown (nothing moves). "Move to group" on the Machines list |
 | GET | `/admin/users/:userId/machine-access` | – | `MachineAccess` (changed) |
 | PATCH | `/admin/users/:userId/machine-access` | `{ machineAccessMode, organisationId? }` (the person's organisation) | `MachineAccess`; 400 `groups_only` for an admin (changed: no `groupIds`) |
 

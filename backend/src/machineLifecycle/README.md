@@ -7,7 +7,8 @@ machine keeps its permanent id and is registered, active, archived or sold.
 Only active machines count toward the month's peak, through activation
 intervals on the billing account. Inactive machines show identity and
 summary only; full history, configuration, photos and new AI threads need
-an active machine. Transfers move a machine between organisations with the
+an active machine. Documents are the exception: open in every state, and
+read-only once sold (`machineHistory/machineDocuments.*`). Transfers move a machine between organisations with the
 receiving organisation's approval.
 
 ## Folder structure
