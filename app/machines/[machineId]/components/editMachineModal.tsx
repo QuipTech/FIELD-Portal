@@ -14,6 +14,11 @@ import type { MachineDetailsChanges } from "@/lib/types/machineFleet";
 
 interface EditMachineModalProps {
   machine: Machine;
+  // The field to start in, from the Edit button on its row.
+  focus?: "site" | "hours";
+  // Another organisation's machine, edited by the platform administrator:
+  // only the site; hours stay the owner's.
+  siteOnly?: boolean;
   onSaved: () => void;
   onClose: () => void;
 }
@@ -21,7 +26,7 @@ interface EditMachineModalProps {
 // Site and a new hour-meter reading. Only changed fields are sent. Serial and Plant ID have
 // their own audited change flow. Existing sites are suggested so a machine moving to one
 // isn't filed under a misspelling; a new site can still be typed.
-export const EditMachineModal = ({ machine, onSaved, onClose }: EditMachineModalProps) => {
+export const EditMachineModal = ({ machine, focus, siteOnly = false, onSaved, onClose }: EditMachineModalProps) => {
   const [site, setSite] = useState(machine.site ?? "");
   const [hours, setHours] = useState(machine.operatingHours === null ? "" : String(machine.operatingHours));
   const [isSaving, setIsSaving] = useState(false);
@@ -33,7 +38,7 @@ export const EditMachineModal = ({ machine, onSaved, onClose }: EditMachineModal
   const collectChanges = (): MachineDetailsChanges => {
     const changes: MachineDetailsChanges = {};
     if (site.trim() !== (machine.site ?? "")) changes.site = site.trim() || null;
-    if (hours !== "" && Number(hours) !== machine.operatingHours) changes.operatingHours = Number(hours);
+    if (!siteOnly && hours !== "" && Number(hours) !== machine.operatingHours) changes.operatingHours = Number(hours);
     return changes;
   };
 
@@ -53,7 +58,7 @@ export const EditMachineModal = ({ machine, onSaved, onClose }: EditMachineModal
   };
 
   return (
-    <Modal title="Edit machine" onClose={isSaving ? undefined : onClose} widthClassName="w-[480px]">
+    <Modal title={siteOnly ? "Edit site" : "Edit machine"} onClose={isSaving ? undefined : onClose} widthClassName="w-[480px]">
       <div className="flex flex-col gap-3.5 p-5">
         <div className="flex gap-2.5">
           <FormField className="flex-1" label="Site">
@@ -64,14 +69,17 @@ export const EditMachineModal = ({ machine, onSaved, onClose }: EditMachineModal
               maxLength={100}
               list={siteListId}
               autoComplete="off"
+              autoFocus={focus === "site"}
             />
             <datalist id={siteListId}>
               {fleet.data?.facets.sites.map((option) => <option key={option} value={option} />)}
             </datalist>
           </FormField>
-          <FormField className="flex-1" label="Hours">
-            <Input value={hours} onChange={(event) => setHours(event.target.value)} inputMode="numeric" />
-          </FormField>
+          {!siteOnly && (
+            <FormField className="flex-1" label="Hours">
+              <Input value={hours} onChange={(event) => setHours(event.target.value)} inputMode="numeric" autoFocus={focus === "hours"} />
+            </FormField>
+          )}
         </div>
         {!isHoursValid && <span className="text-xs text-danger">Hours must be a whole number.</span>}
         {saveError && <span className="text-xs text-danger">{saveError}</span>}
