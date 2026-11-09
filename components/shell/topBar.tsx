@@ -14,7 +14,6 @@ interface TopBarProps {
   userRoleLabel?: string;
   userMenuItems?: UserMenuItem[];
   showThemeToggle?: boolean;
-  showUserMenu?: boolean;
 }
 
 export const TopBar = ({
@@ -26,7 +25,6 @@ export const TopBar = ({
   userRoleLabel,
   userMenuItems,
   showThemeToggle = true,
-  showUserMenu = true,
 }: TopBarProps) => {
   return (
     <div className="flex h-14 flex-none items-center gap-3.5 border-b border-borderGray bg-surface px-4">
@@ -39,9 +37,8 @@ export const TopBar = ({
         {/* Every page with a top bar is signed in, so the bell is always here. */}
         <NotificationBell />
         {showThemeToggle && <ThemeToggleButton />}
-        {showUserMenu && (
-          <UserMenu initials={userInitials} name={userName} roleLabel={userRoleLabel} items={userMenuItems} />
-        )}
+        {/* Bell, theme and user menu sit in the same place on every page. */}
+        <UserMenu initials={userInitials} name={userName} roleLabel={userRoleLabel} items={userMenuItems} />
       </div>
     </div>
   );

@@ -2,10 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ErrorToast } from "@/components/ui/errorToast";
+import { ConfirmDialog } from "@/components/ui/confirmDialog";
 import { Tag } from "@/components/ui/tag";
 import { requireAccessToken } from "@/lib/api/requireAccessToken";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
-import { getDocumentDownloadUrlRequest } from "@/lib/api/documentsApi";
+import { deleteDocumentRequest, getDocumentDownloadUrlRequest } from "@/lib/api/documentsApi";
+import { usePermissions } from "@/lib/auth/usePermissions";
+import { PERMISSIONS } from "@/lib/auth/permissionCodes";
 import type { ArticleNavigation } from "@/lib/knowledge/knowledgeLinks";
 import { useKnowledgeArticle } from "./useKnowledgeArticle";
 import { useActiveSection } from "./useActiveSection";
@@ -24,16 +27,36 @@ interface ArticleViewProps {
   navigation: ArticleNavigation;
   // Opened from a search result: scroll to and highlight this section.
   initialSectionId: string | null;
-  // Inside another page (a machine's Manuals tab) rather than full screen.
-  isEmbedded?: boolean;
+  // page: full screen; embedded: inside another page (a machine's Manuals
+  // tab); modal: fills a dialog opened from the Knowledge results.
+  layout?: "page" | "embedded" | "modal";
+  // Modal only: closes it.
+  onClose?: () => void;
+  // Shows Delete (for viewers allowed to) and runs after it succeeds.
+  onDeleted?: () => void;
 }
 
-export const ArticleView = ({ documentId, navigation, initialSectionId, isEmbedded = false }: ArticleViewProps) => {
+const LAYOUT_CLASSES = {
+  page: "flex h-screen flex-col bg-surfaceGray",
+  embedded: "flex h-[75vh] min-h-[480px] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-surfaceGray",
+  modal: "flex h-full min-h-0 flex-col overflow-hidden bg-surfaceGray",
+} as const;
+
+export const ArticleView = ({
+  documentId,
+  navigation,
+  initialSectionId,
+  layout = "page",
+  onClose,
+  onDeleted,
+}: ArticleViewProps) => {
   const { state, reload } = useKnowledgeArticle(documentId);
   const article = state.kind === "ready" ? state.article : null;
   const [scrollRoot, setScrollRoot] = useState<HTMLElement | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const { can } = usePermissions();
   const hasJumped = useRef(false);
   const sections = article?.sections ?? [];
   const activeSectionId = useActiveSection(
@@ -63,6 +86,16 @@ export const ArticleView = ({ documentId, navigation, initialSectionId, isEmbedd
     } catch (error) {
       setToast(toApiErrorMessage(error, "Couldn't download this document."));
     }
+  };
+
+  // Mirrors the API's rule (documentAccess.ts), which still decides.
+  const canDelete =
+    Boolean(onDeleted && article) &&
+    (article?.source === "quiptech_library" ? can(PERMISSIONS.managePlatform) : can(PERMISSIONS.submitDocuments));
+
+  const deleteDocument = async () => {
+    await deleteDocumentRequest(requireAccessToken(), documentId);
+    onDeleted?.();
   };
 
   const renderBody = () => {
@@ -99,18 +132,14 @@ export const ArticleView = ({ documentId, navigation, initialSectionId, isEmbedd
   };
 
   return (
-    <div
-      className={
-        isEmbedded
-          ? "flex h-[75vh] min-h-[480px] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-surfaceGray"
-          : "flex h-screen flex-col bg-surfaceGray"
-      }
-    >
+    <div className={LAYOUT_CLASSES[layout]}>
       <ArticleHeaderBar
         title={article?.title ?? "Document"}
         article={article}
         navigation={navigation}
         onDownload={download}
+        onDelete={canDelete ? () => setIsConfirmingDelete(true) : undefined}
+        onClose={layout === "modal" ? onClose : undefined}
       />
       <div className="flex min-h-0 flex-1">
         <div className="m-4 flex flex-1 gap-3 overflow-hidden rounded-2xl border border-slate-200/80 bg-surface p-3">
@@ -127,6 +156,18 @@ export const ArticleView = ({ documentId, navigation, initialSectionId, isEmbedd
           )}
         </div>
       </div>
+      {isConfirmingDelete && article && (
+        <ConfirmDialog
+          title="Delete document?"
+          confirmLabel="Delete"
+          onConfirm={deleteDocument}
+          onClose={() => setIsConfirmingDelete(false)}
+          toErrorMessage={(error) => toApiErrorMessage(error, "Couldn't delete this document. Please try again.")}
+        >
+          <strong className="font-medium text-ink">{article.title}</strong> and all its versions will be permanently
+          deleted. It will no longer appear in Knowledge or be used by the AI assistant.
+        </ConfirmDialog>
+      )}
       {toast && <ErrorToast key={toast} message={toast} onDismiss={() => setToast(null)} />}
     </div>
   );
