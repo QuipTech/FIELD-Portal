@@ -17,7 +17,7 @@ const AssignedCasePage = ({ params }: AssignedCasePageProps) => {
   return (
     <AppShell
       topBar={
-        <TopBar showUserMenu={false}>
+        <TopBar>
           <span className="text-[15px] text-bodyGray">Support cases</span>
         </TopBar>
       }
