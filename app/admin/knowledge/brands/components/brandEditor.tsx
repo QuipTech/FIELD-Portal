@@ -1,9 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import { useState, type FormEvent } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { InfoHint } from "@/components/ui/infoHint";
+import { LogoPicker } from "./logoPicker";
 import {
   saveKnowledgeBrandRequest,
   uploadKnowledgeBrandLogoRequest,
@@ -11,11 +12,14 @@ import {
 } from "@/lib/api/knowledgeBrandsApi";
 import { requireAccessToken } from "@/lib/api/requireAccessToken";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
+import { SLUG_HINT, SLUG_PATTERN, toSlug, toSlugWhileTyping } from "@/lib/knowledge/toSlug";
 import type { KnowledgeBrand, KnowledgeBrandInput } from "@/lib/types/knowledgeBrand";
 
 const EMPTY_BRAND: KnowledgeBrandInput = { name: "", slug: "", description: "", isActive: true, sortOrder: 0 };
 export const BrandEditor = ({ brand, onSaved }: { brand: KnowledgeBrand | null; onSaved: () => void }) => {
   const [value, setValue] = useState<KnowledgeBrandInput>(brand ?? EMPTY_BRAND);
+  // A new brand's slug follows its name until someone edits the slug by hand.
+  const [slugTouched, setSlugTouched] = useState(Boolean(brand));
   const [logo, setLogo] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,7 +32,7 @@ export const BrandEditor = ({ brand, onSaved }: { brand: KnowledgeBrand | null; 
         requireAccessToken(),
         {
           name: value.name,
-          slug: value.slug,
+          slug: toSlug(value.slug),
           description: value.description,
           isActive: value.isActive,
           sortOrder: value.sortOrder,
@@ -69,16 +73,34 @@ export const BrandEditor = ({ brand, onSaved }: { brand: KnowledgeBrand | null; 
           required
           maxLength={150}
           value={value.name}
-          onChange={(event) => setValue({ ...value, name: event.target.value })}
+          onChange={(event) =>
+            setValue({
+              ...value,
+              name: event.target.value,
+              slug: slugTouched ? value.slug : toSlug(event.target.value),
+            })
+          }
         />
       </label>
-      <label className="text-xs text-bodyGray">
-        Slug
+      <label className="flex flex-col gap-1 text-xs text-bodyGray">
+        <span className="flex items-center gap-1">
+          Slug
+          <InfoHint
+            label="About the slug"
+            text={`${brand ? "" : "Filled in from the name. "}${SLUG_HINT}`}
+          />
+        </span>
         <Input
           required
-          pattern="[a-z0-9]+(-[a-z0-9]+)*"
+          pattern={SLUG_PATTERN}
+          title={SLUG_HINT}
+          placeholder="hemisphere-gnss"
           value={value.slug}
-          onChange={(event) => setValue({ ...value, slug: event.target.value })}
+          onChange={(event) => {
+            setSlugTouched(true);
+            setValue({ ...value, slug: toSlugWhileTyping(event.target.value) });
+          }}
+          onBlur={() => setValue({ ...value, slug: toSlug(value.slug) })}
         />
       </label>
       <label className="text-xs text-bodyGray">
@@ -90,7 +112,10 @@ export const BrandEditor = ({ brand, onSaved }: { brand: KnowledgeBrand | null; 
         />
       </label>
       <label className="text-xs text-bodyGray">
-        Display order
+        <span className="flex items-center gap-1">
+          Display order
+          <InfoHint label="About display order" text="Brands are listed by this number, lowest first." />
+        </span>
         <Input
           type="number"
           value={value.sortOrder}
@@ -105,25 +130,12 @@ export const BrandEditor = ({ brand, onSaved }: { brand: KnowledgeBrand | null; 
         />
         Active
       </label>
-      {brand?.logoUrl && (
-        <Image
-          src={brand.logoUrl}
-          alt={`${brand.name} logo`}
-          width={64}
-          height={64}
-          unoptimized
-          className="rounded-lg object-contain"
-        />
-      )}
-      <label className="text-xs text-bodyGray">
-        Logo (PNG, JPG or SVG, up to 2 MB)
-        <input
-          type="file"
-          accept="image/png,image/jpeg,image/svg+xml"
-          onChange={(event) => setLogo(event.target.files?.[0] ?? null)}
-          className="mt-1 block w-full"
-        />
-      </label>
+      <LogoPicker
+        file={logo}
+        currentUrl={brand?.logoUrl}
+        currentAlt={`${brand?.name ?? "Brand"} logo`}
+        onChange={setLogo}
+      />
       {error && (
         <p role="alert" className="text-xs text-danger">
           {error}
