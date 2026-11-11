@@ -150,6 +150,26 @@ describe('MachineLifecycleService.applyAction', () => {
     });
   });
 
+  it('refuses to reactivate a machine with a final charge this month, which would bill it twice', async () => {
+    const { service } = setUpLifecycleService({
+      lifecycleState: 'archived',
+      hasFinalCharge: true,
+    });
+    await expect(
+      service.applyAction(actor, 'machine-1', 'reactivate', null, now),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('still lets a machine with a final charge be left inactive', async () => {
+    const { service } = setUpLifecycleService({
+      lifecycleState: 'active',
+      hasFinalCharge: true,
+    });
+    await expect(
+      service.applyAction(actor, 'machine-1', 'deactivate', null, now),
+    ).resolves.toMatchObject({ lifecycleState: 'registered' });
+  });
+
   it('refuses a new activation while the account is suspended', async () => {
     const { service, database } = setUpLifecycleService({ suspended: true });
     await expect(

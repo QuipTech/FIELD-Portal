@@ -111,6 +111,7 @@ import { SubscriptionRenewalService } from './subscriptions/subscriptionRenewal.
     BillingSignUpService,
     AnnualQuoteService,
     ReviewTasksService,
+    UpFrontInvoiceService,
   ],
 })
 export class BillingModule {}

@@ -7,7 +7,8 @@ machine keeps its permanent id and is registered, active, archived or sold.
 Only active machines count toward the month's peak, through activation
 intervals on the billing account. Inactive machines show identity and
 summary only; full history, configuration, photos and new AI threads need
-an active machine. Transfers move a machine between organisations with the
+an active machine. Documents are the exception: open in every state, and
+read-only once sold (`machineHistory/machineDocuments.*`). Transfers move a machine between organisations with the
 receiving organisation's approval.
 
 ## Folder structure
@@ -16,7 +17,9 @@ receiving organisation's approval.
 machineLifecycle/
 ├── lifecycleTransitions.ts        ← pure: states, the 5 transitions, billing days, available actions
 ├── machineLifecycle.service.ts    ← activate/deactivate/archive/reactivate, bulk, lifecycle history
-├── machineLifecycle.controller.ts ← /machines/:id/lifecycle, /machines/lifecycle/bulk, /machines/:id/custody
+├── machineLifecycle.controller.ts ← /machines/:id/lifecycle, /machines/lifecycle/bulk, /machines/:id/custody, deletion
+├── machineDeletionRules.ts        ← pure: when a machine may be deleted, and its days-used final charge
+├── machineDeletion.service.ts     ← GET /machines/:id/deletion-check, POST …/final-charge, DELETE /machines/:id (soft delete, audited)
 ├── machineActivations.repository.ts ← peak-rule count, billing.apply_machine_transition()
 ├── enterpriseThreshold.service.ts ← one sales review task at the Enterprise threshold (T8)
 ├── organisationBillingAccount.service.ts ← self-serve: first activation signs up the organisation (account + monthly ASSET_PRO)
@@ -55,6 +58,24 @@ Part of the API (`npm run start:dev` from `backend/`). Tests:
 - A suspended account can't activate or reactivate; it can still
   deactivate, archive and read everything.
 - Reaching `ENTERPRISE_THRESHOLD_MACHINES` never refuses an activation.
+- Deleting needs `machine.lifecycle` and is a soft delete. The machine must be
+  out of active with no open cases or pending transfer. Every monthly invoice
+  already issued must be paid. On a monthly plan the month still open, and last
+  month if the run hasn't invoiced it, are paid at once: POST
+  `/machines/:id/final-charge` raises one `machine_final` invoice with a line per
+  month, each monthly rate × days used ÷ days in the month, counted to the day it
+  was deactivated at the band for that month's peak. The machine then leaves
+  those months' peaks (spec section 3, rule 3a) and can't be reactivated in the
+  month still open. The same call returns a Stripe Checkout URL for the total
+  (`paymentUrl`): Checkout asks for the billing address (saved on the customer,
+  so Stripe Tax can add GST), creates the paid Stripe invoice itself, and comes
+  back to `/machines/:id?payment=complete`. A machine_final invoice is never
+  pushed as a Stripe invoice too (the hourly retry skips it). Stripe's errors
+  reach the caller; the invoice stays saved and calling again retries. The
+  deletion check asks Stripe about unpaid invoices and Checkout sessions, so a
+  payment counts before its webhook arrives. Annual plans wait for the month-end run; Enterprise
+  and internal plans have no machine charge. Deleting disconnects its machine app
+  and frees its serial to register again; intervals and invoices stay.
 - Transfer approval (which moves the machine's records) is not built yet:
   the list of records that move and stay needs sign-off first.
 

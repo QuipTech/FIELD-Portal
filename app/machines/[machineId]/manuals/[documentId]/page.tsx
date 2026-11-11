@@ -19,7 +19,7 @@ const MachineManualArticlePage = ({ params }: { params: { documentId: string } }
       documentId={params.documentId}
       navigation={machineManualsNavigation(machineId)}
       initialSectionId={initialSectionId}
-      isEmbedded
+      layout="embedded"
     />
   );
 };

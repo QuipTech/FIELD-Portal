@@ -26,6 +26,8 @@ export interface Scenario {
   suspended?: boolean;
   activeMachinesAfter?: number;
   openEnterpriseTask?: boolean;
+  // Paid or owes a final charge for this month, ahead of being deleted.
+  hasFinalCharge?: boolean;
   stateChangedMeanwhile?: boolean;
   // The organisation has no billing account until activation creates one.
   hasNoBillingAccount?: boolean;
@@ -37,6 +39,8 @@ export const setUpLifecycleService = (scenario: Scenario = {}) => {
   const database = createRecordingDatabase((sql) => {
     if (sql.includes('apply_machine_transition'))
       return [{ event_id: scenario.stateChangedMeanwhile ? null : 'event-1' }];
+    if (sql.includes('FROM billing.machine_final_charges'))
+      return scenario.hasFinalCharge ? [{ exists: 1 }] : [];
     if (sql.includes('FROM billing.subscriptions'))
       return scenario.hasNoMachinePlan
         ? []

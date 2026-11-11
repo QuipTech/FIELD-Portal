@@ -18,3 +18,11 @@ export const getDocumentDownloadUrlRequest = (accessToken: string, documentId: s
   apiRequest<SignedUrl>(`/documents/${documentId}/download`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
+
+// Permanent: every version, its chunks and stored files. Shared-library
+// documents need platform.manage; an organisation's own need knowledge.submit.
+export const deleteDocumentRequest = (accessToken: string, documentId: string): Promise<void> =>
+  apiRequest<void>(`/documents/${documentId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });

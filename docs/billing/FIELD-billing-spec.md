@@ -121,11 +121,21 @@ for crossing the threshold.
 
 2.  **Billable machines = the month\'s peak:** the highest number of
     machines active on any one day of the month. There are no part-month
-    charges.
+    charges, except rule 3a.
 
 3.  A machine activated on any day of the month counts toward that day.
     Deactivating, archiving or selling a machine doesn\'t reduce a peak
     already reached; it lowers next month\'s count.
+
+3a. **Exception for deleted machines:** on a monthly plan, a deactivated
+    machine being deleted pays now for the days it was used in the month
+    still open, and last month if not yet invoiced, on one invoice: each
+    month\'s rate at the band for its peak (so far, if still open) × days
+    used ÷ days in the month,
+    rounded half-up, counted to the day it was deactivated. It then leaves
+    those months\' peaks, and can\'t be reactivated in the month still open,
+    so no month is billed twice. Monthly invoices already issued must be
+    paid first. Annual plans wait for the month-end run.
 
 4.  **ASSET_PRO charge** = peak × the rate for the peak\'s band. Every
     machine is charged the same rate.
@@ -177,7 +187,7 @@ VIN/PIN/serials are searchable identifiers, never keys.
 
 **Machine lifecycle (4 states, 5 transitions).** A machine is billed only while active; charges stop from the next month.
 
-- Registered (inactive): free, stays in the register, identity and summary only
+- Registered (inactive): free, stays in the register, identity, summary and documents only
 - Active: counts in the month's peak from the activation day
 - Archived: charge stops next month, records kept
 - Sold / transferred: charge stops next month, machine facts move, private notes stay
@@ -254,7 +264,9 @@ plan-name comparison in code.
 
 **Inactive machines** stay in the fleet register and show identity and
 summary only; full history, AI context and remote sessions need the
-machine to be active.
+machine to be active. Documents (service reports, inspections,
+certificates) are the exception: they can be added, read and removed in
+every state, except that a sold machine's are read-only.
 
 ### Users
 
