@@ -62,7 +62,7 @@ describe('machine app pairing', () => {
     const code = await newCode(world.shared1.id);
     expect(
       await pairing.getConnection(actors.adminA, world.shared1.id),
-    ).toEqual({ connected: false, device: null });
+    ).toEqual({ connected: false, device: null, session: null });
 
     const paired = await pairing.pairDevice({
       code,

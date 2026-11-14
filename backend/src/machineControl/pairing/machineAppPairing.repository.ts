@@ -6,6 +6,7 @@ export interface MachineAppDeviceRow {
   platform: string | null;
   app_version: string | null;
   paired_at: Date;
+  online_since: Date | null;
 }
 
 export const findConnectedDevice = async (
@@ -13,7 +14,7 @@ export const findConnectedDevice = async (
   machineId: string,
 ): Promise<MachineAppDeviceRow | null> => {
   const result = await client.query<MachineAppDeviceRow>(
-    `SELECT id, serial_number, platform, app_version, paired_at FROM mc_devices
+    `SELECT id, serial_number, platform, app_version, paired_at, online_since FROM mc_devices
      WHERE machine_id = $1 AND disabled_at IS NULL AND deleted_at IS NULL`,
     [machineId],
   );

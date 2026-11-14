@@ -4,12 +4,15 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { randomBytes, randomInt } from 'crypto';
+import { randomInt } from 'crypto';
 import * as authRepository from '../../auth/auth.repository';
 import { AuthenticatedUser } from '../../auth/types/authenticatedUser';
 import { hashToken } from '../../common/security/tokenHasher';
 import { DatabaseService } from '../../database/database.service';
 import { requireMachineAccess } from '../../machineSharing/access/machineAccess';
+import { findSessionState } from '../session/deviceSession.repository';
+import { newDeviceToken } from '../session/deviceSession.service';
+import { SessionState } from '../session/machineAppEvents';
 import { PairDeviceDto } from './machineAppPairing.dtos';
 import * as pairingRepository from './machineAppPairing.repository';
 
@@ -25,7 +28,10 @@ export interface MachineAppConnection {
     platform: string | null;
     appVersion: string | null;
     pairedAt: string;
+    online: boolean;
   } | null;
+  // Null when no tablet is connected.
+  session: SessionState | null;
 }
 
 // connected: the machine already has a tablet, so there's no code.
@@ -64,7 +70,9 @@ export class MachineAppPairingService {
           platform: device.platform,
           appVersion: device.app_version,
           pairedAt: new Date(device.paired_at).toISOString(),
+          online: device.online_since !== null,
         },
+        session: device && (await findSessionState(client, machineId)),
       };
     });
 
@@ -127,7 +135,7 @@ export class MachineAppPairingService {
 
   // The token is only ever returned here; the database keeps its hash.
   pairDevice = async (dto: PairDeviceDto) => {
-    const deviceToken = randomBytes(32).toString('base64url');
+    const deviceToken = newDeviceToken();
     const paired = await this.databaseService.transaction((client) =>
       pairingRepository.pairDevice(client, {
         code: dto.code,

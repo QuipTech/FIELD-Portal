@@ -607,6 +607,19 @@ the API runs normally.
     `POST /mc/device/pair` is the tablet's signed-out call: `code`, optional
     `serialNumber`, `platform`, `appVersion`; returns its `deviceToken` once.
     Limited to 5 tries a minute per IP.
+  - **Machine app live session** (`src/machineControl/session/`): the
+    pairing is the session. The tablet calls `GET /mc/device/session`,
+    `POST /mc/device/session/refresh` (new `deviceToken`; the old one works
+    5 more minutes) and `DELETE /mc/device/session` (removes itself) with
+    `Authorization: Bearer <deviceToken>`; a dead token is 401
+    `code: DEVICE_TOKEN_REVOKED`. Socket.IO `/machine-app`: the tablet
+    connects with `auth.deviceToken`, the portal with `auth.token` and emits
+    `watch {machineId}`. Both get `session:status` (`active` / `pending`,
+    `tabletOnline`, `portalOnline`) and `session:ended` (`reason`:
+    `portal_disconnected`, `tablet_disconnected`, `replaced`,
+    `connection_timeout`); the portal also gets `session:started`. A tablet
+    offline longer than `MC_SESSION_PENDING_TIMEOUT_MINUTES` (default 30)
+    is ended by the sweep.
   - `PATCH /users/me` (first/last name), `POST /users/me/avatar`.
 - **Uploads** go S3 first, then the database; if the database write fails
   the object is deleted again. Upload responses include `file:

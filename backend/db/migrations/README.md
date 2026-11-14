@@ -103,6 +103,7 @@ session (set per-request by `DatabaseService.withTenant`).
 | `0125` | Machine final charges: `billing.machine_final_charges` (a machine being deleted pays for the days used this month; RLS own account, service role writes) and invoice kind `machine_final`. The monthly run leaves a machine with a non-void charge out of that month's peak |
 | `0126` | One final-charge invoice can cover several months: one `billing.machine_final_charges` row per month, unique on invoice and month |
 | `0127` | `admin_correct_machine()`: the platform administrator corrects another organisation's machine (Plant ID, serial, site); SECURITY DEFINER, checks `assert_platform_admin()` first |
+| `0128` | Machine app live session: `mc_devices.online_socket_id`/`online_since`/`last_seen_at`, `mc_portal_watchers` (functions only); `mc_session_state()` (`active` when tablet and a portal viewer are connected, else `pending`); token lookup, rotation (5-minute overlap), tablet self-removal, online/offline, watch/unwatch, heartbeat and `mc_sweep_sessions()` (stale sockets, offline timeout), all SECURITY DEFINER; a trigger on `mc_devices` announces start/end on `pg_notify('mc_device_event')` |
 | `0124` | Machine soft delete: a machine's serial is unique only among live machines (`uq_machines_tenant_serial_live` replaces the table constraint), and `accessible_machines()` leaves out the organisation's deleted machines |
 
 See [Knowledge rollout](../../src/knowledgeBrands/README.md) for deployment order and compatibility.
