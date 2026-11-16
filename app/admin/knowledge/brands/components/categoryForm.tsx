@@ -4,7 +4,8 @@ import { useState, type FormEvent } from "react";
 import { Input } from "@/components/ui/input";
 import { SelectInput } from "@/components/ui/selectInput";
 import { Button } from "@/components/ui/button";
-import { toSlug } from "@/lib/knowledge/toSlug";
+import { InfoHint } from "@/components/ui/infoHint";
+import { SLUG_HINT, SLUG_PATTERN, toSlug, toSlugWhileTyping } from "@/lib/knowledge/toSlug";
 import type { categoryOptions } from "@/lib/knowledge/categoryOptions";
 import type { KnowledgeCategoryInput } from "@/lib/types/knowledgeBrand";
 
@@ -45,7 +46,7 @@ export const CategoryForm = ({ initial, editingId, categories, busy, error, onSa
   const parentChoices = editingId ? categories.filter((category) => !isInsideEdited(category)) : categories;
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    onSave(value);
+    onSave({ ...value, slug: toSlug(value.slug) });
   };
   return (
     <form onSubmit={submit} className="flex flex-col gap-3 border-t border-borderGray pt-4">
@@ -68,18 +69,25 @@ export const CategoryForm = ({ initial, editingId, categories, busy, error, onSa
         />
       </label>
       <label className="flex flex-col gap-1 text-xs text-bodyGray">
-        Slug
+        <span className="flex items-center gap-1">
+          Slug
+          <InfoHint
+            label="About the slug"
+            text={`${editingId ? "" : "Filled in from the name. "}${SLUG_HINT}`}
+          />
+        </span>
         <Input
           required
-          pattern="[a-z0-9]+(-[a-z0-9]+)*"
+          pattern={SLUG_PATTERN}
+          title={SLUG_HINT}
           placeholder="machine-maintenance"
           value={value.slug}
           onChange={(event) => {
             setSlugTouched(true);
-            setValue({ ...value, slug: event.target.value });
+            setValue({ ...value, slug: toSlugWhileTyping(event.target.value) });
           }}
+          onBlur={() => setValue({ ...value, slug: toSlug(value.slug) })}
         />
-        <span className="text-mutedGray">Filled in from the name. Lowercase letters, numbers and dashes only.</span>
       </label>
       <label className="flex flex-col gap-1 text-xs text-bodyGray">
         Inside folder
@@ -96,13 +104,15 @@ export const CategoryForm = ({ initial, editingId, categories, busy, error, onSa
         </SelectInput>
       </label>
       <label className="flex flex-col gap-1 text-xs text-bodyGray">
-        Display order
+        <span className="flex items-center gap-1">
+          Display order
+          <InfoHint label="About display order" text="Folders are listed by this number, lowest first." />
+        </span>
         <Input
           type="number"
           value={value.sortOrder}
           onChange={(event) => setValue({ ...value, sortOrder: Number(event.target.value) })}
         />
-        <span className="text-mutedGray">Lower numbers show first.</span>
       </label>
       {error && (
         <p role="alert" className="text-xs text-danger">

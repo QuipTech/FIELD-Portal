@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useState } from "react";
 import { listKnowledgeModelsRequest } from "@/lib/api/knowledgeBrandsApi";
 import { useApiResource } from "@/lib/hooks/useApiResource";
 import { Tag } from "@/components/ui/tag";
@@ -8,7 +9,8 @@ import { BrandNavigation } from "@/components/knowledge/brandNavigation";
 import { Pagination } from "@/components/ui/pagination";
 import { SelectInput } from "@/components/ui/selectInput";
 import { LoadingSpinner } from "@/components/ui/loadingSpinner";
-import type { KnowledgeLibraryFilters } from "@/lib/types/knowledgeLibrary";
+import type { KnowledgeLibraryFilters, KnowledgeResult } from "@/lib/types/knowledgeLibrary";
+import { KnowledgeDocumentModal } from "@/components/knowledge/knowledgeDocumentModal";
 import { knowledgeArticleNavigation, toListContext } from "@/lib/knowledge/knowledgeLinks";
 import { useKnowledgeLibrary } from "../useKnowledgeLibrary";
 import { KnowledgeFilterNav } from "./knowledgeFilterNav";
@@ -23,6 +25,10 @@ export const KnowledgeLibraryView = ({ initialFilters }: { initialFilters: Knowl
   const isNarrowed =
     hasSearch || Boolean(filters.type || filters.make || filters.model || filters.brandId || filters.categoryId);
   const listContext = toListContext(filters);
+  const navigation = knowledgeArticleNavigation(listContext);
+  // The result being read in the modal.
+  const [openResult, setOpenResult] = useState<KnowledgeResult | null>(null);
+  const closeDocument = useCallback(() => setOpenResult(null), []);
 
   const renderResults = () => {
     if (!data || results.isLoading || results.error) {
@@ -42,7 +48,7 @@ export const KnowledgeLibraryView = ({ initialFilters }: { initialFilters: Knowl
       );
     }
     return data.items.map((result) => (
-      <KnowledgeResultCard key={result.id} result={result} navigation={knowledgeArticleNavigation(listContext)} />
+      <KnowledgeResultCard key={result.id} result={result} navigation={navigation} onOpen={setOpenResult} />
     ));
   };
 
@@ -100,6 +106,19 @@ export const KnowledgeLibraryView = ({ initialFilters }: { initialFilters: Knowl
           />
         )}
       </main>
+      {openResult && (
+        <KnowledgeDocumentModal
+          documentId={openResult.id}
+          title={openResult.title}
+          navigation={navigation}
+          initialSectionId={openResult.sectionId}
+          onClose={closeDocument}
+          onDeleted={() => {
+            setOpenResult(null);
+            results.reload();
+          }}
+        />
+      )}
     </>
   );
 };

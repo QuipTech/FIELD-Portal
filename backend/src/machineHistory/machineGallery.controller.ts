@@ -1,4 +1,17 @@
-import { Body, Controller, Get, Param, ParseUUIDPipe, Post, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/guards/jwtAuthGuard';
 import { RequirePermissionsGuard } from '../auth/guards/requirePermissions.guard';
@@ -19,20 +32,44 @@ export class MachineGalleryController {
 
   @Get()
   @RequirePermissions('machine.view')
-  listPhotos(@CurrentUser() user: AuthenticatedUser, @Param('machineId', ParseUUIDPipe) machineId: string) {
+  listPhotos(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('machineId', ParseUUIDPipe) machineId: string,
+  ) {
     return this.machineGalleryService.listPhotos(user, machineId);
   }
 
   // multipart/form-data: `file` (JPG/PNG/HEIC, ≤ 10 MB) and optional `caption`.
   @Post()
   @RequirePermissions('machine.manage')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: PHOTO_RULE.maxBytes, files: 1 } }))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: PHOTO_RULE.maxBytes, files: 1 },
+    }),
+  )
   uploadPhoto(
     @CurrentUser() user: AuthenticatedUser,
     @Param('machineId', ParseUUIDPipe) machineId: string,
     @UploadedFile() file: IncomingFile | undefined,
     @Body() dto: UploadGalleryPhotoDto,
   ) {
-    return this.machineGalleryService.uploadPhoto(user, machineId, file, dto.caption);
+    return this.machineGalleryService.uploadPhoto(
+      user,
+      machineId,
+      file,
+      dto.caption,
+    );
+  }
+
+  // A 'contribute' share deletes only the photos it uploaded.
+  @Delete(':photoId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermissions('machine.manage')
+  deletePhoto(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('machineId', ParseUUIDPipe) machineId: string,
+    @Param('photoId', ParseUUIDPipe) photoId: string,
+  ) {
+    return this.machineGalleryService.deletePhoto(user, machineId, photoId);
   }
 }

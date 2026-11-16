@@ -33,6 +33,8 @@ export const toGalleryPhoto = (photo: GalleryPhotoResponse): MachineGalleryPhoto
   caption: photo.caption ?? "Photo",
   contentType: photo.contentType,
   url: photo.signedUrl,
+  canDelete: photo.canDelete,
+  isCover: photo.isCover,
 });
 
 // The backend stores one description; its first line is the title.

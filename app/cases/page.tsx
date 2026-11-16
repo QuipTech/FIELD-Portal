@@ -8,7 +8,7 @@ const CasesPage = () => {
   return (
     <AppShell
       topBar={
-        <TopBar showUserMenu={false} actions={<NewCaseButton />}>
+        <TopBar actions={<NewCaseButton />}>
           <span className="text-[15px] text-bodyGray">Support cases</span>
         </TopBar>
       }

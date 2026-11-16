@@ -47,6 +47,9 @@ export interface CreateCheckoutInput {
   fieldInvoiceId: string;
   successUrl: string;
   cancelUrl: string;
+  // Checkout asks for the billing address and saves it on the customer, so
+  // Stripe Tax can work out GST for a customer with no address yet.
+  collectBillingAddress?: boolean;
 }
 
 export interface CreateInvoiceItemInput {
@@ -235,6 +238,10 @@ export class StripeService {
           },
         ],
         automatic_tax: { enabled: this.settings.isTaxEnabled },
+        ...(input.collectBillingAddress && {
+          billing_address_collection: 'required' as const,
+          customer_update: { address: 'auto' as const },
+        }),
         invoice_creation: {
           enabled: true,
           invoice_data: { metadata: { fieldInvoiceId: input.fieldInvoiceId } },

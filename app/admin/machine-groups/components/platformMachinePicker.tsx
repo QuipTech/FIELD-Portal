@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LoadingSpinner } from "@/components/ui/loadingSpinner";
 import { requireAccessToken } from "@/lib/api/requireAccessToken";
@@ -9,8 +10,10 @@ import { searchPlatformMachinesRequest } from "@/lib/api/adminMachineGroupsApi";
 import type { PlatformMachine } from "@/lib/types/machineGroup";
 
 interface PlatformMachinePickerProps {
-  selectedIds: string[];
-  onToggle: (machineId: string) => void;
+  selectedIds?: string[];
+  onToggle?: (machineId: string) => void;
+  // Picks one machine with a button on its row, in place of the tick boxes.
+  chooseOne?: { label: string; onChoose: (machine: PlatformMachine) => void };
   // Already in the group: shown ticked and disabled.
   existingIds?: string[];
   disabled?: boolean;
@@ -19,8 +22,8 @@ interface PlatformMachinePickerProps {
 const SEARCH_DELAY_MS = 300;
 
 // Every organisation's machines, searchable by plant ID, serial, VIN or
-// organisation, to tick for a machine group.
-export const PlatformMachinePicker = ({ selectedIds, onToggle, existingIds = [], disabled }: PlatformMachinePickerProps) => {
+// organisation, to tick for a machine group or to pick one.
+export const PlatformMachinePicker = ({ selectedIds = [], onToggle, chooseOne, existingIds = [], disabled }: PlatformMachinePickerProps) => {
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<PlatformMachine[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -57,15 +60,9 @@ export const PlatformMachinePicker = ({ selectedIds, onToggle, existingIds = [],
         {results?.length === 0 && <p className="p-4 text-sm text-mutedGray">No machines match.</p>}
         {results?.map((machine) => {
           const isInGroup = existingIds.includes(machine.id);
-          return (
-            <label key={machine.id} className="flex items-center gap-3 border-b border-borderGray px-3 py-2.5 text-sm last:border-b-0">
-              <input
-                type="checkbox"
-                className="h-4 w-4 accent-primary"
-                checked={isInGroup || selectedIds.includes(machine.id)}
-                disabled={isInGroup || disabled}
-                onChange={() => onToggle(machine.id)}
-              />
+          const rowClasses = "flex items-center gap-3 border-b border-borderGray px-3 py-2.5 text-sm last:border-b-0";
+          const details = (
+            <>
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="font-medium text-ink">{machine.label}</span>
                 <span className="truncate text-xs text-mutedGray">
@@ -74,6 +71,28 @@ export const PlatformMachinePicker = ({ selectedIds, onToggle, existingIds = [],
                 </span>
               </span>
               <span className="flex-none text-xs text-bodyGray">{isInGroup ? "In group" : machine.owningOrganisation.name}</span>
+            </>
+          );
+          if (chooseOne) {
+            return (
+              <div key={machine.id} className={rowClasses}>
+                {details}
+                <Button size="sm" variant="ghost" onClick={() => chooseOne.onChoose(machine)}>
+                  {chooseOne.label}
+                </Button>
+              </div>
+            );
+          }
+          return (
+            <label key={machine.id} className={rowClasses}>
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-primary"
+                checked={isInGroup || selectedIds.includes(machine.id)}
+                disabled={isInGroup || disabled}
+                onChange={() => onToggle?.(machine.id)}
+              />
+              {details}
             </label>
           );
         })}

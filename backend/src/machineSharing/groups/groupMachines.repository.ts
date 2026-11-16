@@ -86,3 +86,19 @@ export const deleteGroupMachine = async (
   );
   return (result.rowCount ?? 0) > 0;
 };
+
+// The live groups a machine is in; a deleted group's membership rows are ignored.
+export const listMachineGroups = async (
+  client: PoolClient,
+  machineId: string,
+): Promise<{ id: string; name: string }[]> => {
+  const result = await client.query<{ id: string; name: string }>(
+    `SELECT g.id, g.name
+     FROM machine_group_machines gm
+     JOIN machine_groups g ON g.id = gm.group_id AND g.deleted_at IS NULL
+     WHERE gm.machine_id = $1
+     ORDER BY g.name`,
+    [machineId],
+  );
+  return result.rows;
+};

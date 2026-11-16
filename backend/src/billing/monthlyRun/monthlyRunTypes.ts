@@ -34,7 +34,9 @@ export type LineFormula =
   | 'ASSET_PRO_ANNUAL'
   | 'TECH_ANNUAL'
   // Assisted onboarding, one site at the price book's flat price.
-  | 'ONBOARD_ASSISTED';
+  | 'ONBOARD_ASSISTED'
+  // A machine being deleted: its monthly rate × days used ÷ days in the month.
+  | 'ASSET_PRO_FINAL_DAYS';
 
 // Everything a line's amount depends on, stored with the line so it can be
 // recalculated to the cent without reading anything else (T31).
@@ -52,6 +54,11 @@ export interface LineCalcSnapshot {
   seatCents: number | null;
   committedQty: number | null;
   monthsCharged: number | null;
+  // ASSET_PRO_FINAL_DAYS only.
+  machineId?: string;
+  monthlyRateCents?: number;
+  daysUsed?: number;
+  daysInMonth?: number;
 }
 
 export interface CalculatedLine {

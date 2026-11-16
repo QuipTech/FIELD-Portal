@@ -10,6 +10,7 @@ import { CreditNotesService } from '../../src/billing/collections/creditNotes.se
 import { OverdueService } from '../../src/billing/collections/overdue.service';
 import { OrganisationPlanService } from '../../src/billing/customerBilling/organisationPlan.service';
 import { InvoicesService } from '../../src/billing/invoices/invoices.service';
+import { PersonalCheckoutService } from '../../src/billing/personalSubscription/personalCheckout.service';
 import { UpFrontInvoiceService } from '../../src/billing/invoices/upFrontInvoice.service';
 import { OnboardingService } from '../../src/billing/onboarding/onboarding.service';
 import { PriceBooksService } from '../../src/billing/priceBooks/priceBooks.service';
@@ -69,9 +70,15 @@ describe('billing operations', () => {
       {} as StripeService,
       config,
     );
-    upFront = new UpFrontInvoiceService(db, accounts, priceBooks, {
-      finaliseInvoice,
-    } as unknown as InvoicesService);
+    upFront = new UpFrontInvoiceService(
+      db,
+      accounts,
+      priceBooks,
+      {
+        finaliseInvoice,
+      } as unknown as InvoicesService,
+      {} as PersonalCheckoutService,
+    );
     notifier = new BillingNotifier(db, { isConfigured: false } as EmailService);
   });
   afterAll(() => fixture.db.close());

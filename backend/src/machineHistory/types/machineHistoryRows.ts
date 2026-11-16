@@ -13,6 +13,8 @@ export interface MachineRow {
   status: string;
   manufacturer_name: string;
   model_name: string;
+  // registered, active, archived or sold.
+  lifecycle_state: string;
 }
 
 export interface MachineDetailRow extends MachineRow {
@@ -67,6 +69,8 @@ export interface HistoryEntryRow {
 
 export interface GalleryPhotoRow extends PhotoRow {
   caption: string | null;
+  uploaded_by: string | null;
+  is_cover: boolean;
 }
 
 export interface MachineDocumentRow {

@@ -11,6 +11,8 @@ import {
   invoiceItemCreateKey,
   invoicePayKey,
 } from '../stripe/stripeIdempotencyKeys';
+import { toInvoiceEventUpdate } from '../webhooks/stripeInvoiceEvents';
+import { applyInvoiceEventUpdate } from '../webhooks/stripeWebhookEvents.repository';
 import * as invoicesRepository from './invoices.repository';
 import * as invoiceSyncRepository from './invoiceSync.repository';
 import { toInvoiceTotals } from './invoiceAmounts';
@@ -65,6 +67,24 @@ export class InvoiceStripeSyncService {
     } catch (error) {
       throw toStripeGatewayError(error);
     }
+  };
+
+  // Asks Stripe whether an invoice has been paid, for a customer back from
+  // paying before the webhook arrives. Applied just as invoice.paid would be,
+  // so the webhook repeating it changes nothing. True if it's now paid.
+  refreshPaidStatus = async (invoice: InvoiceRow): Promise<boolean> => {
+    if (!invoice.stripe_invoice_id || invoice.status === 'paid') return false;
+    const stripeInvoice = await this.stripeService.retrieveInvoice(
+      invoice.stripe_invoice_id,
+    );
+    if (stripeInvoice.status !== 'paid') return false;
+    await this.serviceDatabase.transaction((client) =>
+      applyInvoiceEventUpdate(
+        client,
+        toInvoiceEventUpdate('invoice.paid', stripeInvoice),
+      ),
+    );
+    return true;
   };
 
   // Card or direct debit on file: charge it straight away. A decline is

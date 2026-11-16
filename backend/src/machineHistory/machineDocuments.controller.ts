@@ -20,7 +20,6 @@ import { JwtAuthGuard } from '../auth/guards/jwtAuthGuard';
 import { RequirePermissionsGuard } from '../auth/guards/requirePermissions.guard';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { IdempotencyInterceptor } from '../idempotency/idempotency.interceptor';
-import { RequireActiveMachineGuard } from '../machineLifecycle/activeMachine/requireActiveMachine.guard';
 import { MACHINE_DOCUMENT_RULE } from '../storage/storageFileRules';
 import { IncomingFile } from '../storage/types/storedFile';
 import {
@@ -30,8 +29,11 @@ import {
 import { MachineDocumentsService } from './machineDocuments.service';
 
 // A machine's documents: service reports, inspections, certificates, others.
+// Unlike history, photos and AI, they're open in every lifecycle state, so
+// reports can be kept for a machine that isn't active (billed) yet; a sold
+// machine's are read-only (MachineDocumentsService).
 @Controller('machines/:machineId/documents')
-@UseGuards(JwtAuthGuard, RequirePermissionsGuard, RequireActiveMachineGuard)
+@UseGuards(JwtAuthGuard, RequirePermissionsGuard)
 export class MachineDocumentsController {
   constructor(private readonly documents: MachineDocumentsService) {}
 

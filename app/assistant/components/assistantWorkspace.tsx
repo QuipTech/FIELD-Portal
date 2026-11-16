@@ -85,7 +85,6 @@ export const AssistantWorkspace = () => {
     <AppShell
       topBar={
         <TopBar
-          showUserMenu={false}
           actions={
             <>
               {sourceDocument && (

@@ -19,7 +19,7 @@ export interface AdminInvoice {
   amountRefundedCents: number;
   stripeInvoiceId: string | null;
   hostedInvoiceUrl: string | null;
-  invoiceKind: "monthly" | "annual" | "onboarding" | "personal" | "manual";
+  invoiceKind: "monthly" | "annual" | "onboarding" | "personal" | "manual" | "machine_final";
   // Monthly drafts wait until this for review, unless held.
   reviewUntil: string | null;
   heldAt: string | null;

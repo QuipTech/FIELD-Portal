@@ -102,4 +102,8 @@ export interface GalleryPhoto {
   uploadedAt: string;
   // Signed on read, valid 15 minutes.
   signedUrl: string;
+  // Whether the caller may delete it: the owner any, a 'contribute' share its own.
+  canDelete: boolean;
+  // The machine's chosen cover photo.
+  isCover: boolean;
 }

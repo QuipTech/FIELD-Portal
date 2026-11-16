@@ -12,6 +12,8 @@ export interface MachineDetailService {
   updateStatus: (machineId: string, status: OperatingStatus) => Promise<OperatingStatus>;
   listPhotos: (machineId: string) => Promise<MachineGalleryPhoto[]>;
   uploadPhoto: (machineId: string, file: File) => Promise<MachineGalleryPhoto>;
+  deletePhoto: (machineId: string, photoId: string) => Promise<void>;
+  setCoverPhoto: (machineId: string, photoId: string) => Promise<void>;
   listSystems: (machineId: string) => Promise<MachineSystem[]>;
   // All components when systemId is null.
   listComponents: (machineId: string, systemId: string | null) => Promise<MachineComponent[]>;

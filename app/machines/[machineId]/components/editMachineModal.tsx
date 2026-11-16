@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { FormField } from "@/components/ui/formField";
-import { updateMachineDetailsRequest } from "@/lib/api/machineFleetApi";
+import { EMPTY_MACHINE_FILTERS, listMachinesRequest, updateMachineDetailsRequest } from "@/lib/api/machineFleetApi";
+import { useApiResource } from "@/lib/hooks/useApiResource";
 import { requireAccessToken } from "@/lib/api/requireAccessToken";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import type { Machine } from "@/lib/types/machine";
@@ -13,23 +14,31 @@ import type { MachineDetailsChanges } from "@/lib/types/machineFleet";
 
 interface EditMachineModalProps {
   machine: Machine;
+  // The field to start in, from the Edit button on its row.
+  focus?: "site" | "hours";
+  // Another organisation's machine, edited by the platform administrator:
+  // only the site; hours stay the owner's.
+  siteOnly?: boolean;
   onSaved: () => void;
   onClose: () => void;
 }
 
 // Site and a new hour-meter reading. Only changed fields are sent. Serial and Plant ID have
-// their own audited change flow.
-export const EditMachineModal = ({ machine, onSaved, onClose }: EditMachineModalProps) => {
+// their own audited change flow. Existing sites are suggested so a machine moving to one
+// isn't filed under a misspelling; a new site can still be typed.
+export const EditMachineModal = ({ machine, focus, siteOnly = false, onSaved, onClose }: EditMachineModalProps) => {
   const [site, setSite] = useState(machine.site ?? "");
   const [hours, setHours] = useState(machine.operatingHours === null ? "" : String(machine.operatingHours));
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const isHoursValid = hours === "" || /^\d+$/.test(hours);
+  const siteListId = useId();
+  const fleet = useApiResource((token) => listMachinesRequest(token, EMPTY_MACHINE_FILTERS, ""), [], "Couldn't load sites.");
 
   const collectChanges = (): MachineDetailsChanges => {
     const changes: MachineDetailsChanges = {};
     if (site.trim() !== (machine.site ?? "")) changes.site = site.trim() || null;
-    if (hours !== "" && Number(hours) !== machine.operatingHours) changes.operatingHours = Number(hours);
+    if (!siteOnly && hours !== "" && Number(hours) !== machine.operatingHours) changes.operatingHours = Number(hours);
     return changes;
   };
 
@@ -49,15 +58,28 @@ export const EditMachineModal = ({ machine, onSaved, onClose }: EditMachineModal
   };
 
   return (
-    <Modal title="Edit machine" onClose={isSaving ? undefined : onClose} widthClassName="w-[480px]">
+    <Modal title={siteOnly ? "Edit site" : "Edit machine"} onClose={isSaving ? undefined : onClose} widthClassName="w-[480px]">
       <div className="flex flex-col gap-3.5 p-5">
         <div className="flex gap-2.5">
           <FormField className="flex-1" label="Site">
-            <Input value={site} onChange={(event) => setSite(event.target.value)} placeholder="e.g. Pit 4" maxLength={100} />
+            <Input
+              value={site}
+              onChange={(event) => setSite(event.target.value)}
+              placeholder="e.g. Pit 4"
+              maxLength={100}
+              list={siteListId}
+              autoComplete="off"
+              autoFocus={focus === "site"}
+            />
+            <datalist id={siteListId}>
+              {fleet.data?.facets.sites.map((option) => <option key={option} value={option} />)}
+            </datalist>
           </FormField>
-          <FormField className="flex-1" label="Hours">
-            <Input value={hours} onChange={(event) => setHours(event.target.value)} inputMode="numeric" />
-          </FormField>
+          {!siteOnly && (
+            <FormField className="flex-1" label="Hours">
+              <Input value={hours} onChange={(event) => setHours(event.target.value)} inputMode="numeric" autoFocus={focus === "hours"} />
+            </FormField>
+          )}
         </div>
         {!isHoursValid && <span className="text-xs text-danger">Hours must be a whole number.</span>}
         {saveError && <span className="text-xs text-danger">{saveError}</span>}

@@ -41,4 +41,7 @@ export interface MachineGalleryPhoto {
   contentType: string | null;
   // Signed, valid 15 minutes; reload the gallery for fresh URLs.
   url: string;
+  // The owner may delete any photo, a "contribute" share only its own.
+  canDelete: boolean;
+  isCover: boolean;
 }

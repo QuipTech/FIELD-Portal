@@ -21,6 +21,10 @@ export interface FleetMachine {
   operatingHours: number | null;
   // Signed for 15 minutes: the cover photo, else the newest gallery photo.
   photoUrl: string | null;
+  // GET /machines only: signed gallery photos, cover first then newest, for
+  // the row's slider. Empty where the gallery is unavailable (see
+  // machineFleet.service.ts) or there's nothing a browser can show.
+  photoUrls?: string[];
   status: OperatingStatus;
   // Billing lifecycle: only active machines are billed and show full
   // history.

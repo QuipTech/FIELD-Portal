@@ -70,9 +70,11 @@ export const insertSourceReferences = async (
   params: { tenantId: string; messageId: string; chunks: RetrievedChunk[] },
 ): Promise<void> => {
   if (!params.chunks.length) return;
+  // $1 needs an explicit ::uuid: DISTINCT resolves an untyped parameter
+  // to text before the INSERT sees it, which Postgres then rejects.
   await client.query(
     `INSERT INTO ai_message_documents(message_id,document_id)
-    SELECT DISTINCT $1,d.id FROM documents d WHERE d.knowledge_item_id=ANY($2::uuid[]) ON CONFLICT DO NOTHING`,
+    SELECT DISTINCT $1::uuid,d.id FROM documents d WHERE d.knowledge_item_id=ANY($2::uuid[]) ON CONFLICT DO NOTHING`,
     [params.messageId, params.chunks.map((chunk) => chunk.documentId)],
   );
   await client.query(

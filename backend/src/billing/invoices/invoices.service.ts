@@ -98,6 +98,11 @@ export class InvoicesService {
     return invoice;
   };
 
+  refreshPaidStatus = async (invoiceId: string): Promise<boolean> =>
+    this.invoiceStripeSync.refreshPaidStatus(
+      await this.requireInvoice(invoiceId),
+    );
+
   listInvoices = async (query: ListInvoicesQueryDto): Promise<InvoiceList> => {
     const { rows, total } = await invoicesRepository.listInvoicesPage(
       this.serviceDatabase,

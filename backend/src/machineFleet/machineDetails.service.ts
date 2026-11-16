@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PoolClient } from 'pg';
+import { AuditEntry } from '../common/audit/runAuditedChange';
 import { DatabaseService } from '../database/database.service';
 import { StorageService } from '../storage/storage.service';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
@@ -12,6 +13,9 @@ import { ACCESSIBLE_MACHINES } from '../machineSharing/access/machineScope';
 import * as fleetRepository from './machineFleet.repository';
 import * as detailsRepository from './machineDetails.repository';
 import { toFleetMachineWithPhoto } from './machinePhotoUrl';
+import { requireMachineAccess } from '../machineSharing/access/machineAccess';
+import { auditForMachineOwners } from '../machineSharing/groups/auditForMachineOwners';
+import { correctMachineAsPlatformAdmin } from './adminMachineCorrections.repository';
 import { UpdateMachineDto } from './dto/updateMachineDto';
 import { FleetMachine } from './types/machineFleetResponse';
 
@@ -20,7 +24,8 @@ const PHOTO_NOT_FOUND_MESSAGE = "That photo isn't in this machine's gallery.";
 
 // Site, hour-meter reading and cover photo, audited with before/after. Only
 // the owning organisation edits a machine: a shared one, or one outside the
-// caller's machine scope, is a 404.
+// caller's machine scope, is a 404 — except that the platform administrator
+// may correct a shared machine's site (adminMachineCorrections.repository).
 @Injectable()
 export class MachineDetailsService {
   constructor(
@@ -36,6 +41,19 @@ export class MachineDetailsService {
     this.databaseService.withActor(actor, async (client) => {
       const details = dto;
       const scope = ACCESSIBLE_MACHINES;
+      const access = await requireMachineAccess(client, machineId);
+      if (access.isShared) {
+        await this.updateSharedSite(client, actor, machineId, dto);
+        return toFleetMachineWithPhoto(
+          this.storageService,
+          (await fleetRepository.findFleetMachine(
+            client,
+            actor.tenantId,
+            machineId,
+            scope,
+          ))!,
+        );
+      }
       const before = await detailsRepository.findMachineDetails(
         client,
         actor.tenantId,
@@ -78,6 +96,38 @@ export class MachineDetailsService {
         ))!,
       );
     });
+
+  // Site only: hours and the cover photo stay the owner's own.
+  private updateSharedSite = async (
+    client: PoolClient,
+    actor: AuthenticatedUser,
+    machineId: string,
+    dto: UpdateMachineDto,
+  ): Promise<void> => {
+    if (dto.operatingHours !== undefined || dto.coverPhotoId !== undefined) {
+      throw new NotFoundException(MACHINE_NOT_FOUND_MESSAGE);
+    }
+    if (dto.site === undefined) return;
+    const correction = await correctMachineAsPlatformAdmin(client, machineId, {
+      site: dto.site,
+    });
+    const entry: AuditEntry = {
+      action: 'update',
+      entityType: 'machine',
+      entityId: machineId,
+      metadata: {
+        before: { site: correction.before.site },
+        after: { site: correction.after.site },
+        byPlatformAdmin: true,
+      },
+    };
+    await authRepository.insertAuditLog(client, {
+      ...entry,
+      tenantId: actor.tenantId,
+      userId: actor.userId,
+    });
+    await auditForMachineOwners(client, actor, [correction.tenantId], entry);
+  };
 
   private updateDetails = async (
     client: PoolClient,

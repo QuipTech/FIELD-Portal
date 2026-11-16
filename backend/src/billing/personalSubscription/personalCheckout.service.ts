@@ -36,8 +36,26 @@ export class PersonalCheckoutService {
     customerId: string,
     returnOrigin: string,
     returnTo: ReturnTo = 'portal',
+  ): Promise<string | null> =>
+    this.openCheckoutAt(invoice, customerId, {
+      returnPage: `${returnOrigin}${returnPagePath(returnTo)}`,
+      keyScope: returnTo === 'app' ? `${returnOrigin}:app` : returnOrigin,
+    });
+
+  // The same for any FIELD invoice (a machine's final charge too): Stripe
+  // returns the payer to returnPage with ?payment=complete or =cancelled.
+  openCheckoutAt = async (
+    invoice: InvoiceRow,
+    customerId: string,
+    options: {
+      returnPage: string;
+      // Tells apart the sessions for different return pages.
+      keyScope: string;
+      description?: string;
+      collectBillingAddress?: boolean;
+    },
   ): Promise<string | null> => {
-    const returnPage = `${returnOrigin}${returnPagePath(returnTo)}`;
+    const { returnPage } = options;
     const successUrl = `${returnPage}?payment=complete`;
     const sessions = await this.stripe.listCheckoutSessions(
       customerId,
@@ -64,16 +82,16 @@ export class PersonalCheckoutService {
           (sum, line) => sum + Number(line.amount_cents),
           0,
         ),
-        description: lines[0]?.description ?? 'FIELD Technician subscription',
+        description:
+          options.description ??
+          lines[0]?.description ??
+          'FIELD Technician subscription',
         fieldInvoiceId: invoice.id,
         successUrl,
         cancelUrl: `${returnPage}?payment=cancelled`,
+        collectBillingAddress: options.collectBillingAddress,
       },
-      checkoutCreateKey(
-        invoice.id,
-        sessions.length,
-        returnTo === 'app' ? `${returnOrigin}:app` : returnOrigin,
-      ),
+      checkoutCreateKey(invoice.id, sessions.length, options.keyScope),
     );
     return created.url;
   };

@@ -8,6 +8,7 @@ import { PERMISSIONS } from "@/lib/auth/permissionCodes";
 import { useApiResource } from "@/lib/hooks/useApiResource";
 import { getMachineLifecycleRequest } from "@/lib/api/machineLifecycleApi";
 import type { LifecycleChangeResult, LifecycleState } from "@/lib/types/machineLifecycle";
+import { DeleteMachineSection } from "./deleteMachineSection";
 import { LifecycleActionDialog } from "./lifecycleActionDialog";
 import { TransferRequestDialog } from "./transferRequestDialog";
 
@@ -68,6 +69,7 @@ export const MachineLifecycleCard = ({ machineId, machineLabel, lifecycleState, 
           ))}
         </ol>
       )}
+      <DeleteMachineSection machineId={machineId} machineLabel={machineLabel} lifecycleState={lifecycleState} />
       {dialog === "deactivate" || dialog === "archive" ? (
         <LifecycleActionDialog
           machineId={machineId}

@@ -23,7 +23,7 @@ export class KnowledgeBrandDto {
   name: string;
   @IsString()
   @MaxLength(150)
-  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+  @Matches(/^[a-z0-9]+(?:[-_][a-z0-9]+)*$/)
   slug: string;
   @IsOptional() @IsString() @MaxLength(5000) description?: string;
   @IsOptional() @IsBoolean() isActive?: boolean;
@@ -37,7 +37,7 @@ export class KnowledgeCategoryDto {
   name: string;
   @IsString()
   @MaxLength(150)
-  @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+  @Matches(/^[a-z0-9]+(?:[-_][a-z0-9]+)*$/)
   slug: string;
   @IsOptional() @IsUUID() parentId?: string | null;
   @IsOptional() @IsInt() sortOrder?: number;

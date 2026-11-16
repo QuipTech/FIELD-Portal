@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import * as authRepository from '../auth/auth.repository';
 import { AuthenticatedUser } from '../auth/types/authenticatedUser';
 import { DatabaseService } from '../database/database.service';
@@ -21,6 +25,21 @@ import {
 
 const ENTRY_NOT_FOUND_MESSAGE = 'History entry not found.';
 const DOCUMENT_NOT_FOUND_MESSAGE = 'Document not found.';
+export const MACHINE_SOLD_CODE = 'machine_sold';
+const MACHINE_SOLD_MESSAGE =
+  "This machine was sold to another organisation, so its documents can't be changed.";
+
+// Documents are open in every lifecycle state (not only active), except that
+// a sold machine's record belongs to its new owner: read-only.
+const assertNotSold = (machine: { lifecycle_state: string }) => {
+  if (machine.lifecycle_state === 'sold') {
+    throw new ForbiddenException({
+      statusCode: 403,
+      code: MACHINE_SOLD_CODE,
+      message: MACHINE_SOLD_MESSAGE,
+    });
+  }
+};
 
 // Files about one machine, on their own or added with a history entry. Rows
 // live in the machine's owning organisation. A 'contribute' share adds files
@@ -130,11 +149,13 @@ export class MachineDocumentsService {
     documentId: string,
   ): Promise<void> =>
     this.databaseService.withActor(actor, async (client) => {
-      const { access } = await assertMachineAccessible(
+      const machine = await assertMachineAccessible(
         client,
         machineId,
         'contribute',
       );
+      assertNotSold(machine);
+      const { access } = machine;
       const isShared = access.tenantId !== actor.tenantId;
       const deleted = await machineDocumentsRepository.softDeleteDocument(
         client,
@@ -164,11 +185,13 @@ export class MachineDocumentsService {
     historyEntryId: string | null,
   ): Promise<string> =>
     this.databaseService.withActor(actor, async (client) => {
-      const { access } = await assertMachineAccessible(
+      const machine = await assertMachineAccessible(
         client,
         machineId,
         'contribute',
       );
+      assertNotSold(machine);
+      const { access } = machine;
       if (historyEntryId) {
         const isShared = access.tenantId !== actor.tenantId;
         const canAttach = await machineDocumentsRepository.canAttachToEntry(

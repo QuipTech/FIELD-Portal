@@ -14,6 +14,7 @@ import { requireAccessToken } from "@/lib/api/requireAccessToken";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import { listGroupMachinesRequest, removeGroupMachineRequest } from "@/lib/api/adminMachineGroupsApi";
 import type { GroupMachine } from "@/lib/types/machineGroup";
+import { ManageMachineGroupsModal } from "@/components/machines/manageMachineGroupsModal";
 import { AddMachinesModal } from "./addMachinesModal";
 
 interface GroupMachinesTabProps {
@@ -33,6 +34,7 @@ export const GroupMachinesTab = ({ groupId, onChanged }: GroupMachinesTabProps) 
   );
   const [isAdding, setIsAdding] = useState(false);
   const [removing, setRemoving] = useState<GroupMachine | null>(null);
+  const [managing, setManaging] = useState<GroupMachine | null>(null);
   const list = machines.data ?? [];
 
   const renderRows = () => {
@@ -52,7 +54,10 @@ export const GroupMachinesTab = ({ groupId, onChanged }: GroupMachinesTabProps) 
         <TableCell flex={1}>
           <Tag>{STATUS_LABELS[machine.status] ?? machine.status}</Tag>
         </TableCell>
-        <TableCell flex={0.6} className="flex justify-end">
+        <TableCell flex={1.4} className="flex justify-end gap-1">
+          <Button size="sm" variant="ghost" onClick={() => setManaging(machine)}>
+            Manage groups
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => setRemoving(machine)}>
             Remove
           </Button>
@@ -75,7 +80,7 @@ export const GroupMachinesTab = ({ groupId, onChanged }: GroupMachinesTabProps) 
           <TableHeaderCell flex={1.5}>Model</TableHeaderCell>
           <TableHeaderCell flex={1.5}>Owning organisation</TableHeaderCell>
           <TableHeaderCell flex={1}>Status</TableHeaderCell>
-          <TableHeaderCell flex={0.6}>{""}</TableHeaderCell>
+          <TableHeaderCell flex={1.4}>{""}</TableHeaderCell>
         </TableHeaderRow>
         {renderRows()}
       </Table>
@@ -89,6 +94,16 @@ export const GroupMachinesTab = ({ groupId, onChanged }: GroupMachinesTabProps) 
             onChanged(`${count} ${count === 1 ? "machine" : "machines"} added.`);
           }}
           onClose={() => setIsAdding(false)}
+        />
+      )}
+      {managing && (
+        <ManageMachineGroupsModal
+          machine={managing}
+          onSaved={(message) => {
+            machines.reload();
+            onChanged(message);
+          }}
+          onClose={() => setManaging(null)}
         />
       )}
       {removing && (

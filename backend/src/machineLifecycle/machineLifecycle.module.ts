@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { BillingModule } from '../billing/billing.module';
 import { EnterpriseThresholdService } from './enterpriseThreshold.service';
 import { MachineLifecycleController } from './machineLifecycle.controller';
+import { MachineDeletionService } from './machineDeletion.service';
 import { MachineLifecycleService } from './machineLifecycle.service';
 import { OrganisationBillingAccountService } from './organisationBillingAccount.service';
 import { ActivationQuoteService } from './activationQuote.service';
@@ -16,6 +17,7 @@ import { MachineTransfersService } from './transfers/machineTransfers.service';
   controllers: [MachineLifecycleController, MachineTransfersController],
   providers: [
     MachineLifecycleService,
+    MachineDeletionService,
     MachineTransfersService,
     MachineTransferApprovalService,
     EnterpriseThresholdService,

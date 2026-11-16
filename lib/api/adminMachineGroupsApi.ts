@@ -6,6 +6,7 @@ import type {
   GroupMachine,
   MachineGroup,
   MachineGroupChanges,
+  MachineGroupMembership,
   PlatformMachine,
   ShareAccessLevel,
 } from "../types/machineGroup";
@@ -92,4 +93,26 @@ export const revokeGroupAssignmentRequest = (
 export const searchPlatformMachinesRequest = (accessToken: string, search: string) =>
   apiRequest<PlatformMachine[]>(`/admin/machines/search?${new URLSearchParams({ search, limit: "50" })}`, {
     headers: authorizationHeader(accessToken),
+  });
+
+export const getMachineGroupsRequest = (accessToken: string, machineId: string) =>
+  apiRequest<MachineGroupMembership[]>(`/admin/machines/${machineId}/groups`, {
+    headers: authorizationHeader(accessToken),
+  });
+
+// Makes the machine's groups exactly these, in one go; empty leaves them all.
+export const setMachineGroupsRequest = (accessToken: string, machineId: string, groupIds: string[]) =>
+  apiRequest<MachineGroupMembership[]>(`/admin/machines/${machineId}/groups`, {
+    method: "PUT",
+    headers: authorizationHeader(accessToken),
+    body: JSON.stringify({ groupIds }),
+  });
+
+// "Move to group" on the Machines list: each machine leaves every group it is
+// in and joins this one, all at once. `moved` counts the machines that changed.
+export const moveMachinesToGroupRequest = (accessToken: string, machineIds: string[], groupId: string) =>
+  apiRequest<{ moved: number; group: { id: string; name: string } }>("/admin/machines/move-to-group", {
+    method: "POST",
+    headers: authorizationHeader(accessToken),
+    body: JSON.stringify({ machineIds, groupId }),
   });

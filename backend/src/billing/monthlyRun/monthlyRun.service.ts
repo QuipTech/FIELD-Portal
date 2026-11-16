@@ -12,7 +12,10 @@ import { BillingConfigService } from '../billingConfig/billingConfig.service';
 import { PriceBooksService } from '../priceBooks/priceBooks.service';
 import { sumAmountCents } from '../invoices/invoiceAmounts';
 import * as countsRepository from './dailyBillableCounts.repository';
-import { buildDailyCounts } from './dailyCountRules';
+import {
+  buildDailyCounts,
+  withoutFinalChargedMachines,
+} from './dailyCountRules';
 import { calculateMonthlyLines } from './monthlyLineCalculation';
 import * as runInvoicesRepository from './runInvoices.repository';
 import { RunSubscription } from './monthlyRunTypes';
@@ -87,10 +90,17 @@ export class MonthlyRunService {
         periodStart,
         periodEnd,
       );
+      const finalCharged =
+        await runInvoicesRepository.listFinalChargedIntervals(
+          client,
+          account.id,
+          periodStart,
+          periodEnd,
+        );
       const lines = calculateMonthlyLines({
         periodStart,
         periodEnd,
-        counts,
+        counts: withoutFinalChargedMachines(counts, finalCharged),
         subscriptions,
       });
       if (lines.length === 0) return null;
@@ -113,7 +123,10 @@ export class MonthlyRunService {
         from: null,
         to: { status: 'draft', periodStart, periodEnd, totalExGstCents },
         reason: 'monthly billing run',
-        metadata: { lineCount: lines.length },
+        metadata: {
+          lineCount: lines.length,
+          machinesWithFinalCharge: finalCharged.length,
+        },
       });
       return invoiceId;
     });

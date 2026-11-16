@@ -22,7 +22,10 @@ export const MachineTabs = ({ machineId, active, openCaseCount }: MachineTabsPro
   ];
 
   return (
-    <nav aria-label="Machine sections" className="flex items-end gap-5 overflow-x-auto border-b border-borderGray">
+    // flex-none: the page is a scrolling flex column, and overflow-x-auto would
+    // otherwise let this bar shrink to a sliver once the page is taller than
+    // the window.
+    <nav aria-label="Machine sections" className="flex flex-none items-end gap-5 overflow-x-auto border-b border-borderGray">
       {tabs.map((tab) => (
         <Link
           key={tab.key}

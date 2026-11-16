@@ -6,6 +6,7 @@ import {
   calculateFleetPriceCents,
   findBandRateCents,
 } from '../pricing/fleetPrice';
+import { divideRoundHalfUp } from '../pricing/roundHalfUp';
 import {
   calculateTechExtraSeatUnitCents,
   calculateTechMonthlyCents,
@@ -78,6 +79,11 @@ export const recalculateLineAmountCents = (
       );
     case 'ONBOARD_ASSISTED':
       return snapshot.seatCents ?? 0;
+    case 'ASSET_PRO_FINAL_DAYS':
+      return divideRoundHalfUp(
+        (snapshot.monthlyRateCents ?? 0) * (snapshot.daysUsed ?? 0),
+        snapshot.daysInMonth ?? 1,
+      );
   }
 };
 

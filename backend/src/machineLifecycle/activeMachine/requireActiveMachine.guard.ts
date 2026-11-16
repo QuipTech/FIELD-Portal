@@ -5,7 +5,8 @@ import { assertFullMachineAccess } from './activeMachine.repository';
 import { ACCESSIBLE_MACHINES } from '../../machineSharing/access/machineScope';
 
 // Inactive machines show identity and summary only: full history,
-// configuration and photos need an active machine. Reads :machineId from
+// configuration and photos need an active machine. Documents are the
+// exception and don't use this guard (machineDocuments.controller.ts). Reads :machineId from
 // the route; a missing machine (or one outside the caller's machine
 // groups) is left to the handler's own 404. Must run after JwtAuthGuard.
 @Injectable()
