@@ -34,6 +34,7 @@ const links: AdminNavLink[] = [
   { href: "/admin/knowledge", label: "Knowledge", icon: "book", permission: PERMISSIONS.managePlatform },
   { href: "/admin/machines", label: "Machine library", icon: "db", permission: PERMISSIONS.managePlatform },
   { href: MACHINE_GROUPS_HREF, label: "Machine groups", icon: "layers", permission: PERMISSIONS.managePlatform },
+  { href: "/admin/machine-control", label: "Machine Control", icon: "broadcast", permission: PERMISSIONS.managePlatform },
   {
     href: "/admin/ai-configuration",
     label: "AI configuration",

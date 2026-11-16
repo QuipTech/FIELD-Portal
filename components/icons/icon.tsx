@@ -1,4 +1,5 @@
 export type IconName =
+  | "broadcast"
   | "panel"
   | "grid"
   | "truck"

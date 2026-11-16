@@ -20,6 +20,12 @@ export const PERMISSIONS = {
   managePlatform: "platform.manage",
   // Owner and Organisation Admin: people, their machine access and machine groups.
   manageUsers: "admin.manage_users",
+  // Machine Control, once the organisation has it turned on.
+  viewMachineControl: "mc.view",
+  uploadMachineControlFiles: "mc.upload",
+  sendMachineControlFiles: "mc.deliver",
+  manageMachineControlDevices: "mc.manage_devices",
+  useMachineControlRemote: "mc.remote",
 } as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -40,6 +46,11 @@ export const permissionLabels: Record<PermissionCode, string> = {
   "history.delete_photos": "Delete machine photos",
   "platform.manage": "Manage the whole platform",
   "admin.manage_users": "Manage users and machine groups",
+  "mc.view": "See Machine Control",
+  "mc.upload": "Upload files to Machine Control",
+  "mc.deliver": "Send files to machines",
+  "mc.manage_devices": "Connect and disconnect machine tablets",
+  "mc.remote": "Use remote support on machine tablets",
 };
 
 export const describeMissingPermission = (permission: PermissionCode): string =>

@@ -64,7 +64,7 @@ export const findTenantById = async (
   tenantId: string,
 ): Promise<TenantRow> => {
   const result = await client.query<TenantRow>(
-    `SELECT id, name, slug FROM tenants WHERE id = $1`,
+    `SELECT id, name, slug, machine_control_enabled FROM tenants WHERE id = $1`,
     [tenantId],
   );
   return result.rows[0];

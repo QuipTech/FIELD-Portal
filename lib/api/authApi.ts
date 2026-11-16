@@ -32,6 +32,7 @@ export const checkPasswordResetRequest = (email: string): Promise<PasswordResetE
 export interface CurrentUserResponse extends AuthSessionUser {
   status: string;
   permissions: string[];
+  machineControlEnabled?: boolean;
   // Which machines they see; missing from older backends (own
   // organisation's). Read on every request: the API filters, never the page.
   machineAccessMode?: MachineAccessMode;
