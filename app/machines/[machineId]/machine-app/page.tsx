@@ -20,10 +20,13 @@ import { canContributeTo } from "@/lib/machineDetail/machineAccessRules";
 import { machineCacheKeys } from "@/lib/machineDetail/machineDetailCacheKeys";
 import { useCachedResource } from "@/lib/machineDetail/useCachedResource";
 import { useMachineDetail } from "../machineDetailContext";
+import { usePermissions } from "@/lib/auth/usePermissions";
+import { MachineControlOffNotice } from "@/components/machineControl/machineControlOffNotice";
 
 // Machine app tab: connect this machine's tablet, then reach it remotely.
 const MachineAppPage = () => {
   const { machineId, machine, notify } = useMachineDetail();
+  const { machineControlEnabled } = usePermissions();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const connection = useCachedResource(
@@ -35,6 +38,7 @@ const MachineAppPage = () => {
   const label = machine?.assetId ?? "";
   const device = connection.data?.device ?? null;
 
+  if (!machineControlEnabled) return <MachineControlOffNotice />;
   if (connection.isLoading && !connection.data) {
     return (
       <div className="flex justify-center py-10 text-mutedGray">
@@ -53,7 +57,7 @@ const MachineAppPage = () => {
           description="Connect this machine's tablet to the FIELD machine app with a 6-digit code."
           actions={
             canManage && (
-              <PermissionButton permission={PERMISSIONS.manageMachine} variant="primary" onClick={() => setIsConnecting(true)}>
+              <PermissionButton permission={PERMISSIONS.manageMachineControlDevices} variant="primary" onClick={() => setIsConnecting(true)}>
                 <Icon name="cloud" />
                 Connect app
               </PermissionButton>
@@ -69,7 +73,7 @@ const MachineAppPage = () => {
             </Tag>
             <span className="text-sm text-bodyGray">Since {formatShortDateTime(device.pairedAt)}</span>
             {canManage && (
-              <PermissionButton permission={PERMISSIONS.manageMachine} size="sm" variant="ghost" className="ml-auto" onClick={() => setIsDisconnecting(true)}>
+              <PermissionButton permission={PERMISSIONS.manageMachineControlDevices} size="sm" variant="ghost" className="ml-auto" onClick={() => setIsDisconnecting(true)}>
                 Disconnect
               </PermissionButton>
             )}

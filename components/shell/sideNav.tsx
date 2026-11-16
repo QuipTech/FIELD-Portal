@@ -17,9 +17,13 @@ interface NavLink {
   icon: IconName;
 }
 
+// Only when the organisation has it turned on and the person may see it.
+const MACHINE_CONTROL_LINK: NavLink = { href: "/machine-control", label: "Machine Control", icon: "broadcast" };
+
 const primaryLinks: NavLink[] = [
   { href: "/dashboard", label: "Dashboard", icon: "grid" },
   { href: "/machines", label: "Machines", icon: "truck" },
+  MACHINE_CONTROL_LINK,
   { href: "/knowledge", label: "Knowledge", icon: "book" },
   { href: "/assistant", label: "AI assistant", icon: "spark" },
   { href: "/cases", label: "Support cases", icon: "life" },
@@ -49,7 +53,8 @@ export const SideNav = () => {
   const { isStaff, isAdmin } = useSupportStaffAccess();
   // The admin's queue lives in the admin portal; here only assigned cases count.
   const staffCaseCount = useUnreadCaseCount("staff", isStaff && !isAdmin);
-  const { can } = usePermissions();
+  const { can, machineControlEnabled } = usePermissions();
+  const showMachineControl = machineControlEnabled && can(PERMISSIONS.viewMachineControl);
 
   return (
     <div
@@ -63,15 +68,17 @@ export const SideNav = () => {
       >
         <Icon name="panel" className="stroke-current" />
       </button>
-      {primaryLinks.map((link) => (
-        <NavItem
-          key={link.href}
-          {...link}
-          label={collapsed ? "" : link.label}
-          active={pathname.startsWith(link.href)}
-          badgeCount={link.href === CASES_HREF ? unreadCaseCount + staffCaseCount : 0}
-        />
-      ))}
+      {primaryLinks
+        .filter((link) => link.href !== MACHINE_CONTROL_LINK.href || showMachineControl)
+        .map((link) => (
+          <NavItem
+            key={link.href}
+            {...link}
+            label={collapsed ? "" : link.label}
+            active={pathname.startsWith(link.href)}
+            badgeCount={link.href === CASES_HREF ? unreadCaseCount + staffCaseCount : 0}
+          />
+        ))}
       <div className="mt-auto flex flex-col gap-0.5 border-t border-white/[0.16] pt-2.5">
         {can(PERMISSIONS.managePlatform) && (
           <NavItem href="/admin/dashboard" label={collapsed ? "" : "Admin portal"} icon="shield" active={false} />

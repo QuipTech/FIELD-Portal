@@ -103,7 +103,8 @@ export class MachineAppGateway
     const machineId = readMachineId(body);
     if (!actor || !machineId) return NOT_FOUND_REPLY;
     const allowed = await this.pairing
-      .getConnection(actor, machineId)
+      .assertMachineControlOn(actor)
+      .then(() => this.pairing.getConnection(actor, machineId))
       .then(() => true)
       .catch(() => false);
     if (!allowed) return NOT_FOUND_REPLY;

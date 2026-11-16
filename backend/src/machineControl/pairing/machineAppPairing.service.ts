@@ -13,6 +13,7 @@ import { requireMachineAccess } from '../../machineSharing/access/machineAccess'
 import { findSessionState } from '../session/deviceSession.repository';
 import { newDeviceToken } from '../session/deviceSession.service';
 import { SessionState } from '../session/machineAppEvents';
+import { assertMachineControlEnabled } from '../access/machineControlAccess';
 import { PairDeviceDto } from './machineAppPairing.dtos';
 import * as pairingRepository from './machineAppPairing.repository';
 
@@ -51,6 +52,13 @@ const generateCode = (): string =>
 @Injectable()
 export class MachineAppPairingService {
   constructor(private readonly databaseService: DatabaseService) {}
+
+  // For the portal socket, which has no route guard: 403 when the caller's
+  // organisation doesn't have Machine Control turned on.
+  assertMachineControlOn = (actor: AuthenticatedUser): Promise<void> =>
+    this.databaseService.withActor(actor, (client) =>
+      assertMachineControlEnabled(client, actor.tenantId),
+    );
 
   getConnection = (
     actor: AuthenticatedUser,

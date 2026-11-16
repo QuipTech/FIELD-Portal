@@ -31,6 +31,8 @@ export interface MeResponse {
   // (for the Group filter and chips).
   accessibleGroups: AccessibleGroup[];
   tenant: { id: string; name: string; slug: string };
+  // The organisation has Machine Control turned on (the platform admin's switch).
+  machineControlEnabled: boolean;
 }
 
 export interface AuthTokens {

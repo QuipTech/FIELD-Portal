@@ -603,7 +603,8 @@ the API runs normally.
     HEIC, up to 20 MB, stored under `documents/{tenantId}/machines/`.
   - `GET /machines/:machineId/app-connection` (`machine.view`);
     `POST …/app-connection/pairing-code` and `DELETE …/app-connection`
-    (`machine.manage`; own machines and `contribute` shares, active only).
+    (`mc.view` / `mc.manage_devices`; own machines and `contribute` shares,
+    active only; Machine Control must be on for the caller's organisation).
     `POST /mc/device/pair` is the tablet's signed-out call: `code`, optional
     `serialNumber`, `platform`, `appVersion`; returns its `deviceToken` once.
     Limited to 5 tries a minute per IP.
@@ -620,6 +621,12 @@ the API runs normally.
     `connection_timeout`); the portal also gets `session:started`. A tablet
     offline longer than `MC_SESSION_PENDING_TIMEOUT_MINUTES` (default 30)
     is ended by the sweep.
+  - Machine Control (`src/machineControl/`), only for organisations the
+    platform administrator has turned it on for (`RequireMachineControlGuard`,
+    403 `machine_control_disabled`; `/auth/me` returns
+    `machineControlEnabled`): `GET /mc/devices` (`mc.view`) lists connected
+    tablets with online status. The switch: `GET /admin/machine-control/organisations`
+    and `PATCH …/:tenantId { enabled }` (platform administrator).
   - `PATCH /users/me` (first/last name), `POST /users/me/avatar`.
 - **Uploads** go S3 first, then the database; if the database write fails
   the object is deleted again. Upload responses include `file:

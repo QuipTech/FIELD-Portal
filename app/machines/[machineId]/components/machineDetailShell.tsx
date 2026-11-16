@@ -25,6 +25,8 @@ import { SystemsTabs } from "./systemsTabs";
 import { AppShell } from "@/components/shell/appShell";
 import { isOwnMachine } from "@/lib/machineDetail/machineAccessRules";
 import { MachineSharingPanel } from "./machineSharingPanel";
+import { usePermissions } from "@/lib/auth/usePermissions";
+import { PERMISSIONS } from "@/lib/auth/permissionCodes";
 
 const ROUTED_TABS: MachineTab[] = ["history", "documents", "machine-app", "config-history", "manuals", "cases"];
 
@@ -51,6 +53,7 @@ export const MachineDetailShell = ({ machineId, children }: { machineId: string;
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   // Bumped on activation: remounts the content so every tab loads afresh.
   const [contentVersion, setContentVersion] = useState(0);
+  const { can, machineControlEnabled } = usePermissions();
   const activeTab = toActiveTab(usePathname(), machineId);
   const notify = useCallback((message: string) => setSuccessMessage(message), []);
   const notifyError = useCallback((message: string) => setErrorMessage(message), []);
@@ -111,7 +114,12 @@ export const MachineDetailShell = ({ machineId, children }: { machineId: string;
             />
           )}
           {isOwnMachine(machine.data) && <MachineSharingPanel machineId={machineId} />}
-          <MachineTabs machineId={machineId} active={activeTab} openCaseCount={machine.data?.openCaseCount ?? null} />
+          <MachineTabs
+            machineId={machineId}
+            active={activeTab}
+            openCaseCount={machine.data?.openCaseCount ?? null}
+            showMachineApp={machineControlEnabled && can(PERMISSIONS.viewMachineControl)}
+          />
           {activeTab === "components" && <SystemsTabs />}
           {children}
         </main>
