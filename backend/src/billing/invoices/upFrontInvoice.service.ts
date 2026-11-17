@@ -187,7 +187,12 @@ export class UpFrontInvoiceService {
   openPaymentSheet = async (
     invoiceId: string,
   ): Promise<PaymentSheet | null | typeof PAYMENT_SHEET_UNAVAILABLE> => {
-    if (!this.paymentSheets.isAvailable) return PAYMENT_SHEET_UNAVAILABLE;
+    if (!this.paymentSheets.isAvailable) {
+      this.logger.warn(
+        `Final charge ${invoiceId}: no Payment Sheet, STRIPE_PUBLISHABLE_KEY is not set. Using Checkout.`,
+      );
+      return PAYMENT_SHEET_UNAVAILABLE;
+    }
     try {
       const invoice = await this.requireInvoiceRow(invoiceId);
       // Not finalised on Stripe yet, so GST is still to be worked out.
@@ -198,9 +203,20 @@ export class UpFrontInvoiceService {
         const canTax = await this.stripe.canTaxCustomer(
           account.stripe_customer_id as string,
         );
-        if (!canTax) return PAYMENT_SHEET_UNAVAILABLE;
+        if (!canTax) {
+          this.logger.warn(
+            `Final charge ${invoiceId}: no Payment Sheet, Stripe Tax has no address for customer ${account.stripe_customer_id}. Using Checkout, which asks for one.`,
+          );
+          return PAYMENT_SHEET_UNAVAILABLE;
+        }
       }
-      return await this.paymentSheets.forInvoice(invoice);
+      const paymentSheet = await this.paymentSheets.forInvoice(invoice);
+      this.logger.log(
+        paymentSheet
+          ? `Final charge ${invoiceId}: Payment Sheet for Stripe invoice ${invoice.stripe_invoice_id ?? '(new)'}.`
+          : `Final charge ${invoiceId}: no Payment Sheet, nothing left to pay on Stripe.`,
+      );
+      return paymentSheet;
     } catch (error) {
       throw toStripeGatewayError(error);
     }

@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PoolClient } from 'pg';
@@ -76,6 +77,8 @@ const formatMonth = (day: string) =>
 // leaves every read, and its records, activation intervals and invoices stay.
 @Injectable()
 export class MachineDeletionService {
+  private readonly logger = new Logger(MachineDeletionService.name);
+
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly serviceDatabase: ServiceDatabaseService,
@@ -246,7 +249,11 @@ export class MachineDeletionService {
       (invoice) => invoice.isFinalCharge,
     );
     if (!finalCharge) return { ...check, paymentUrl: null, paymentSheet: null };
-    if (inApp) {
+    if (!inApp) {
+      this.logger.log(
+        `Final charge ${finalCharge.id} for machine ${machineId}: portal request (X-Field-Client: web), so Checkout or the hosted page and no Payment Sheet.`,
+      );
+    } else {
       const paymentSheet = await this.upFrontInvoices.openPaymentSheet(
         finalCharge.id,
       );
