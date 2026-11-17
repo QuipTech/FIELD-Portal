@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { CurrentUser } from '../../auth/decorators/currentUser.decorator';
 import { JwtAuthGuard } from '../../auth/guards/jwtAuthGuard';
 import { AuthenticatedUser } from '../../auth/types/authenticatedUser';
@@ -24,6 +33,18 @@ export class PersonalSubscriptionController {
   @Get('invoices')
   listInvoices(@CurrentUser() actor: AuthenticatedUser) {
     return this.subscriptions.listInvoices(actor);
+  }
+
+  // Payment Sheet for an earlier unpaid invoice of the caller's; 404 for
+  // anyone else's (or a malformed id).
+  @Post('invoices/:invoiceId/payment-sheet')
+  @HttpCode(200)
+  invoicePaymentSheet(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('invoiceId', new ParseUUIDPipe({ errorHttpStatusCode: 404 }))
+    invoiceId: string,
+  ) {
+    return this.invoices.paymentSheetForInvoice(actor, invoiceId);
   }
 
   @Post('payment')

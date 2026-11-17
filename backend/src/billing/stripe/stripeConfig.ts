@@ -5,6 +5,9 @@ export type StripeMode = 'test' | 'live' | 'not_configured';
 export interface StripeSettings {
   secretKey: string | undefined;
   webhookSecret: string | undefined;
+  // pk_ key handed to the mobile app's Payment Sheet. Public by design; it
+  // must belong to the same Stripe account and mode as secretKey.
+  publishableKey: string | undefined;
   isTaxEnabled: boolean;
   mode: StripeMode;
 }
@@ -36,6 +39,31 @@ export const assertStripeKeyAllowed = (
   }
 };
 
+// A pk_test_ key with a live secret key (or the other way round) makes
+// every Payment Sheet fail, so the app refuses to start rather than run
+// like that. An unset publishable key is allowed: payments then fall back
+// to the hosted invoice page.
+export const assertPublishableKeyMatches = (
+  secretKey: string | undefined,
+  publishableKey: string | undefined,
+): void => {
+  if (!publishableKey) return;
+  if (!publishableKey.startsWith('pk_')) {
+    throw new Error(
+      'Refusing to start: STRIPE_PUBLISHABLE_KEY must be a publishable key (pk_test_ / pk_live_). Never put a secret key there.',
+    );
+  }
+  const mode = stripeModeOf(secretKey);
+  const publishableMode = publishableKey.startsWith('pk_live_')
+    ? 'live'
+    : 'test';
+  if (mode !== 'not_configured' && mode !== publishableMode) {
+    throw new Error(
+      `Refusing to start: STRIPE_PUBLISHABLE_KEY is a ${publishableMode} key but STRIPE_SECRET_KEY is a ${mode} key. Both must come from the same Stripe account and mode.`,
+    );
+  }
+};
+
 export const readStripeSettings = (
   configService: ConfigService,
 ): StripeSettings => {
@@ -44,6 +72,8 @@ export const readStripeSettings = (
     secretKey,
     webhookSecret:
       configService.get<string>('STRIPE_WEBHOOK_SECRET') || undefined,
+    publishableKey:
+      configService.get<string>('STRIPE_PUBLISHABLE_KEY') || undefined,
     isTaxEnabled: configService.get<string>('STRIPE_TAX_ENABLED') === 'true',
     mode: stripeModeOf(secretKey),
   };

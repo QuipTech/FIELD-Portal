@@ -13,6 +13,13 @@ from the FIELD TECH price book and billing timezone configuration.
   creates a paid invoice tagged `fieldInvoiceId`, which the existing invoice webhooks
   match. An open session is reused, and a completed one is never paid twice. Invoices
   already sent to Stripe before Checkout keep their hosted invoice page.
+- Mobile Payment Sheet (`returnTo: 'app'` with `STRIPE_PUBLISHABLE_KEY` set): instead of
+  Checkout, the month's invoice is pushed to Stripe as a card-only Stripe Invoice (any open
+  Checkout session for it is expired first, or recorded if already paid) and the response
+  carries `paymentSheet` with the client secret of that invoice's own PaymentIntent
+  (`confirmation_secret`). `paymentUrl` is the same invoice's hosted page. The shared helper
+  is `../invoices/invoicePaymentSheet.service.ts`; `POST /me/billing/invoices/:invoiceId/payment-sheet`
+  uses it for an earlier unpaid invoice.
 - personalPaymentCheck.service.ts: `POST /me/billing/payment/check` asks Stripe for
   this month's invoice and records it as paid, so a missed webhook never locks out a payer.
 - personalSubscription.repository.ts: reads restricted to user and tenant.

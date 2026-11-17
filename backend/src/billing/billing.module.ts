@@ -6,6 +6,7 @@ import { BillingAccountsService } from './billingAccounts/billingAccounts.servic
 import { InvoicesController } from './invoices/invoices.controller';
 import { InvoicesService } from './invoices/invoices.service';
 import { InvoiceStripeSyncService } from './invoices/invoiceStripeSync.service';
+import { InvoicePaymentSheetService } from './invoices/invoicePaymentSheet.service';
 import { BillingRunWorker } from './monthlyRun/billingRun.worker';
 import { InvoiceReviewController } from './monthlyRun/invoiceReview.controller';
 import { InvoiceReviewService } from './monthlyRun/invoiceReview.service';
@@ -73,6 +74,7 @@ import { SubscriptionRenewalService } from './subscriptions/subscriptionRenewal.
     BillingAccountsService,
     InvoicesService,
     InvoiceStripeSyncService,
+    InvoicePaymentSheetService,
     MonthlyRunService,
     InvoiceReviewService,
     BillingRunWorker,

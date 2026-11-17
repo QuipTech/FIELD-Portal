@@ -19,6 +19,13 @@ import { toInvoiceTotals } from './invoiceAmounts';
 import { formatCents } from './formatCents';
 import { InvoiceLineRow, InvoiceRow } from './types/invoiceRows';
 
+export interface PushInvoiceOptions {
+  // The payer pays it in the mobile Payment Sheet: card only (no delayed
+  // methods such as BECS debit), and never charged to a saved card here.
+  // Applies when the Stripe invoice is first created.
+  forPaymentSheet?: boolean;
+}
+
 // Pushes one FIELD invoice to Stripe: an empty Stripe Invoice, one Invoice
 // Item per line, then finalise. Every step is idempotent twice over — a
 // Stripe idempotency key, and a saved Stripe id that makes a retry skip
@@ -34,7 +41,10 @@ export class InvoiceStripeSyncService {
     private readonly billingConfig: BillingConfigService,
   ) {}
 
-  pushInvoice = async (invoice: InvoiceRow): Promise<void> => {
+  pushInvoice = async (
+    invoice: InvoiceRow,
+    options: PushInvoiceOptions = {},
+  ): Promise<void> => {
     try {
       const account = await this.billingAccountsService.ensureStripeCustomer(
         await this.billingAccountsService.requireAccount(
@@ -49,6 +59,7 @@ export class InvoiceStripeSyncService {
       const stripeInvoiceId = await this.ensureStripeInvoice(
         invoice,
         customerId,
+        options,
       );
       const lines = await invoicesRepository.listInvoiceLines(
         this.serviceDatabase,
@@ -110,11 +121,14 @@ export class InvoiceStripeSyncService {
   private ensureStripeInvoice = async (
     invoice: InvoiceRow,
     customerId: string,
+    { forPaymentSheet = false }: PushInvoiceOptions,
   ): Promise<string> => {
     if (invoice.stripe_invoice_id) return invoice.stripe_invoice_id;
     const [{ PAYMENT_TERMS_DAYS }, chargeAutomatically] = await Promise.all([
       this.billingConfig.loadConfig(),
-      this.stripeService.hasDefaultPaymentMethod(customerId),
+      forPaymentSheet
+        ? false
+        : this.stripeService.hasDefaultPaymentMethod(customerId),
     ]);
     const stripeInvoice = await this.stripeService.createInvoice(
       {
@@ -123,6 +137,7 @@ export class InvoiceStripeSyncService {
         fieldInvoiceId: invoice.id,
         daysUntilDue: PAYMENT_TERMS_DAYS,
         chargeAutomatically,
+        ...(forPaymentSheet && { paymentMethodTypes: ['card' as const] }),
       },
       invoiceCreateKey(invoice.id),
     );

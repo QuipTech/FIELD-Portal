@@ -788,6 +788,9 @@ archived, and only the caller's organisation + the shared library
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_TAX_ENABLED` —
   Stripe, used only by `src/billing`; unset key = billing endpoints answer
   503; a live key (`sk_live_`) outside `NODE_ENV=production` stops startup
+- `STRIPE_PUBLISHABLE_KEY` — `pk_` key returned to the mobile app's Payment
+  Sheet; must match the secret key's account and mode (a mismatch stops
+  startup); unset = no `paymentSheet`, the app pays on a Stripe page
 - `AI_LOG_RETENTION_JOB_ENABLED` (default on), `AI_LOG_RETENTION_HOUR_UTC`
   (default 17) — the nightly AI query log purge
 - `DATA_EXPORT_WORKER_ENABLED` (default on; needs S3) — "My data" exports

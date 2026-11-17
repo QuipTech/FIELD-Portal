@@ -17,10 +17,22 @@ const actor = {
   tenantId: 'tenant-a',
   email: 'a@example.com',
 };
+const PAYMENT_SHEET = {
+  publishableKey: 'pk_test_field',
+  paymentIntentClientSecret: 'pi_a_secret_b',
+  customerId: 'cus_a',
+  customerEphemeralKeySecret: 'ek_test_a',
+  merchantDisplayName: 'FIELD',
+};
+const INVOICE_ID = '46eab22d-9761-42a9-87ae-a0b15f91ed11';
 const payments = {
-  createPayment: jest
+  createPayment: jest.fn().mockResolvedValue({
+    paymentUrl: 'https://invoice.stripe.com/i/a',
+    paymentSheet: PAYMENT_SHEET,
+  }),
+  paymentSheetForInvoice: jest
     .fn()
-    .mockResolvedValue({ paymentUrl: 'https://invoice.stripe.com/i/a' }),
+    .mockResolvedValue({ paymentSheet: PAYMENT_SHEET }),
 };
 const paymentCheck = {
   checkPayment: jest.fn().mockResolvedValue({ paymentRequired: false }),
@@ -139,5 +151,47 @@ describe('personal billing API access', () => {
       .post('/me/billing/payment/check')
       .expect(403);
     expect(paymentCheck.checkPayment).not.toHaveBeenCalled();
+  });
+
+  it('returns paymentSheet next to paymentUrl for an app payment', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/me/billing/payment')
+      .set('Authorization', 'Bearer test-user-a')
+      .send({ ...address, returnTo: 'app' })
+      .expect(201);
+    expect(response.body).toEqual({
+      paymentUrl: 'https://invoice.stripe.com/i/a',
+      paymentSheet: PAYMENT_SHEET,
+    });
+    expect(payments.createPayment).toHaveBeenCalledWith(actor, {
+      ...address,
+      returnTo: 'app',
+    });
+  });
+
+  it("returns the Payment Sheet for one of the caller's invoices", async () => {
+    await request(app.getHttpServer())
+      .post(`/me/billing/invoices/${INVOICE_ID}/payment-sheet`)
+      .set('Authorization', 'Bearer test-user-a')
+      .expect(200, { paymentSheet: PAYMENT_SHEET });
+    expect(payments.paymentSheetForInvoice).toHaveBeenCalledWith(
+      actor,
+      INVOICE_ID,
+    );
+  });
+
+  it('404s a malformed invoice id for the Payment Sheet', async () => {
+    await request(app.getHttpServer())
+      .post('/me/billing/invoices/not-a-uuid/payment-sheet')
+      .set('Authorization', 'Bearer test-user-a')
+      .expect(404);
+    expect(payments.paymentSheetForInvoice).not.toHaveBeenCalled();
+  });
+
+  it('requires sign-in for an invoice Payment Sheet', async () => {
+    await request(app.getHttpServer())
+      .post(`/me/billing/invoices/${INVOICE_ID}/payment-sheet`)
+      .expect(403);
+    expect(payments.paymentSheetForInvoice).not.toHaveBeenCalled();
   });
 });

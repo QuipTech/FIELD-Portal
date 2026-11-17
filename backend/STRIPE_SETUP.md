@@ -35,7 +35,13 @@ startup (`Stripe mode: test; tax on`).
    STRIPE_SECRET_KEY=sk_test_...
    STRIPE_WEBHOOK_SECRET=whsec_...   # from step 3 or 4 below
    STRIPE_TAX_ENABLED=true
+   STRIPE_PUBLISHABLE_KEY=pk_test_...   # same page, "Publishable key"
    ```
+
+   The publishable key is what the mobile app's Payment Sheet uses. It must
+   come from the same account and mode as the secret key: `pk_test_` with
+   `sk_test_`, `pk_live_` with `sk_live_`. The backend refuses to start on a
+   mismatch. Leave it unset and the app pays on a Stripe page instead.
 
    Leave the `.env.production` values empty until go-live.
 
@@ -101,7 +107,8 @@ Run the tests with `npx jest src/billing`.
 
 ## 5. Test cards
 
-Open the invoice's `hostedInvoiceUrl` and pay with:
+Open the invoice's `hostedInvoiceUrl` (or pay in the mobile app's Payment
+Sheet) with:
 
 | Card                  | Result                    |
 | --------------------- | ------------------------- |

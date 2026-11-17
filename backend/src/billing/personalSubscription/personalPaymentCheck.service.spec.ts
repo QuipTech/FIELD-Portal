@@ -68,6 +68,23 @@ const setup = (remoteStatus: string) => {
 beforeEach(() => jest.clearAllMocks());
 
 describe('personal payment check', () => {
+  it('records an invoice paid through its PaymentIntent from the Payment Sheet', async () => {
+    // The app calls check as soon as the sheet closes; the Stripe invoice
+    // (not the client) says whether it is paid.
+    const { service, client, stripe } = setup('paid');
+    stripe.retrieveInvoice.mockResolvedValue({
+      ...stripeInvoice('paid'),
+      payment_settings: { payment_method_types: ['card'] },
+    });
+    expect(await service.checkPayment(actor)).toEqual({
+      paymentRequired: false,
+    });
+    expect(applyInvoiceEventUpdate).toHaveBeenCalledWith(
+      client,
+      expect.objectContaining({ stripeInvoiceId: 'in_a', status: 'paid' }),
+    );
+  });
+
   it('records a payment Stripe has but whose webhook was missed', async () => {
     const { service, client, stripe } = setup('paid');
     expect(await service.checkPayment(actor)).toEqual({
