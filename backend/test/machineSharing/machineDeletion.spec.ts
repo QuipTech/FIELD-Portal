@@ -2,6 +2,9 @@ import { MachineDeletionService } from '../../src/machineLifecycle/machineDeleti
 import { PriceBooksService } from '../../src/billing/priceBooks/priceBooks.service';
 import { ASSET_PRO_V1 } from '../../src/billing/pricing/priceBookV1Fixture';
 import { UpFrontInvoiceService } from '../../src/billing/invoices/upFrontInvoice.service';
+import { PaymentSheet } from '../../src/billing/invoices/invoicePaymentSheet.service';
+import { StripeService } from '../../src/billing/stripe/stripe.service';
+import { StripeWebhookService } from '../../src/billing/webhooks/stripeWebhook.service';
 import { ListMachinesQueryDto } from '../../src/machineFleet/dto/listMachinesQueryDto';
 import { AuthenticatedUser } from '../../src/auth/types/authenticatedUser';
 import { listFinalChargedIntervals } from '../../src/billing/monthlyRun/runInvoices.repository';
@@ -36,6 +39,10 @@ describe('deleting a machine', () => {
   );
   const confirmCheckouts = jest.fn(async () => false);
   const refreshPaid = jest.fn(async () => false);
+  const openPaymentSheet = jest.fn<
+    Promise<PaymentSheet | null | 'unavailable'>,
+    [string]
+  >(async () => 'unavailable');
 
   beforeAll(async () => {
     fixture = await createBillingTestDatabase();
@@ -66,6 +73,7 @@ describe('deleting a machine', () => {
       openCheckout,
       confirmCheckouts,
       refreshPaid,
+      openPaymentSheet,
     } as unknown as UpFrontInvoiceService;
     const priceBooks = {
       getPinnedPriceBook: jest.fn(async () => ASSET_PRO_V1),
@@ -322,6 +330,144 @@ describe('deleting a machine', () => {
         const paid = await pay();
         expect(paid.paymentUrl).toBeNull();
         expect(paid.canDelete).toBe(true);
+      });
+    });
+
+    describe('paying in the mobile Payment Sheet', () => {
+      const HOSTED_URL = 'https://invoice.stripe.com/i/final';
+      const STRIPE_INVOICE_ID = 'in_final_charge';
+      const SHEET: PaymentSheet = {
+        publishableKey: 'pk_test_field',
+        // The final charge invoice's own PaymentIntent.
+        paymentIntentClientSecret: 'pi_final_secret_abc',
+        customerId: 'cus_test',
+        customerEphemeralKeySecret: 'ek_test_1',
+        merchantDisplayName: 'FIELD',
+      };
+      const payInApp = () =>
+        deletion.payFinalCharge(adminB, machineId(), RETURN_PAGE, NOV_20, {
+          inApp: true,
+        });
+      // What the real openPaymentSheet leaves behind: the invoice finalised
+      // on Stripe, with its hosted page.
+      const pushedToStripe = (invoiceId: string) =>
+        fixture.query(
+          `UPDATE billing.invoices SET status = 'synced', stripe_invoice_id = $2, hosted_invoice_url = $3
+           WHERE id = $1 AND status <> 'paid'`,
+          [invoiceId, STRIPE_INVOICE_ID, HOSTED_URL],
+        );
+
+      beforeEach(() => {
+        openCheckout.mockClear();
+        refreshPaid.mockImplementation(async () => false);
+        openPaymentSheet.mockReset().mockImplementation(async (invoiceId) => {
+          await pushedToStripe(invoiceId);
+          return SHEET;
+        });
+      });
+
+      it('returns the sheet while the charge is due, with paymentUrl on the same invoice', async () => {
+        await setUpDeactivated();
+        const raised = await payInApp();
+        expect(raised.blocker).toBe('unpaid_invoices');
+        expect(raised.paymentSheet).toEqual(SHEET);
+        expect(openPaymentSheet).toHaveBeenCalledWith(
+          raised.unpaidInvoices[0].id,
+        );
+        // Older app builds: the hosted page of the same Stripe invoice, so
+        // there is no second way to pay it.
+        expect(raised.paymentUrl).toBe(HOSTED_URL);
+        expect(openCheckout).not.toHaveBeenCalled();
+      });
+
+      it('repeat calls return the same PaymentIntent for the one charge', async () => {
+        await setUpDeactivated();
+        const first = await payInApp();
+        const second = await payInApp();
+        expect(second.paymentSheet?.paymentIntentClientSecret).toBe(
+          first.paymentSheet?.paymentIntentClientSecret,
+        );
+        const invoiceIds = openPaymentSheet.mock.calls.map(([id]) => id);
+        expect(new Set(invoiceIds).size).toBe(1);
+        const { rows } = await fixture.query(
+          `SELECT count(*)::int AS count FROM billing.invoices WHERE kind = 'machine_final'`,
+        );
+        expect(rows[0].count).toBe(1);
+      });
+
+      it('returns no sheet once the charge is paid, and allows the delete', async () => {
+        await setUpDeactivated();
+        await payInApp();
+        await markFinalPaid();
+        openPaymentSheet.mockClear();
+        const paid = await payInApp();
+        expect(paid.paymentSheet).toBeNull();
+        expect(paid.paymentUrl).toBeNull();
+        expect(paid.canDelete).toBe(true);
+        expect(openPaymentSheet).not.toHaveBeenCalled();
+      });
+
+      it('returns no sheet when Stripe turns out to have the payment already', async () => {
+        await setUpDeactivated();
+        await pay();
+        openPaymentSheet.mockImplementationOnce(async () => {
+          await markFinalPaid();
+          return null;
+        });
+        const paid = await payInApp();
+        expect(paid.paymentSheet).toBeNull();
+        expect(paid.canDelete).toBe(true);
+      });
+
+      it('clears the deletion blocker when the invoice.paid webhook arrives', async () => {
+        await setUpDeactivated();
+        const raised = await payInApp();
+        const invoiceId = raised.unpaidInvoices[0].id;
+        expect((await check()).canDelete).toBe(false);
+
+        const webhooks = new StripeWebhookService(
+          fixture.serviceDatabase,
+          {} as StripeService,
+        );
+        // The event Stripe sends once the sheet's PaymentIntent succeeds.
+        const outcome = await webhooks.handleEvent({
+          id: 'evt_final_paid',
+          type: 'invoice.paid',
+          data: {
+            object: {
+              id: STRIPE_INVOICE_ID,
+              status: 'paid',
+              metadata: { fieldInvoiceId: invoiceId },
+              total: 899,
+              total_excluding_tax: 817,
+              amount_paid: 899,
+              hosted_invoice_url: HOSTED_URL,
+            },
+          },
+        } as unknown as Parameters<StripeWebhookService['handleEvent']>[0]);
+        expect(outcome).toEqual({ status: 'processed' });
+
+        const after = await check();
+        expect(after.blocker).toBeNull();
+        expect(after.canDelete).toBe(true);
+        await deletion.deleteMachine(adminB, machineId(), 'Scrapped', NOV_20);
+        expect(await listed()).not.toContain(machineId());
+      });
+
+      it('falls back to Checkout when the sheet cannot take it (no address for GST)', async () => {
+        await setUpDeactivated();
+        openPaymentSheet.mockImplementation(async () => 'unavailable');
+        const raised = await payInApp();
+        expect(raised.paymentUrl).toBe(CHECKOUT_URL);
+        expect(raised.paymentSheet).toBeNull();
+      });
+
+      it('never gives the portal a sheet', async () => {
+        await setUpDeactivated();
+        const raised = await pay();
+        expect(raised.paymentSheet).toBeNull();
+        expect(raised.paymentUrl).toBe(CHECKOUT_URL);
+        expect(openPaymentSheet).not.toHaveBeenCalled();
       });
     });
 

@@ -12,6 +12,7 @@ import { OrganisationPlanService } from '../../src/billing/customerBilling/organ
 import { InvoicesService } from '../../src/billing/invoices/invoices.service';
 import { PersonalCheckoutService } from '../../src/billing/personalSubscription/personalCheckout.service';
 import { UpFrontInvoiceService } from '../../src/billing/invoices/upFrontInvoice.service';
+import { InvoicePaymentSheetService } from '../../src/billing/invoices/invoicePaymentSheet.service';
 import { OnboardingService } from '../../src/billing/onboarding/onboarding.service';
 import { PriceBooksService } from '../../src/billing/priceBooks/priceBooks.service';
 import { ReviewTasksService } from '../../src/billing/reviewTasks/reviewTasks.service';
@@ -78,6 +79,8 @@ describe('billing operations', () => {
         finaliseInvoice,
       } as unknown as InvoicesService,
       {} as PersonalCheckoutService,
+      { isAvailable: false } as InvoicePaymentSheetService,
+      {} as StripeService,
     );
     notifier = new BillingNotifier(db, { isConfigured: false } as EmailService);
   });

@@ -55,7 +55,8 @@ export const MACHINE_FINAL_INVOICE_KIND = 'machine_final';
 
 // kind 'monthly' (the run, in arrears, waits for review), 'annual' (a
 // term's up-front invoice), 'onboarding' (assisted onboarding on
-// completion) or 'machine_final' (paid on the spot through Stripe Checkout);
+// completion) or 'machine_final' (paid on the spot: Stripe Checkout, or the
+// mobile app's Payment Sheet);
 // annual and onboarding are finalised straight away.
 export const insertRunInvoice = async (
   client: PoolClient,
@@ -115,8 +116,9 @@ export const listInvoicesDueForFinalisation = async (
      WHERE (status = 'draft' AND kind = 'monthly' AND held_at IS NULL
             AND review_until <= $1)
         -- Up-front invoices whose Stripe push failed: retried. Not
-        -- machine_final: it's paid through Stripe Checkout, which creates its
-        -- own Stripe invoice, so pushing one too would bill it twice.
+        -- machine_final: it's paid on the spot (Stripe Checkout, which creates
+        -- its own Stripe invoice, or the app's Payment Sheet, which pushes it
+        -- itself), so pushing it here could bill it twice.
         OR (status IN ('draft', 'final') AND kind IN ('annual', 'onboarding')
             AND created_at <= $1::timestamptz - interval '10 minutes')
      ORDER BY coalesce(review_until, created_at), id`,

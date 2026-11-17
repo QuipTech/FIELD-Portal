@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpCode,
   Param,
   ParseUUIDPipe,
@@ -22,6 +23,10 @@ import {
   PayFinalChargeDto,
 } from './dto/lifecycleActionDtos';
 import { toReturnOrigin } from '../billing/personalSubscription/personalCheckout.service';
+import {
+  parseRequestSource,
+  REQUEST_SOURCE_HEADER,
+} from '../common/requestSource/requestSource';
 import { MACHINE_LIFECYCLE_PERMISSION } from './lifecycleTransitions';
 import { MachineDeletionService } from './machineDeletion.service';
 import { MachineLifecycleService } from './machineLifecycle.service';
@@ -106,6 +111,9 @@ export class MachineLifecycleController {
 
   // Raises the days-used charge and returns the Stripe Checkout URL to pay
   // it; Checkout returns to the machine's page. Then delete. Safe to repeat.
+  // Any client but the portal (X-Field-Client: web) is the mobile app and
+  // also gets paymentSheet. The header only picks how to pay: payment is
+  // still confirmed by Stripe, never by the client.
   @Post(':machineId/final-charge')
   @HttpCode(200)
   @RequirePermissions(MACHINE_LIFECYCLE_PERMISSION)
@@ -113,11 +121,14 @@ export class MachineLifecycleController {
     @CurrentUser() actor: AuthenticatedUser,
     @Param('machineId', ParseUUIDPipe) machineId: string,
     @Body() dto: PayFinalChargeDto,
+    @Headers(REQUEST_SOURCE_HEADER) client?: string,
   ) {
     return this.deletionService.payFinalCharge(
       actor,
       machineId,
       `${toReturnOrigin(dto.returnOrigin)}/machines/${machineId}`,
+      undefined,
+      { inApp: parseRequestSource(client) !== 'web' },
     );
   }
 
