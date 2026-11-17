@@ -204,4 +204,29 @@ describe('InvoiceStripeSyncService', () => {
       expect(retrieveInvoice).not.toHaveBeenCalled();
     });
   });
+
+  it('makes a card-only invoice for the Payment Sheet and never charges a saved card', async () => {
+    stripe.hasDefaultPaymentMethod.mockResolvedValue(true);
+    await service.pushInvoice(state.invoices[0], { forPaymentSheet: true });
+    expect(stripe.createInvoice).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chargeAutomatically: false,
+        paymentMethodTypes: ['card'],
+      }),
+      expect.any(String),
+    );
+    expect(stripe.hasDefaultPaymentMethod).not.toHaveBeenCalled();
+    expect(stripe.payInvoice).not.toHaveBeenCalled();
+    expect(state.invoices[0]).toMatchObject({
+      status: 'synced',
+      hosted_invoice_url: 'https://invoice.stripe.com/i/test',
+    });
+  });
+
+  it('leaves other invoices on the account defaults', async () => {
+    await service.pushInvoice(state.invoices[0]);
+    expect(stripe.createInvoice.mock.calls[0][0]).not.toHaveProperty(
+      'paymentMethodTypes',
+    );
+  });
 });

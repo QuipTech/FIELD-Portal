@@ -110,6 +110,36 @@ export class PersonalCheckoutService {
     return paid ? this.recordPayment(paid) : false;
   };
 
+  // Before an invoice moves to a Stripe Invoice (mobile Payment Sheet), no
+  // Checkout session for it may stay payable: its payment would create a
+  // second Stripe invoice that our invoice no longer matches, and the payer
+  // could pay twice. 'paid' when Checkout already took the payment (now
+  // recorded); 'closed' once every open session is expired.
+  closeCheckout = async (
+    invoice: InvoiceRow,
+    customerId: string,
+  ): Promise<'paid' | 'closed'> => {
+    const sessions = await this.stripe.listCheckoutSessions(
+      customerId,
+      invoice.id,
+    );
+    const paid = sessions.find(isPaid);
+    if (paid) {
+      await this.recordPayment(paid);
+      return 'paid';
+    }
+    for (const session of sessions.filter((item) => item.status === 'open')) {
+      try {
+        await this.stripe.expireCheckoutSession(session.id);
+      } catch (error) {
+        // Completed between the list and the expire: count it as paid.
+        if (await this.confirmPayment(invoice, customerId)) return 'paid';
+        throw error;
+      }
+    }
+    return 'closed';
+  };
+
   private recordPayment = async (
     session: Stripe.Checkout.Session,
   ): Promise<boolean> => {

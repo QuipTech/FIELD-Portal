@@ -93,6 +93,7 @@ Migration 0098 must be applied before the portal's personal billing flow is used
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
 - `STRIPE_TAX_ENABLED`
+- `STRIPE_PUBLISHABLE_KEY` (mobile Payment Sheet; same account and mode as the secret key)
 - `BILLING_RUN_ENABLED` (monthly run; off unless `true`)
 - `SERVICE_DATABASE_URL`
 - `SES_FROM_EMAIL`, `NOTIFICATIONS_ENABLED` (for the invoice email)

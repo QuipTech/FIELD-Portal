@@ -22,11 +22,57 @@ invoice's paid status and recorded paid amount confirm it.
 
 ### POST /me/billing/payment
 
-Body: `{ line1, city, state, postalCode }`, an Australian billing address.
-State is ACT/NSW/NT/QLD/SA/TAS/VIC/WA; postalCode is a four-digit string.
-Address is sent to the personal Stripe Customer so Stripe Tax can calculate GST.
-No card information passes through FIELD. Response is GET /me/billing plus
-`paymentUrl`, a Stripe hosted invoice URL (null if already paid).
+Body: `{ line1, city, state, postalCode, returnOrigin?, returnTo? }`, an
+Australian billing address. State is ACT/NSW/NT/QLD/SA/TAS/VIC/WA; postalCode
+is a four-digit string. `returnTo` is `"portal"` (default) or `"app"` (the
+mobile app). Address is sent to the personal Stripe Customer so Stripe Tax can
+calculate GST. No card information passes through FIELD.
+
+Response is GET /me/billing plus:
+
+```
+paymentUrl:   string | null   // a Stripe page to pay on; null when nothing is due
+paymentSheet: {               // null when nothing is due (see below)
+  publishableKey: string,             // pk_ key, same Stripe account and mode as the server
+  paymentIntentClientSecret: string,  // the invoice's own PaymentIntent
+  customerId: string | null,          // enables saved cards
+  customerEphemeralKeySecret: string | null, // only together with customerId; new on every call
+  merchantDisplayName: string | null  // "FIELD"
+} | null
+```
+
+**Portal** (`returnTo` omitted or `"portal"`): unchanged. `paymentUrl` is
+Stripe Checkout, which returns to `/settings/billing`, or the hosted invoice
+page when the invoice is already on Stripe. `paymentSheet` is always null.
+
+**Mobile app** (`returnTo: "app"`): the month's invoice is created on Stripe
+as a Stripe Invoice (Stripe Tax, card payments only) and finalised. Any open
+Checkout session for it is expired first, so the invoice can only be paid one
+way. `paymentSheet` carries the client secret of **that invoice's own
+PaymentIntent** (`confirmation_secret`, Stripe API 2026-08-26.dahlia): paying
+it in the Payment Sheet pays the invoice. No separate PaymentIntent is ever
+created. `paymentUrl` is the same invoice's hosted page, for older app builds.
+Repeat calls while the invoice is open return the same invoice and
+PaymentIntent (with a fresh ephemeral key), never a second charge.
+
+`paymentSheet` is null when:
+
+- nothing is due: the month is paid, the caller is covered by their
+  organisation, the Stripe invoice is paid, void or uncollectible, or its
+  amount due is 0. `paymentRequired` is then false, or becomes false once
+  the payment is recorded;
+- the request is from the portal (see above);
+- `STRIPE_PUBLISHABLE_KEY` is not configured. App requests then get Checkout
+  exactly as before.
+
+Owners (exempt) still receive 403. When `paymentSheet` is present,
+`publishableKey` and `paymentIntentClientSecret` are non-empty strings.
+
+The sheet closing is not a payment confirmation. Payment is recorded only from
+Stripe: the `invoice.paid` webhook, or `POST /me/billing/payment/check` (which
+reads the invoice from Stripe), so the app should call check when the sheet
+closes. A declined card leaves the invoice open (`payment_failed`), and the
+next call returns the same PaymentIntent to retry.
 
 Owners receive 403. Invalid input receives 400. Stripe failures leave a saved
 invoice for retry. One user and calendar month has exactly one invoice, with
@@ -34,6 +80,23 @@ a transaction advisory lock preventing concurrent creation. Stripe writes reuse
 the existing invoice/item idempotency keys. A void or refunded invoice is
 marked replaced (kept in the history and audited) and the month gets a fresh
 invoice when the user confirms again. A payment_failed invoice is reused.
+
+### POST /me/billing/payment/check
+
+No body. Asks Stripe about this month's invoice and records it as paid if
+Stripe has the payment (hosted page, Checkout or Payment Sheet), exactly as
+the `invoice.paid` webhook would. Returns GET /me/billing.
+
+### POST /me/billing/invoices/:invoiceId/payment-sheet
+
+No body. Returns `{ paymentSheet }`, the same shape as above, for an earlier
+invoice of the caller's that is still unpaid. The invoice is moved to a
+card-only Stripe Invoice first if it is not on Stripe yet, using the billing
+address already saved on the caller's Stripe customer. Returns 200 with
+`{ paymentSheet: null }` for a paid, void or refunded invoice (or when the
+publishable key is not configured), and 404 for an invoice that is not the
+caller's own or a malformed id. Payment is recorded by the `invoice.paid`
+webhook; `/me/billing/payment/check` only looks at this month's invoice.
 
 ### GET /me/billing/invoices
 

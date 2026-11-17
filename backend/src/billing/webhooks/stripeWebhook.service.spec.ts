@@ -52,6 +52,25 @@ beforeEach(() => {
 });
 
 describe('StripeWebhookService', () => {
+  it('marks the invoice paid when it was paid through its PaymentIntent in the mobile Payment Sheet', async () => {
+    // The same invoice.paid event Stripe sends for the hosted page: the
+    // invoice's own PaymentIntent succeeded, so the invoice itself is paid.
+    const outcome = await service.handleEvent(
+      invoiceEvent('evt_sheet', 'invoice.paid', {
+        status: 'paid',
+        amount_due: 16500,
+        amount_remaining: 0,
+        payment_settings: { payment_method_types: ['card'] },
+        confirmation_secret: null,
+      }),
+    );
+    expect(outcome).toEqual({ status: 'processed' });
+    expect(state.invoices[0]).toMatchObject({
+      status: 'paid',
+      amount_paid_cents: '16500',
+    });
+  });
+
   it('sets our invoice to paid on invoice.paid, with Stripe totals', async () => {
     const outcome = await service.handleEvent(
       invoiceEvent('evt_1', 'invoice.paid'),

@@ -5,12 +5,14 @@ import { StripeService } from '../stripe/stripe.service';
 import { findInvoice } from '../invoices/invoices.repository';
 import {
   findPersonalAccount,
+  findPersonalInvoiceHistory,
   findPersonalPeriods,
   markPersonalPeriodReplaced,
 } from './personalSubscription.repository';
 import { PersonalInvoiceService } from './personalInvoice.service';
 import { PersonalSubscriptionService } from './personalSubscription.service';
 import { PersonalCheckoutService } from './personalCheckout.service';
+import { InvoicePaymentSheetService } from '../invoices/invoicePaymentSheet.service';
 
 jest.mock('../invoices/invoices.repository', () => ({
   findInvoice: jest.fn(),
@@ -18,6 +20,7 @@ jest.mock('../invoices/invoices.repository', () => ({
 jest.mock('./personalSubscription.repository', () => ({
   findPersonalAccount: jest.fn(),
   findPersonalPeriods: jest.fn(),
+  findPersonalInvoiceHistory: jest.fn(),
   markPersonalPeriodReplaced: jest.fn(),
 }));
 
@@ -45,6 +48,13 @@ const status = {
 };
 
 const CHECKOUT_URL = 'https://checkout.stripe.com/c/pay/a';
+const PAYMENT_SHEET = {
+  publishableKey: 'pk_test_field',
+  paymentIntentClientSecret: 'pi_invoice_a_secret_abc',
+  customerId: 'cus_a',
+  customerEphemeralKeySecret: 'ek_test_1',
+  merchantDisplayName: 'FIELD',
+};
 
 const setup = () => {
   const client = {
@@ -68,10 +78,15 @@ const setup = () => {
       .fn()
       .mockResolvedValue({ id: 'book-a', unitCents: 4900 }),
   };
+  const paymentSheets = {
+    isAvailable: true,
+    forInvoice: jest.fn().mockResolvedValue(PAYMENT_SHEET),
+  };
   jest.mocked(findInvoice).mockResolvedValue({
     id: 'invoice-a',
     billing_account_id: 'account-a',
     status: 'draft',
+    stripe_invoice_id: null,
     hosted_invoice_url: null,
   } as Awaited<ReturnType<typeof findInvoice>>);
   jest.mocked(findPersonalAccount).mockResolvedValue({
@@ -86,8 +101,18 @@ const setup = () => {
     checkout as unknown as PersonalCheckoutService,
     stripe as unknown as StripeService,
     books as unknown as PriceBooksService,
+    paymentSheets as unknown as InvoicePaymentSheetService,
   );
-  return { service, client, subscriptions, accounts, checkout, stripe, books };
+  return {
+    service,
+    client,
+    subscriptions,
+    accounts,
+    checkout,
+    stripe,
+    books,
+    paymentSheets,
+  };
 };
 
 beforeEach(() => jest.clearAllMocks());
@@ -110,6 +135,7 @@ describe('personal payment invoice creation', () => {
     });
     expect(await service.createPayment(actor, address)).toMatchObject({
       paymentUrl: null,
+      paymentSheet: null,
     });
     expect(client.query).not.toHaveBeenCalled();
   });
@@ -141,9 +167,13 @@ describe('personal payment invoice creation', () => {
     );
   });
 
-  it('opens Checkout that returns to the mobile app when it asks', async () => {
-    const { service, checkout } = setup();
-    await service.createPayment(actor, { ...address, returnTo: 'app' });
+  it('opens Checkout that returns to the mobile app when the Payment Sheet is not configured', async () => {
+    const { service, checkout, paymentSheets } = setup();
+    paymentSheets.isAvailable = false;
+    expect(
+      await service.createPayment(actor, { ...address, returnTo: 'app' }),
+    ).toMatchObject({ paymentUrl: CHECKOUT_URL, paymentSheet: null });
+    expect(paymentSheets.forInvoice).not.toHaveBeenCalled();
     expect(checkout.openCheckout).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'invoice-a' }),
       'cus_a',
@@ -232,8 +262,175 @@ describe('personal payment invoice creation', () => {
     } as Awaited<ReturnType<typeof findInvoice>>);
     expect(await service.createPayment(actor, address)).toMatchObject({
       paymentUrl: status.hostedInvoiceUrl,
+      paymentSheet: null,
     });
     expect(checkout.openCheckout).not.toHaveBeenCalled();
     expect(stripe.updateBillingAddress).not.toHaveBeenCalled();
+  });
+});
+
+describe('personal payment in the mobile Payment Sheet', () => {
+  const app = { ...address, returnTo: 'app' as const };
+
+  it("returns paymentSheet and keeps paymentUrl (the same invoice's hosted page)", async () => {
+    const { service, checkout, paymentSheets } = setup();
+    const response = await service.createPayment(actor, app);
+    expect(response).toMatchObject({
+      ...status,
+      paymentUrl: status.hostedInvoiceUrl,
+      paymentSheet: PAYMENT_SHEET,
+    });
+    expect(paymentSheets.forInvoice).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'invoice-a' }),
+    );
+    // No Checkout session competes with the invoice's own PaymentIntent.
+    expect(checkout.openCheckout).not.toHaveBeenCalled();
+  });
+
+  it('saves the billing address before the invoice goes to Stripe, so GST is right', async () => {
+    const { service, stripe, paymentSheets } = setup();
+    await service.createPayment(actor, app);
+    expect(stripe.updateBillingAddress).toHaveBeenCalledWith('cus_a', app);
+    expect(
+      stripe.updateBillingAddress.mock.invocationCallOrder[0],
+    ).toBeLessThan(paymentSheets.forInvoice.mock.invocationCallOrder[0]);
+  });
+
+  it('leaves the address alone once the Stripe invoice exists (its tax is fixed)', async () => {
+    const { service, stripe, paymentSheets } = setup();
+    jest.mocked(findInvoice).mockResolvedValue({
+      id: 'invoice-a',
+      billing_account_id: 'account-a',
+      status: 'synced',
+      stripe_invoice_id: 'in_a',
+      hosted_invoice_url: status.hostedInvoiceUrl,
+    } as Awaited<ReturnType<typeof findInvoice>>);
+    expect(await service.createPayment(actor, app)).toMatchObject({
+      paymentSheet: PAYMENT_SHEET,
+    });
+    expect(stripe.updateBillingAddress).not.toHaveBeenCalled();
+    expect(paymentSheets.forInvoice).toHaveBeenCalledTimes(1);
+  });
+
+  it('two calls in a row reuse one invoice and return the same PaymentIntent', async () => {
+    const { service, client, paymentSheets } = setup();
+    const first = await service.createPayment(actor, app);
+    jest
+      .mocked(findPersonalPeriods)
+      .mockResolvedValue([
+        { period_start: status.periodStart, invoice_id: 'invoice-a' },
+      ] as Awaited<ReturnType<typeof findPersonalPeriods>>);
+    const second = await service.createPayment(actor, app);
+    const inserts = client.query.mock.calls.filter(([sql]) =>
+      String(sql).includes('INSERT INTO billing.invoices'),
+    );
+    expect(inserts).toHaveLength(1);
+    expect(paymentSheets.forInvoice.mock.calls.map(([row]) => row.id)).toEqual([
+      'invoice-a',
+      'invoice-a',
+    ]);
+    expect(second.paymentSheet?.paymentIntentClientSecret).toBe(
+      first.paymentSheet?.paymentIntentClientSecret,
+    );
+  });
+
+  it('returns null paymentSheet when the payment was taken meanwhile', async () => {
+    const { service, subscriptions, paymentSheets } = setup();
+    paymentSheets.forInvoice.mockResolvedValue(null);
+    subscriptions.getStatus
+      .mockResolvedValueOnce(status)
+      .mockResolvedValueOnce({ ...status, paymentRequired: false });
+    expect(await service.createPayment(actor, app)).toMatchObject({
+      paymentRequired: false,
+      paymentUrl: null,
+      paymentSheet: null,
+    });
+  });
+
+  it.each([
+    ['covered by the organisation', { coveredByOrganisation: true }],
+    ['already paid', { invoiceStatus: 'paid' }],
+  ])('returns null paymentSheet when %s', async (_label, override) => {
+    const { service, client, subscriptions, paymentSheets } = setup();
+    subscriptions.getStatus.mockResolvedValue({
+      ...status,
+      ...override,
+      paymentRequired: false,
+    });
+    expect(await service.createPayment(actor, app)).toMatchObject({
+      paymentUrl: null,
+      paymentSheet: null,
+    });
+    expect(paymentSheets.forInvoice).not.toHaveBeenCalled();
+    expect(client.query).not.toHaveBeenCalled();
+  });
+
+  it('refuses Owners (exempt) with 403 and no paymentSheet', async () => {
+    const { service, subscriptions, paymentSheets } = setup();
+    subscriptions.getStatus.mockResolvedValue({ ...status, exempt: true });
+    await expect(service.createPayment(actor, app)).rejects.toThrow('Owners');
+    expect(paymentSheets.forInvoice).not.toHaveBeenCalled();
+  });
+
+  it('never gives the portal a paymentSheet: it keeps Checkout', async () => {
+    const { service, paymentSheets } = setup();
+    expect(await service.createPayment(actor, address)).toMatchObject({
+      paymentUrl: CHECKOUT_URL,
+      paymentSheet: null,
+    });
+    expect(paymentSheets.forInvoice).not.toHaveBeenCalled();
+  });
+});
+
+describe('Payment Sheet for an earlier unpaid invoice', () => {
+  const period = (fields: Record<string, unknown>) =>
+    ({
+      invoice_id: 'invoice-old',
+      period_start: '2026-09-01',
+      status: 'synced',
+      amount_refunded_cents: '0',
+      ...fields,
+    }) as Awaited<ReturnType<typeof findPersonalInvoiceHistory>>[number];
+
+  it("returns the sheet for one of the caller's own unpaid invoices", async () => {
+    const { service, paymentSheets } = setup();
+    jest.mocked(findPersonalInvoiceHistory).mockResolvedValue([period({})]);
+    jest.mocked(findInvoice).mockResolvedValue({
+      id: 'invoice-old',
+      status: 'synced',
+    } as Awaited<ReturnType<typeof findInvoice>>);
+    expect(await service.paymentSheetForInvoice(actor, 'invoice-old')).toEqual({
+      paymentSheet: PAYMENT_SHEET,
+    });
+    expect(findPersonalInvoiceHistory).toHaveBeenCalledWith(
+      expect.anything(),
+      actor,
+    );
+    expect(paymentSheets.forInvoice).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'invoice-old' }),
+    );
+  });
+
+  it("404s for an invoice that isn't the caller's", async () => {
+    const { service, paymentSheets } = setup();
+    jest.mocked(findPersonalInvoiceHistory).mockResolvedValue([period({})]);
+    await expect(
+      service.paymentSheetForInvoice(actor, 'someone-elses'),
+    ).rejects.toThrow('Invoice not found.');
+    expect(findInvoice).not.toHaveBeenCalled();
+    expect(paymentSheets.forInvoice).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['paid', { status: 'paid' }],
+    ['void', { status: 'void' }],
+    ['refunded', { status: 'paid', amount_refunded_cents: '5390' }],
+  ])('returns null for a %s invoice', async (_label, fields) => {
+    const { service, paymentSheets } = setup();
+    jest.mocked(findPersonalInvoiceHistory).mockResolvedValue([period(fields)]);
+    expect(await service.paymentSheetForInvoice(actor, 'invoice-old')).toEqual({
+      paymentSheet: null,
+    });
+    expect(paymentSheets.forInvoice).not.toHaveBeenCalled();
   });
 });
