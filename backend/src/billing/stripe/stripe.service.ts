@@ -90,7 +90,7 @@ export class StripeService {
       this.settings.publishableKey,
     );
     this.logger.log(
-      `Stripe mode: ${this.settings.mode}; tax ${this.settings.isTaxEnabled ? 'on' : 'off'}`,
+      `Stripe mode: ${this.settings.mode}; tax ${this.settings.isTaxEnabled ? 'on' : 'off'}; mobile Payment Sheet ${this.settings.publishableKey ? 'on' : 'off (STRIPE_PUBLISHABLE_KEY not set)'}`,
     );
   }
 
@@ -247,7 +247,12 @@ export class StripeService {
     });
     if ('deleted' in customer && customer.deleted) return false;
     const status = (customer as Stripe.Customer).tax?.automatic_tax;
-    return status === 'supported' || status === 'not_collecting';
+    const canTax = status === 'supported' || status === 'not_collecting';
+    if (!canTax)
+      this.logger.warn(
+        `Stripe Tax can't place customer ${customerId} (automatic_tax: ${status ?? 'none'}); it needs a billing address.`,
+      );
+    return canTax;
   };
 
   // A credit note for part or all of a finalised invoice: amountCents is
