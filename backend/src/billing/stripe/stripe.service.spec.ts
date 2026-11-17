@@ -2,10 +2,10 @@ import { ConfigService } from '@nestjs/config';
 import { STRIPE_API_VERSION, StripeService } from './stripe.service';
 
 // The request shapes sent to Stripe, checked against a fake SDK client.
-const createService = () => {
+const createService = (env: Record<string, string> = {}) => {
   const service = new StripeService({
     get: (key: string) =>
-      ({ STRIPE_SECRET_KEY: 'sk_test_example', NODE_ENV: 'test' })[key],
+      ({ STRIPE_SECRET_KEY: 'sk_test_example', NODE_ENV: 'test', ...env })[key],
   } as unknown as ConfigService);
   const client = {
     invoices: {
@@ -14,6 +14,7 @@ const createService = () => {
       finalizeInvoice: jest.fn().mockResolvedValue({ id: 'in_a' }),
     },
     ephemeralKeys: { create: jest.fn().mockResolvedValue({ secret: 'ek' }) },
+    customers: { retrieve: jest.fn() },
     checkout: { sessions: { expire: jest.fn().mockResolvedValue({}) } },
   };
   (service as unknown as { client: typeof client }).client = client;
@@ -77,5 +78,34 @@ describe('StripeService Payment Sheet calls', () => {
     const { service, client } = createService();
     await service.expireCheckoutSession('cs_a');
     expect(client.checkout.sessions.expire).toHaveBeenCalledWith('cs_a');
+  });
+
+  it.each([
+    ['supported', true],
+    ['not_collecting', true],
+    ['unrecognized_location', false],
+    ['failed', false],
+  ])(
+    'can tax a customer whose automatic tax is %s: %s',
+    async (automaticTax, expected) => {
+      const { service, client } = createService({ STRIPE_TAX_ENABLED: 'true' });
+      client.customers.retrieve.mockResolvedValue({
+        id: 'cus_a',
+        tax: { automatic_tax: automaticTax },
+      });
+      expect(await service.canTaxCustomer('cus_a')).toBe(expected);
+      expect(client.customers.retrieve).toHaveBeenCalledWith('cus_a', {
+        expand: ['tax'],
+      });
+    },
+  );
+
+  it('cannot tax a deleted customer, and needs no check with tax off', async () => {
+    const taxed = createService({ STRIPE_TAX_ENABLED: 'true' });
+    taxed.client.customers.retrieve.mockResolvedValue({ deleted: true });
+    expect(await taxed.service.canTaxCustomer('cus_a')).toBe(false);
+    const untaxed = createService();
+    expect(await untaxed.service.canTaxCustomer('cus_a')).toBe(true);
+    expect(untaxed.client.customers.retrieve).not.toHaveBeenCalled();
   });
 });

@@ -11,7 +11,11 @@ import {
   firstDayOfNextMonth,
   toBillingDay,
 } from '../billing/billingCalendar/billingDay';
-import { UpFrontInvoiceService } from '../billing/invoices/upFrontInvoice.service';
+import {
+  PAYMENT_SHEET_UNAVAILABLE,
+  UpFrontInvoiceService,
+} from '../billing/invoices/upFrontInvoice.service';
+import { PaymentSheet } from '../billing/invoices/invoicePaymentSheet.service';
 import {
   hasRunInvoice,
   MACHINE_FINAL_INVOICE_KIND,
@@ -49,7 +53,15 @@ const NOTHING_TO_PAY_MESSAGE =
 
 export type FinalChargePayment = MachineDeletionCheck & {
   paymentUrl: string | null;
+  // The mobile app's Payment Sheet for the final charge; null when nothing
+  // is left to pay, for the portal, or when only Checkout can take it.
+  paymentSheet: PaymentSheet | null;
 };
+
+export interface FinalChargePaymentOptions {
+  // From the mobile app: pay in the Payment Sheet rather than Checkout.
+  inApp?: boolean;
+}
 
 const formatRate = (cents: number) => `A$${(cents / 100).toFixed(2)}`;
 const formatMonth = (day: string) =>
@@ -109,12 +121,14 @@ export class MachineDeletionService {
   // Stripe Checkout to pay it: paymentUrl is where to send the payer, who
   // comes back to returnPage. Null once nothing is left to pay here. If Stripe
   // fails they get the error, and the invoice stays saved. Safe to repeat: a
-  // second call finds the first charge and its open Checkout.
+  // second call finds the first charge and its open Checkout. From the app
+  // (inApp) it returns paymentSheet instead, paying the same invoice.
   payFinalCharge = async (
     actor: AuthenticatedUser,
     machineId: string,
     returnPage: string,
     now = new Date(),
+    options: FinalChargePaymentOptions = {},
   ): Promise<FinalChargePayment> => {
     const { check, machine, intervals, today, label } = await this.readCheck(
       actor,
@@ -122,10 +136,18 @@ export class MachineDeletionService {
       now,
     );
     if (check.blocker === 'unpaid_invoices') {
-      return this.openPayment(actor, machineId, label, returnPage, now);
+      return this.openPayment(
+        actor,
+        machineId,
+        label,
+        returnPage,
+        now,
+        options,
+      );
     }
     if (check.blocker !== 'final_charge_due') {
-      if (check.canDelete) return { ...check, paymentUrl: null };
+      if (check.canDelete)
+        return { ...check, paymentUrl: null, paymentSheet: null };
       throw new ConflictException({
         statusCode: 409,
         code: check.blocker,
@@ -205,7 +227,7 @@ export class MachineDeletionService {
       }
       return invoice;
     });
-    return this.openPayment(actor, machineId, label, returnPage, now);
+    return this.openPayment(actor, machineId, label, returnPage, now, options);
   };
 
   // The payment page for the machine's unpaid final charge: its Stripe
@@ -217,14 +239,37 @@ export class MachineDeletionService {
     label: string,
     returnPage: string,
     now: Date,
+    { inApp = false }: FinalChargePaymentOptions = {},
   ): Promise<FinalChargePayment> => {
     const check = await this.checkDeletion(actor, machineId, now);
     const finalCharge = check.unpaidInvoices.find(
       (invoice) => invoice.isFinalCharge,
     );
-    if (!finalCharge) return { ...check, paymentUrl: null };
+    if (!finalCharge) return { ...check, paymentUrl: null, paymentSheet: null };
+    if (inApp) {
+      const paymentSheet = await this.upFrontInvoices.openPaymentSheet(
+        finalCharge.id,
+      );
+      if (paymentSheet !== PAYMENT_SHEET_UNAVAILABLE) {
+        // Read again: the invoice is now on Stripe (paymentUrl is its hosted
+        // page, for older app builds), or was found paid.
+        const fresh = await this.checkDeletion(actor, machineId, now);
+        const charge = fresh.unpaidInvoices.find(
+          (invoice) => invoice.id === finalCharge.id,
+        );
+        return {
+          ...fresh,
+          paymentUrl: charge?.hostedInvoiceUrl ?? null,
+          paymentSheet: charge ? paymentSheet : null,
+        };
+      }
+    }
     if (finalCharge.hostedInvoiceUrl) {
-      return { ...check, paymentUrl: finalCharge.hostedInvoiceUrl };
+      return {
+        ...check,
+        paymentUrl: finalCharge.hostedInvoiceUrl,
+        paymentSheet: null,
+      };
     }
     const paymentUrl = await this.upFrontInvoices.openCheckout(finalCharge.id, {
       returnPage,
@@ -233,8 +278,12 @@ export class MachineDeletionService {
     });
     // Null: Checkout was already paid, and is now recorded.
     return paymentUrl
-      ? { ...check, paymentUrl }
-      : { ...(await this.checkDeletion(actor, machineId, now)), paymentUrl };
+      ? { ...check, paymentUrl, paymentSheet: null }
+      : {
+          ...(await this.checkDeletion(actor, machineId, now)),
+          paymentUrl,
+          paymentSheet: null,
+        };
   };
 
   // Checked again inside the transaction, whatever the screen showed.

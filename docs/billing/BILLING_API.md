@@ -106,6 +106,60 @@ totalCents, hostedInvoiceUrl }]`. Nullable amounts mean tax has not yet been
 calculated. Only the authenticated user's invoices in their current tenant
 are returned, including when multiple users share an organisation.
 
+## Machine final charge
+
+### POST /machines/:machineId/final-charge
+
+Requires `machine.lifecycle`. Body: `{ returnOrigin? }`. Raises the machine's
+final charge (one `machine_final` invoice, days used) if it isn't raised yet,
+then returns GET /machines/:machineId/deletion-check plus:
+
+```
+paymentUrl:   string | null   // a Stripe page to pay on; null when nothing is left to pay
+paymentSheet: {               // null when nothing is left to pay (see below)
+  publishableKey: string,             // pk_ key, same Stripe account and mode as the server
+  paymentIntentClientSecret: string,  // the final charge invoice's own PaymentIntent
+  customerId: string | null,          // the organisation's Stripe customer (saved cards)
+  customerEphemeralKeySecret: string | null, // only together with customerId; new on every call
+  merchantDisplayName: string | null  // "FIELD"
+} | null
+```
+
+**Portal** (`X-Field-Client: web`): unchanged. `paymentUrl` is Stripe Checkout
+(it asks for the billing address and returns to `/machines/:id`), or the
+hosted invoice page once the invoice is on Stripe. `paymentSheet` is always null.
+
+**Mobile app** (any other `X-Field-Client`, including none): the final charge
+invoice is created on Stripe as a Stripe Invoice (Stripe Tax, card payments
+only) and finalised. Any open Checkout session for it is expired first (or
+recorded, if it was already paid), so the charge can only be paid one way.
+`paymentSheet` carries the client secret of **that invoice's own
+PaymentIntent** (`confirmation_secret`, Stripe API 2026-08-26.dahlia). No
+separate PaymentIntent is created, and none is stored. `paymentUrl` is the same
+invoice's hosted page, for older app builds. Repeat calls while it's unpaid
+return the same invoice and PaymentIntent (with a fresh ephemeral key).
+
+`paymentSheet` is null when:
+
+- nothing is left to pay: the charge is paid (`canDelete` may then be true),
+  or Stripe already has the payment (it is recorded on the spot), or the
+  Stripe invoice is void or has nothing due;
+- the request is from the portal;
+- `STRIPE_PUBLISHABLE_KEY` is not set, or Stripe Tax has no address for the
+  organisation's Stripe customer yet. Checkout asks for the address and a
+  Stripe Invoice can't, so the app gets Checkout in `paymentUrl` instead.
+  After one Checkout payment the address is saved for next time.
+
+Payment is never taken from the client. The `invoice.paid` webhook marks the
+charge paid. GET /machines/:machineId/deletion-check also asks Stripe about an
+unpaid invoice that is on Stripe, so the blocker clears even before the webhook
+arrives. Once paid, deletion-check reports `canDelete: true` (when nothing
+else blocks it). The app should call deletion-check when the sheet closes.
+
+Errors: 409 with the blocker's `code` when the machine can't be charged yet
+(for example still active), 502 with Stripe's message when Stripe fails (the
+invoice stays saved; calling again retries).
+
 ## Existing platform admin APIs
 
 Require platform.manage (the existing Owner role), not a new super_admin role.

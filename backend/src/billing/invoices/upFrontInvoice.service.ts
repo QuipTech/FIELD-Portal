@@ -11,6 +11,15 @@ import { insertRunInvoice } from '../monthlyRun/runInvoices.repository';
 import { Subscription } from '../subscriptions/subscriptionTypes';
 import { InvoicesService } from './invoices.service';
 import { calculateAnnualTermLine } from './upFrontLines';
+import {
+  InvoicePaymentSheetService,
+  PaymentSheet,
+} from './invoicePaymentSheet.service';
+import { StripeService } from '../stripe/stripe.service';
+
+// Why an invoice can't be paid in the Payment Sheet here: the caller then
+// opens Checkout as before.
+export const PAYMENT_SHEET_UNAVAILABLE = 'unavailable';
 
 // Invoices raised at the moment they occur (spec section 9): an annual
 // term's up-front payment and assisted onboarding. Same path as the
@@ -27,6 +36,8 @@ export class UpFrontInvoiceService {
     private readonly priceBooks: PriceBooksService,
     private readonly invoices: InvoicesService,
     private readonly checkout: PersonalCheckoutService,
+    private readonly paymentSheets: InvoicePaymentSheetService,
+    private readonly stripe: StripeService,
   ) {}
 
   // Once per annual term (uq_invoices_account_annual_term). The invoice
@@ -160,6 +171,36 @@ export class UpFrontInvoiceService {
         account.stripe_customer_id as string,
         { ...options, collectBillingAddress: true },
       );
+    } catch (error) {
+      throw toStripeGatewayError(error);
+    }
+  };
+
+  // Paying an invoice on the spot (a machine's final charge) in the mobile
+  // Payment Sheet instead of Checkout: the invoice becomes a card-only Stripe
+  // Invoice and the sheet pays its own PaymentIntent. Open Checkout sessions
+  // for it are expired first, so it can be paid only once. Null when nothing
+  // is left to pay (a payment already taken is recorded).
+  // PAYMENT_SHEET_UNAVAILABLE without a publishable key, or while Stripe Tax
+  // has no address for the customer: Checkout asks for one, a Stripe
+  // Invoice can't, so the caller opens Checkout instead.
+  openPaymentSheet = async (
+    invoiceId: string,
+  ): Promise<PaymentSheet | null | typeof PAYMENT_SHEET_UNAVAILABLE> => {
+    if (!this.paymentSheets.isAvailable) return PAYMENT_SHEET_UNAVAILABLE;
+    try {
+      const invoice = await this.requireInvoiceRow(invoiceId);
+      // Not finalised on Stripe yet, so GST is still to be worked out.
+      if (!invoice.hosted_invoice_url) {
+        const account = await this.billingAccounts.ensureStripeCustomer(
+          await this.billingAccounts.requireAccount(invoice.billing_account_id),
+        );
+        const canTax = await this.stripe.canTaxCustomer(
+          account.stripe_customer_id as string,
+        );
+        if (!canTax) return PAYMENT_SHEET_UNAVAILABLE;
+      }
+      return await this.paymentSheets.forInvoice(invoice);
     } catch (error) {
       throw toStripeGatewayError(error);
     }

@@ -237,6 +237,19 @@ export class StripeService {
     );
   };
 
+  // True when Stripe Tax can work out GST for the customer, so an invoice
+  // for them can be finalised (Stripe refuses one with
+  // customer_tax_location_invalid otherwise). Always true with tax off.
+  canTaxCustomer = async (customerId: string): Promise<boolean> => {
+    if (!this.settings.isTaxEnabled) return true;
+    const customer = await this.require().customers.retrieve(customerId, {
+      expand: ['tax'],
+    });
+    if ('deleted' in customer && customer.deleted) return false;
+    const status = (customer as Stripe.Customer).tax?.automatic_tax;
+    return status === 'supported' || status === 'not_collecting';
+  };
+
   // A credit note for part or all of a finalised invoice: amountCents is
   // the GST-inclusive amount given back (credited to the balance, or
   // refunded if the invoice was paid).
