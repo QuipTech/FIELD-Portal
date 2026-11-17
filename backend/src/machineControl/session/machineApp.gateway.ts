@@ -10,6 +10,7 @@ import {
   SubscribeMessage,
   WebSocketGateway,
 } from '@nestjs/websockets';
+import { randomUUID } from 'crypto';
 import { isUUID } from 'class-validator';
 import { Namespace, Socket } from 'socket.io';
 import { AuthenticatedUser } from '../../auth/types/authenticatedUser';
@@ -47,6 +48,7 @@ export class MachineAppGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
   private readonly logger = new Logger(MachineAppGateway.name);
+  private readonly instanceId = randomUUID();
 
   constructor(
     private readonly jwtService: JwtService,
@@ -75,8 +77,14 @@ export class MachineAppGateway
   handleConnection = async (socket: Socket) => {
     const { device } = socket.data as SocketData;
     if (!device) return;
+    socket.prependOnceListener('disconnect', (reason) => {
+      socket.data.disconnectReason = reason;
+    });
     await socket.join(deviceRoom(device.deviceId));
     await this.sessions.setTabletOnline(device.deviceId, socket.id, true);
+    if (!socket.connected)
+      await this.sessions.setTabletOnline(device.deviceId, socket.id, false);
+    await this.trace('connected', socket, device);
   };
 
   // A tablet going offline, or a portal person leaving, makes the session
@@ -91,6 +99,13 @@ export class MachineAppGateway
     await work.catch((error: unknown) =>
       this.logger.warn(`Machine app disconnect failed: ${String(error)}`),
     );
+    if (device)
+      await this.trace(
+        'disconnected',
+        socket,
+        device,
+        socket.data.disconnectReason,
+      );
   };
 
   // The reply says where the machine stands right now; events follow.
@@ -127,6 +142,30 @@ export class MachineAppGateway
       await this.sessions.unwatch(socket.id, machineId);
     }
     return { ok: true };
+  }
+
+  private async trace(
+    event: string,
+    socket: Socket,
+    device: PairedDevice,
+    reason?: string,
+  ) {
+    const presence = await this.sessions
+      .getState(device.machineId)
+      .catch(() => null);
+    this.logger.log(
+      JSON.stringify({
+        event,
+        presence,
+        deviceId: device.deviceId,
+        machineId: device.machineId,
+        socketId: socket.id,
+        instanceId: this.instanceId,
+        buildSha: process.env.BUILD_SHA ?? 'unknown',
+        utc: new Date().toISOString(),
+        ...(reason ? { reason } : {}),
+      }),
+    );
   }
 
   private authenticate = async (socket: Socket): Promise<Error | undefined> => {

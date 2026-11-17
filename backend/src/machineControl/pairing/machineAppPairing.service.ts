@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Injectable,
-  NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { randomInt } from 'crypto';
@@ -19,7 +18,6 @@ import * as pairingRepository from './machineAppPairing.repository';
 
 const MAX_CODE_ATTEMPTS = 10;
 const CODE_REFUSED_MESSAGE = "That code isn't valid or has expired.";
-const NOT_CONNECTED_MESSAGE = 'This machine has no machine app connected.';
 
 export interface MachineAppConnection {
   connected: boolean;
@@ -130,7 +128,7 @@ export class MachineAppPairingService {
         client,
         machineId,
       );
-      if (!wasConnected) throw new NotFoundException(NOT_CONNECTED_MESSAGE);
+      if (!wasConnected) return;
       await authRepository.insertAuditLog(client, {
         tenantId: actor.tenantId,
         userId: actor.userId,

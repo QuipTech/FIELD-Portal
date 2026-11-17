@@ -4,17 +4,18 @@ import { useEffect } from "react";
 import { listMcDevicesRequest } from "../api/machineControlApi";
 import { useApiResource } from "../hooks/useApiResource";
 
-// Tablets report every 30 seconds, so their online status is re-read as often.
-const REFRESH_EVERY_MS = 30_000;
+// Refresh pairing and live presence without a manual page reload.
+const REFRESH_EVERY_MS = 5_000;
 
 export const useMcDevices = () => {
   const devices = useApiResource(listMcDevicesRequest, [], "Couldn't load your machines' tablets.");
-  const { reload } = devices;
+  const { reload, isLoading } = devices;
 
   useEffect(() => {
-    const timer = setInterval(reload, REFRESH_EVERY_MS);
-    return () => clearInterval(timer);
-  }, [reload]);
+    if (isLoading) return;
+    const timer = setTimeout(reload, REFRESH_EVERY_MS);
+    return () => clearTimeout(timer);
+  }, [reload, isLoading]);
 
   return devices;
 };

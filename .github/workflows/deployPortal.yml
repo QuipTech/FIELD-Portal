@@ -90,6 +90,8 @@ jobs:
           file: deploy/docker/api.Dockerfile
           push: true
           tags: ${{ steps.tags.outputs.apiImage }}
+          build-args: |
+            BUILD_SHA=${{ github.sha }}
           cache-from: type=gha,scope=api
           cache-to: type=gha,scope=api,mode=max
       - name: Build and push portal image

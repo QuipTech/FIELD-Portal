@@ -16,7 +16,7 @@ export const DevicesTable = ({ devices }: { devices: McDevice[] }) => (
         <TableHeaderCell flex={1}>Site</TableHeaderCell>
         <TableHeaderCell flex={2}>Tablet</TableHeaderCell>
         <TableHeaderCell flex={1.6}>Status</TableHeaderCell>
-        <TableHeaderCell flex={1.1}>Connected</TableHeaderCell>
+        <TableHeaderCell flex={1.1}>Paired</TableHeaderCell>
         <TableHeaderCell flex={0.4}>
           <span className="sr-only">Open</span>
         </TableHeaderCell>

@@ -19,8 +19,8 @@ describe("ConnectMachineAppButton", () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  it("says Connected once the machine has paired", () => {
+  it("says Paired once the machine has paired", () => {
     render(<ConnectMachineAppButton isConnected onClick={vi.fn()} />);
-    expect(screen.getByRole("button", { name: "Connected" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Paired" })).toBeTruthy();
   });
 });

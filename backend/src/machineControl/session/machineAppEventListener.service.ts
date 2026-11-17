@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'crypto';
 import { Namespace } from 'socket.io';
 import { PgChannelListener } from '../../database/pgChannelListener';
 import {
@@ -16,6 +17,7 @@ import {
 @Injectable()
 export class MachineAppEventListenerService implements OnModuleDestroy {
   private readonly logger = new Logger(MachineAppEventListenerService.name);
+  private readonly instanceId = randomUUID();
   private namespace: Namespace | null = null;
   private listener: PgChannelListener | null = null;
 
@@ -40,6 +42,18 @@ export class MachineAppEventListenerService implements OnModuleDestroy {
     try {
       const { event, ...body } = JSON.parse(payload) as MachineAppEvent;
       const { deviceId, machineId } = body;
+      this.logger.log(
+        JSON.stringify({
+          event: 'session_event_forwarded',
+          socketEvent: event,
+          deviceId,
+          machineId,
+          reason: body.reason,
+          instanceId: this.instanceId,
+          buildSha: process.env.BUILD_SHA ?? 'unknown',
+          utc: new Date().toISOString(),
+        }),
+      );
       this.namespace?.to(machineWatchRoom(machineId)).emit(event, body);
       if (event !== MACHINE_APP_EVENTS.sessionStarted) {
         this.namespace?.to(deviceRoom(deviceId)).emit(event, body);

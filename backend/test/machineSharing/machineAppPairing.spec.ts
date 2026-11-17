@@ -144,7 +144,7 @@ describe('machine app pairing', () => {
     expect(rows[0].revoked_at).not.toBeNull();
     await expect(
       pairing.disconnect(actors.adminA, world.shared1.id),
-    ).rejects.toMatchObject({ status: 404 });
+    ).resolves.toBeUndefined();
     await newCode(world.shared1.id);
   });
 

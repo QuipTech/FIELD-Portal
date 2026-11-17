@@ -12,13 +12,12 @@ import { EmptyState } from "@/components/ui/emptyState";
 import { LoadErrorState } from "@/components/ui/loadErrorState";
 import { LoadingSpinner } from "@/components/ui/loadingSpinner";
 import { Tag } from "@/components/ui/tag";
-import { disconnectMachineAppRequest, getMachineAppConnectionRequest } from "@/lib/api/machineAppConnectionApi";
+import { disconnectMachineAppRequest } from "@/lib/api/machineAppConnectionApi";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import { PERMISSIONS } from "@/lib/auth/permissionCodes";
 import { formatShortDateTime } from "@/lib/format/shortDate";
 import { canContributeTo } from "@/lib/machineDetail/machineAccessRules";
-import { machineCacheKeys } from "@/lib/machineDetail/machineDetailCacheKeys";
-import { useCachedResource } from "@/lib/machineDetail/useCachedResource";
+import { useMachineAppStatus } from "@/components/machines/machineApp/useMachineAppStatus";
 import { useMachineDetail } from "../machineDetailContext";
 import { usePermissions } from "@/lib/auth/usePermissions";
 import { MachineControlOffNotice } from "@/components/machineControl/machineControlOffNotice";
@@ -29,11 +28,7 @@ const MachineAppPage = () => {
   const { machineControlEnabled } = usePermissions();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
-  const connection = useCachedResource(
-    machineCacheKeys.appConnection(machineId),
-    () => getMachineAppConnectionRequest(machineId),
-    "Couldn't load this machine's connection.",
-  );
+  const connection = useMachineAppStatus(machineId, machineControlEnabled);
   const canManage = canContributeTo(machine);
   const label = machine?.assetId ?? "";
   const device = connection.data?.device ?? null;
@@ -50,10 +45,11 @@ const MachineAppPage = () => {
 
   return (
     <section className="flex flex-col gap-4">
+      {connection.error && <p role="status" className="text-sm text-bodyGray">{connection.error}</p>}
       {!device ? (
         <EmptyState
           icon="cloud"
-          title="Machine app not connected"
+          title="Machine app unpaired"
           description="Connect this machine's tablet to the FIELD machine app with a 6-digit code."
           actions={
             canManage && (
@@ -69,7 +65,10 @@ const MachineAppPage = () => {
           <div className="flex flex-wrap items-center gap-2">
             <Tag tone="ok">
               <Icon name="check" className="h-3.5 w-3.5" />
-              Connected
+              Paired
+            </Tag>
+            <Tag tone={!connection.error && connection.data?.session?.tabletOnline ? "ok" : "default"}>
+              {connection.error || !connection.data?.session ? "Status unavailable" : connection.data.session.tabletOnline ? "Online" : "Offline"}
             </Tag>
             <span className="text-sm text-bodyGray">Since {formatShortDateTime(device.pairedAt)}</span>
             {canManage && (

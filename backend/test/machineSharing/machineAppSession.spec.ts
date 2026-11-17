@@ -144,7 +144,11 @@ describe('machine app live session', () => {
       event: 'session:ended',
       reason: 'tablet_disconnected',
     });
-    await expect(sessions.endSession(deviceToken)).rejects.toMatchObject({
+    await expect(sessions.endSession(deviceToken)).resolves.toBeUndefined();
+    expect(
+      (await announced()).filter((event) => event.event === 'session:ended'),
+    ).toHaveLength(1);
+    await expect(sessions.endSession('unknown-token')).rejects.toMatchObject({
       status: 401,
     });
   });
@@ -155,13 +159,24 @@ describe('machine app live session', () => {
     await pairing.disconnect(actors.adminA, world.shared1.id);
     expect(await sessions.authenticate(deviceToken)).toBeNull();
     expect(await sessions.authenticate(newToken)).toBeNull();
+    await expect(
+      pairing.disconnect(actors.adminA, world.shared1.id),
+    ).resolves.toBeUndefined();
+    const rows = await fixture.query(
+      'SELECT online_socket_id, online_since FROM mc_devices WHERE machine_id = $1',
+      [world.shared1.id],
+    );
+    expect(rows.rows[0]).toMatchObject({
+      online_socket_id: null,
+      online_since: null,
+    });
     expect(await lastAnnounced()).toEqual({
       event: 'session:ended',
       reason: 'portal_disconnected',
     });
   });
 
-  it('clears sockets of a dead container and ends long-offline sessions', async () => {
+  it('clears stale presence without revoking long-offline pairing', async () => {
     const { deviceId, deviceToken } = await pairTablet();
     await sessions.setTabletOnline(deviceId, 'tablet-1', true);
     await sessions.watch('portal-1', world.shared1.id);
@@ -182,11 +197,49 @@ describe('machine app live session', () => {
     await fixture.query(
       `UPDATE mc_devices SET last_seen_at = now() - interval '31 minutes'`,
     );
-    expect(await sessions.sweep(90, 30)).toBe(1);
-    expect(await sessions.authenticate(deviceToken)).toBeNull();
-    expect(await lastAnnounced()).toEqual({
-      event: 'session:ended',
-      reason: 'connection_timeout',
+    expect(await sessions.sweep(90, 30)).toBe(0);
+    expect(await sessions.authenticate(deviceToken)).not.toBeNull();
+    expect(
+      (await pairing.getConnection(actors.adminA, world.shared1.id)).connected,
+    ).toBe(true);
+    expect(
+      (await announced()).some((event) => event.event === 'session:ended'),
+    ).toBe(false);
+  });
+  it('an old disconnect retry cannot revoke a replacement pairing', async () => {
+    const old = await pairTablet();
+    await sessions.endSession(old.deviceToken);
+    const replacement = await pairTablet();
+    await sessions.setTabletOnline(replacement.deviceId, 'new-socket', true);
+    await sessions.endSession(old.deviceToken);
+    await sessions.setTabletOnline(old.deviceId, 'old-socket', false);
+    expect(await sessions.authenticate(replacement.deviceToken)).not.toBeNull();
+    expect((await sessions.getState(world.shared1.id)).tabletOnline).toBe(true);
+  });
+
+  it('an expired rotated token cannot end a live pairing', async () => {
+    const old = await pairTablet();
+    const refreshed = await sessions.refreshToken(old.deviceToken);
+    await fixture.query(
+      "UPDATE mc_device_credentials SET revoked_at = now() - interval '1 second' WHERE revoked_at IS NOT NULL",
+    );
+    await expect(sessions.endSession(old.deviceToken)).rejects.toMatchObject({
+      status: 401,
     });
+    expect(await sessions.authenticate(refreshed.deviceToken)).not.toBeNull();
+  });
+
+  it('an old socket heartbeat cannot keep a newer missing socket online', async () => {
+    const { deviceId } = await pairTablet();
+    await sessions.setTabletOnline(deviceId, 'old', true);
+    await sessions.setTabletOnline(deviceId, 'new', true);
+    await fixture.query(
+      "UPDATE mc_devices SET last_seen_at = now() - interval '2 minutes'",
+    );
+    await sessions.touchLiveSockets([deviceId], ['old']);
+    await sessions.sweep(90, 30);
+    expect((await sessions.getState(world.shared1.id)).tabletOnline).toBe(
+      false,
+    );
   });
 });

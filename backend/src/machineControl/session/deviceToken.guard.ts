@@ -16,9 +16,9 @@ interface DeviceRequest extends Request {
   mcDeviceToken?: string;
 }
 
-const readBearerToken = (request: Request): string | null => {
-  const [scheme, token] = (request.headers.authorization ?? '').split(' ');
-  return scheme === 'Bearer' && token ? token : null;
+export const readBearerToken = (authorization?: string): string | null => {
+  const match = /^Bearer ([^\s]+)$/i.exec(authorization ?? '');
+  return match?.[1] ?? null;
 };
 
 // A paired tablet's REST calls: `Authorization: Bearer <deviceToken>`.
@@ -29,7 +29,7 @@ export class DeviceTokenGuard implements CanActivate {
 
   canActivate = async (context: ExecutionContext): Promise<boolean> => {
     const request = context.switchToHttp().getRequest<DeviceRequest>();
-    const token = readBearerToken(request);
+    const token = readBearerToken(request.headers.authorization);
     const device = token && (await this.sessions.authenticate(token));
     if (!device) throw revokedTokenError();
     request.mcDevice = device;

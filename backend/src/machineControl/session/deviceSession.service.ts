@@ -90,6 +90,16 @@ export class DeviceSessionService {
     if (!ended) throw revokedTokenError();
   };
 
+  // Reconcile an already-authenticated socket by its device identity, not its
+  // handshake token: token rotation must not terminate a healthy live socket.
+  isCurrentDevice = async (device: PairedDevice): Promise<boolean> => {
+    const { rows } = await this.databaseService.query<{ device_id: string }>(
+      'SELECT device_id FROM mc_session_state($1)',
+      [device.machineId],
+    );
+    return rows[0]?.device_id === device.deviceId;
+  };
+
   setTabletOnline = (deviceId: string, socketId: string, online: boolean) =>
     sessionRepository.setDeviceOnline(this.databaseService, {
       deviceId,
