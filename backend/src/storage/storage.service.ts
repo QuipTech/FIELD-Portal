@@ -76,6 +76,17 @@ export class StorageService {
     );
   };
 
+  uploadMachineDesign = (
+    file: IncomingFile,
+    tenantId: string,
+    fileName: string,
+  ): Promise<StoredFile> =>
+    this.storeFile(
+      buildDocumentKey(tenantId, fileName),
+      file,
+      'application/octet-stream',
+    );
+
   uploadAvatar = (
     file: IncomingFile | undefined,
     tenantId: string,
