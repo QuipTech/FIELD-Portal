@@ -6,7 +6,7 @@ export interface DesignUploadFile {
 export const selectDesignFiles = (files: FileList): DesignUploadFile[] =>
   Array.from(files, (file) => ({
     file,
-    path: file.webkitRelativePath.split("/").slice(1).join("/") || file.name,
+    path: file.webkitRelativePath?.split("/").slice(1).join("/") || file.name,
   }));
 
 export async function readDroppedDesignFiles(transfer: DataTransfer): Promise<DesignUploadFile[]> {

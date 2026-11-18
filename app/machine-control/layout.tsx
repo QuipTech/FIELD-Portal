@@ -12,7 +12,13 @@ import { summariseDevices } from "@/lib/types/machineControl";
 const HeaderWithCounts = () => {
   const { data } = useMcDevicesContext();
   const summary = data ? summariseDevices(data) : null;
-  return <MachineControlHeader onlineCount={summary?.online ?? null} connectedCount={summary?.connected ?? null} />;
+  return (
+    <MachineControlHeader
+      onlineCount={summary?.online ?? null}
+      connectedCount={summary?.connected ?? null}
+      connectedMachineLabel={data?.items.length === 1 ? data.items[0].machine.label : undefined}
+    />
+  );
 };
 
 // Machine Control: banner and tabs over every section, behind the
