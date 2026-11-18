@@ -68,7 +68,7 @@ export const createPriceBookRequest = (accessToken: string, input: NewPriceBook)
 export const listBillingConfigRequest = (accessToken: string) =>
   apiRequest<BillingConfigEntry[]>("/admin/billing/config", { headers: authorizationHeader(accessToken) });
 
-export const updateBillingConfigRequest = (accessToken: string, key: string, value: number | string | null) =>
+export const updateBillingConfigRequest = (accessToken: string, key: string, value: number | string | boolean | number[] | null) =>
   post(accessToken, `/admin/billing/config/${key}`, { value }, "PUT");
 
 export const listReviewTasksRequest = (accessToken: string, status: "open" | "closed") =>

@@ -1,5 +1,10 @@
 # Personal TECH payment operations
 
+> With `REQUIRE_USER_SUBSCRIPTION` false (the default since migration 0130)
+> nobody is asked for a personal payment. Card or 30-day accounts, reminders,
+> free periods and promo codes: see PAYMENT_TERMS.md. Apply migrations 0130 and
+> 0131, and fill in the bank details config before approving an account.
+
 Apply migrations through backend/db/applyMigrations.sh with the migration role.
 0098 creates personal account and period mappings; it does not change an
 organisation's billing account or move existing data. Do not run migrations
@@ -43,6 +48,6 @@ administrator held it (`POST /admin/billing/invoices/:id/hold`). Drafts in
 review: `GET /admin/billing/invoices?status=draft`. Details:
 backend/src/billing/monthlyRun/README.md.
 
-No overdue-reminder, suspension, credit-note or partner-statement job exists
-yet. Those remain required by the full specification; see
-implementationPlan.md.
+Payment reminders (`INVOICE_REMINDER_OFFSET_DAYS`) and the credit limit
+warning run in the same hourly job; suspension stays a manual platform admin
+action. Partner statements are not built yet; see implementationPlan.md.

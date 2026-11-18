@@ -27,6 +27,9 @@ export const invoicePaymentSheetFinalizeKey = (invoiceId: string) =>
 
 export const invoicePayKey = (invoiceId: string) => `invoice:${invoiceId}:pay`;
 
+export const invoicePaidOutOfBandKey = (invoiceId: string) =>
+  `invoice:${invoiceId}:paid-out-of-band`;
+
 export const creditNoteCreateKey = (creditNoteId: string) =>
   `credit-note:${creditNoteId}:create`;
 

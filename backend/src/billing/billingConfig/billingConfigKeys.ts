@@ -10,7 +10,12 @@ export type BillingConfigValueKind =
   | 'nonNegativeInteger'
   | 'ratio'
   | 'optionalPositiveNumber'
-  | 'timeZone';
+  | 'timeZone'
+  | 'boolean'
+  // Free text; may be empty (e.g. bank details not filled in yet).
+  | 'text'
+  // Whole numbers, each between -365 and 365 (reminder offsets in days).
+  | 'dayOffsets';
 
 export const BILLING_CONFIG_KEYS = {
   ENTERPRISE_THRESHOLD_MACHINES: 'positiveInteger',
@@ -31,15 +36,27 @@ export const BILLING_CONFIG_KEYS = {
   CANCEL_EXPORT_DAYS: 'positiveInteger',
   CANCEL_DELETE_DAYS: 'positiveInteger',
   SUSPENSION_NOTICE_DAYS: 'positiveInteger',
+  REQUIRE_USER_SUBSCRIPTION: 'boolean',
+  ACCOUNT_DEFAULT_TERMS_DAYS: 'positiveInteger',
+  BANK_ACCOUNT_NAME: 'text',
+  BANK_BSB: 'text',
+  BANK_ACCOUNT_NUMBER: 'text',
+  PAYMENT_REFERENCE_FORMAT: 'text',
+  INVOICE_REMINDER_OFFSET_DAYS: 'dayOffsets',
 } as const satisfies Record<string, BillingConfigValueKind>;
 
 export type BillingConfigKey = keyof typeof BILLING_CONFIG_KEYS;
 
-type ValueOfKind<Kind extends BillingConfigValueKind> = Kind extends 'timeZone'
+type ValueOfKind<Kind extends BillingConfigValueKind> = Kind extends
+  'timeZone' | 'text'
   ? string
   : Kind extends 'optionalPositiveNumber'
     ? number | null
-    : number;
+    : Kind extends 'boolean'
+      ? boolean
+      : Kind extends 'dayOffsets'
+        ? number[]
+        : number;
 
 export type BillingConfig = {
   [Key in BillingConfigKey]: ValueOfKind<(typeof BILLING_CONFIG_KEYS)[Key]>;
@@ -47,7 +64,7 @@ export type BillingConfig = {
 
 export interface BillingConfigEntry {
   key: BillingConfigKey;
-  value: number | string | null;
+  value: number | string | boolean | number[] | null;
   isFinal: boolean;
   description: string;
   updatedAt: string;

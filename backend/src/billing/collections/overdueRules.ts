@@ -1,6 +1,7 @@
-// Pure rules for overdue invoices (spec section 9): notices on day 1 and
-// day 7 overdue, and suspension allowed only after the written notice
-// period (SUSPENSION_NOTICE_DAYS) from the first notice.
+// Pure rules for unpaid invoices: reminders on a configurable schedule
+// around the due date (INVOICE_REMINDER_OFFSET_DAYS), suspension allowed
+// SUSPENSION_NOTICE_DAYS after the earliest unpaid due date, and the credit
+// limit warning. Nothing here ever blocks an account by itself.
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -10,28 +11,62 @@ export const daysBetween = (from: string, to: string): number =>
     (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS,
   );
 
-export type OverdueNotice = 'day1' | 'day7';
+export type CollectionMethod = 'charge_automatically' | 'send_invoice';
 
-// The notice due today for an unpaid invoice, if any. The day-7 notice is
-// never sent before the day-1 one.
-export const findNoticeDue = (params: {
+// The reminder to send today, as its offset from the due date, or null.
+// Only the latest reminder that has come round is sent: one missed while
+// the job was down is superseded by the next, never sent late as a burst.
+// A card that is charged automatically gets no "coming up" reminders.
+export const findReminderDue = (params: {
   dueOn: string;
   today: string;
-  notice1SentAt: Date | null;
-  notice7SentAt: Date | null;
-}): OverdueNotice | null => {
-  const daysOverdue = daysBetween(params.dueOn, params.today);
-  if (daysOverdue < 1) return null;
-  if (!params.notice1SentAt) return 'day1';
-  if (daysOverdue >= 7 && !params.notice7SentAt) return 'day7';
-  return null;
+  offsets: number[];
+  sentOffsets: number[];
+  collectionMethod: CollectionMethod | null;
+}): number | null => {
+  const daysFromDue = daysBetween(params.dueOn, params.today);
+  const latest = params.offsets
+    .filter((offset) => offset <= daysFromDue)
+    .filter(
+      (offset) =>
+        offset >= 0 || params.collectionMethod !== 'charge_automatically',
+    )
+    .sort((a, b) => b - a)[0];
+  if (latest === undefined) return null;
+  if (params.sentOffsets.some((sent) => sent >= latest)) return null;
+  return latest;
 };
 
-// The first day suspension is allowed, or null when no notice was sent.
+// How many days before the due date the first reminder goes out (0 when
+// none are before it), so the job only reads invoices that could need one.
+export const reminderLeadDays = (offsets: number[]): number =>
+  Math.max(0, ...offsets.map((offset) => -offset));
+
+// The first day suspension is allowed: the notice period counts from the
+// earliest unpaid due date. null when nothing is overdue.
 export const firstSuspensionDay = (
-  firstNoticeSentAt: Date | null,
+  firstUnpaidDueOn: string | null,
   noticeDays: number,
 ): Date | null =>
-  firstNoticeSentAt
-    ? new Date(firstNoticeSentAt.getTime() + noticeDays * DAY_MS)
+  firstUnpaidDueOn
+    ? new Date(
+        Date.parse(`${firstUnpaidDueOn}T00:00:00Z`) + noticeDays * DAY_MS,
+      )
     : null;
+
+export type CreditLimitAction = 'warn' | 'clear' | null;
+
+// Warn once each time the unpaid balance goes over the limit; clear the
+// flag once it's back at or under, so the next crossing warns again.
+export const findCreditLimitAction = (params: {
+  unpaidCents: number;
+  creditLimitCents: number | null;
+  warned: boolean;
+}): CreditLimitAction => {
+  const over =
+    params.creditLimitCents !== null &&
+    params.unpaidCents > params.creditLimitCents;
+  if (over && !params.warned) return 'warn';
+  if (!over && params.warned) return 'clear';
+  return null;
+};

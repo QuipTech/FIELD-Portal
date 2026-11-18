@@ -36,6 +36,7 @@ const address = {
   postalCode: '4000',
 };
 const status = {
+  userSubscriptionRequired: true,
   exempt: false,
   paymentRequired: true,
   priceBookId: 'book-a',
@@ -118,6 +119,19 @@ const setup = () => {
 beforeEach(() => jest.clearAllMocks());
 
 describe('personal payment invoice creation', () => {
+  it('refuses with 409 when there is no user subscription, before any write', async () => {
+    const { service, client, subscriptions } = setup();
+    subscriptions.getStatus.mockResolvedValue({
+      ...status,
+      userSubscriptionRequired: false,
+      paymentRequired: false,
+    });
+    await expect(service.createPayment(actor, address)).rejects.toMatchObject({
+      status: 409,
+    });
+    expect(client.query).not.toHaveBeenCalled();
+  });
+
   it('refuses Owner payments before any money-changing write', async () => {
     const { service, client, subscriptions } = setup();
     subscriptions.getStatus.mockResolvedValue({ ...status, exempt: true });

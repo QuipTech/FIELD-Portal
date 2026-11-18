@@ -42,7 +42,8 @@ export interface OrganisationBillingSummary {
   overdue: {
     count: number;
     amountCents: number;
-    firstNoticeAt: string | null;
+    // The earliest unpaid due date that has passed.
+    firstDueOn: string | null;
     suspensionFrom: string | null;
   };
   allowance: {

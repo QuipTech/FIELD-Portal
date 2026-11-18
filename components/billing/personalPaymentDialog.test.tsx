@@ -8,7 +8,7 @@ vi.mock("@/lib/api/personalBillingApi", () => ({ createPersonalPayment: vi.fn(),
 vi.mock("@/lib/auth/authSession", () => ({ getAccessToken: () => "test-token" }));
 vi.mock("../shell/logoutButton", () => ({ LogoutButton: () => <button type="button">Log out</button> }));
 const status: PersonalBillingStatus = {
-  exempt: false, coveredByOrganisation: false, paymentRequired: true, monthlyCents: 4900, currency: "AUD",
+  userSubscriptionRequired: true, exempt: false, coveredByOrganisation: false, paymentRequired: true, monthlyCents: 4900, currency: "AUD",
   timezone: "Australia/Brisbane", periodStart: "2026-10-01", periodEnd: "2026-11-01",
   invoiceId: null, invoiceStatus: null, gstCents: null, totalCents: null, hostedInvoiceUrl: null,
 };

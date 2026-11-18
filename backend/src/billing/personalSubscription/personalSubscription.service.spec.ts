@@ -34,6 +34,7 @@ const setup = (
   roles: string[],
   periods: PersonalPeriodRow[] = [],
   hasOrganisationSeat = false,
+  requireUserSubscription = true,
 ) => {
   const roleClient = {
     query: jest
@@ -69,12 +70,44 @@ const setup = (
     {
       loadConfig: async () => ({
         DEFAULT_BILLING_TIMEZONE: 'Australia/Brisbane',
+        REQUIRE_USER_SUBSCRIPTION: requireUserSubscription,
       }),
     } as BillingConfigService,
     books as unknown as PriceBooksService,
   );
   return { service, serviceDatabase, tenantDatabase, books };
 };
+
+describe('no user paywall (REQUIRE_USER_SUBSCRIPTION false)', () => {
+  it.each([
+    'Customer',
+    'Technician',
+    'Support Agent',
+    'Read-only viewer',
+    'Owner',
+  ])(
+    'requires no payment from %s and reads no personal invoices',
+    async (role) => {
+      const { service, serviceDatabase, books } = setup(
+        [role],
+        [],
+        false,
+        false,
+      );
+      expect(
+        await service.getStatus(actor, new Date('2026-10-20T00:00:00Z')),
+      ).toMatchObject({
+        userSubscriptionRequired: false,
+        paymentRequired: false,
+        monthlyCents: 0,
+        periodStart: '2026-10-01',
+        periodEnd: '2026-11-01',
+      });
+      expect(serviceDatabase.query).not.toHaveBeenCalled();
+      expect(books.getPriceBookInEffect).not.toHaveBeenCalled();
+    },
+  );
+});
 
 describe('personal subscription payment', () => {
   it('exempts the current database Owner role, without consulting personal invoices', async () => {

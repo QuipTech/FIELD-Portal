@@ -1,7 +1,9 @@
 import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import { AuthenticatedUser } from '../../auth/types/authenticatedUser';
 import { ServiceDatabaseService } from '../../database/serviceDatabase.service';
+import { findAccountTerms } from '../accountTerms/accountTerms.repository';
 import { BillingAccountsService } from '../billingAccounts/billingAccounts.service';
+import { BillingNotifier } from '../billingNotices/billingNotifier.service';
 import { recordBillingAudit } from '../billingAudit/billingAudit';
 import { InvoicesService } from '../invoices/invoices.service';
 import { InvoiceDetail } from '../invoices/types/invoiceResponse';
@@ -22,6 +24,7 @@ export class InvoiceReviewService {
     private readonly serviceDatabase: ServiceDatabaseService,
     private readonly billingAccounts: BillingAccountsService,
     private readonly invoices: InvoicesService,
+    private readonly notifier: BillingNotifier,
   ) {}
 
   finaliseDueInvoices = async (now: Date): Promise<string[]> => {
@@ -38,12 +41,38 @@ export class InvoiceReviewService {
         );
         await this.invoices.finaliseInvoice(id, account.billing_email);
         finalised.push(id);
+        await this.warnIfPoMissing(invoice.billingAccountId, invoice.poNumber);
       } catch (error) {
         // Left as it is; the next run retries without duplicating anything.
         this.logger.error(`Finalising invoice ${id} failed: ${String(error)}`);
       }
     }
     return finalised;
+  };
+
+  // A PO number is required but none was given: the invoice still went out
+  // (with "PO: Not provided") and QuipTech is told, so it can follow up.
+  private warnIfPoMissing = async (
+    billingAccountId: string,
+    invoicePoNumber: string | null,
+  ): Promise<void> => {
+    try {
+      const terms = await findAccountTerms(
+        this.serviceDatabase,
+        billingAccountId,
+      );
+      if (!terms?.po_required || invoicePoNumber || terms.default_po_number)
+        return;
+      await this.notifier.notifyPlatformAdmins({
+        title: 'Invoice sent without a PO number',
+        body: `${terms.name} requires a PO number, but none was entered before its invoice was finalised. It was sent marked "PO number: Not provided".`,
+        link: '/admin/billing-accounts',
+      });
+    } catch (error) {
+      this.logger.warn(
+        `PO check for account ${billingAccountId} failed: ${String(error)}`,
+      );
+    }
   };
 
   holdInvoice = async (

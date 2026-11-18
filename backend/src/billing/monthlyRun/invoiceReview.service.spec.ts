@@ -2,6 +2,7 @@ import { ConflictException } from '@nestjs/common';
 import { ServiceDatabaseService } from '../../database/serviceDatabase.service';
 import { BillingAccountsService } from '../billingAccounts/billingAccounts.service';
 import { InvoicesService } from '../invoices/invoices.service';
+import { BillingNotifier } from '../billingNotices/billingNotifier.service';
 import { InvoiceReviewService } from './invoiceReview.service';
 import * as runInvoicesRepository from './runInvoices.repository';
 
@@ -36,6 +37,7 @@ const setup = () => {
     database as unknown as ServiceDatabaseService,
     accounts as unknown as BillingAccountsService,
     invoices as unknown as InvoicesService,
+    { notifyPlatformAdmins: jest.fn() } as unknown as BillingNotifier,
   );
   return { service, client, invoices };
 };

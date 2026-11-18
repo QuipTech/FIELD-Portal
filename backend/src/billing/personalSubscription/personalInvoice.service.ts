@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -60,6 +61,11 @@ export class PersonalInvoiceService {
     address: PersonalPaymentDto,
   ): Promise<PersonalPaymentResponse> => {
     const status = await this.subscriptions.getStatus(actor);
+    if (!status.userSubscriptionRequired)
+      throw new ConflictException({
+        code: 'user_subscription_not_required',
+        message: 'FIELD has no personal subscription. Nothing is due.',
+      });
     if (status.exempt)
       throw new ForbiddenException(
         'Owners do not require a personal subscription.',

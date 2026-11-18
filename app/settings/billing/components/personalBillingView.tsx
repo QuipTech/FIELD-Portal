@@ -16,6 +16,10 @@ import { OrganisationBillingView } from "./organisation/organisationBillingView"
 export const PersonalBillingView = () => {
   const { status, error, loading, refresh } = usePersonalBilling();
   const { can } = usePermissions();
+  const canManageBilling = can(PERMISSIONS.manageBilling);
+  // Personal TECH subscriptions only exist when REQUIRE_USER_SUBSCRIPTION is
+  // on; otherwise this page is the organisation's billing, for its admins.
+  const personalRequired = status?.userSubscriptionRequired === true;
   const [showPayment, setShowPayment] = useState(false);
   const [invoices, setInvoices] = useState<PersonalInvoice[] | null>(null);
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
@@ -37,10 +41,19 @@ export const PersonalBillingView = () => {
     <>
       <h1 className="text-[22px] font-medium text-ink">Billing &amp; subscription</h1>
       <PaymentReturnBanner paymentRequired={status?.paymentRequired} refresh={refresh} />
-      {can(PERMISSIONS.manageBilling) && <OrganisationBillingView />}
+      {canManageBilling && <OrganisationBillingView />}
+      {status && !personalRequired && !canManageBilling && (
+        <section className="rounded-xl border border-borderGray bg-surface p-5">
+          <h2 className="text-lg font-medium text-ink">Billing is handled by your organisation</h2>
+          <p className="mt-2 text-sm text-bodyGray">
+            FIELD is billed to your organisation for its active machines. There&apos;s nothing for you to pay. Your
+            organisation&apos;s administrators manage billing.
+          </p>
+        </section>
+      )}
       {loading && <div role="status" className="h-36 animate-pulse rounded-xl bg-surface">Loading subscription…</div>}
       {error && <div role="alert" className="rounded-xl border border-borderGray bg-surface p-5"><p>{error}</p><Button onClick={() => void refresh()}>Try again</Button></div>}
-      {status && (
+      {status && personalRequired && (
         <section className="rounded-xl border border-borderGray bg-surface p-5">
           <h2 className="text-lg font-medium text-ink">{status.exempt ? "Owner account" : "FIELD Technician"}</h2>
           {status.exempt ? <p className="mt-2 text-bodyGray">Owners are exempt from the personal monthly subscription.</p> : <>
@@ -53,7 +66,7 @@ export const PersonalBillingView = () => {
           </>}
         </section>
       )}
-      <section className="overflow-hidden rounded-xl border border-borderGray bg-surface">
+      {(personalRequired || (invoices?.length ?? 0) > 0) && <section className="overflow-hidden rounded-xl border border-borderGray bg-surface">
         <h2 className="border-b border-borderGray p-4 font-medium text-ink">Your invoices</h2>
         {invoiceError ? <div role="alert" className="p-4"><p>{invoiceError}</p><Button onClick={() => setReload((value) => value + 1)}>Retry invoices</Button></div> : invoices === null ? <p role="status" className="p-4 text-bodyGray">Loading invoices…</p> : invoices.length === 0 ? <p className="p-4 text-bodyGray">No invoices yet.</p> : <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -68,7 +81,7 @@ export const PersonalBillingView = () => {
             </tr>)}</tbody>
           </table>
         </div>}
-      </section>
+      </section>}
       {showPayment && status?.paymentRequired && <PersonalPaymentDialog status={status} refresh={refresh} onClose={() => setShowPayment(false)} />}
     </>
   );

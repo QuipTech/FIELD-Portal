@@ -29,8 +29,23 @@ const describePrice = (book: PriceBook) => {
   return book.unitCents === null ? "—" : audMoney(book.unitCents);
 };
 
-const parseConfigValue = (entry: BillingConfigEntry, text: string): number | string | null | undefined => {
+type ConfigValue = BillingConfigEntry["value"];
+
+const configText = (value: ConfigValue): string =>
+  value === null ? "" : Array.isArray(value) ? value.join(", ") : String(value);
+
+const parseConfigValue = (entry: BillingConfigEntry, text: string): ConfigValue | undefined => {
   if (entry.kind === "timeZone") return text.trim() || undefined;
+  if (entry.kind === "text") return text.trim();
+  if (entry.kind === "boolean") {
+    const answer = text.trim().toLowerCase();
+    return answer === "true" ? true : answer === "false" ? false : undefined;
+  }
+  if (entry.kind === "dayOffsets") {
+    if (!text.trim()) return [];
+    const days = text.split(",").map((part) => Number(part.trim()));
+    return days.every((day) => Number.isInteger(day)) ? days : undefined;
+  }
   if (entry.kind === "optionalPositiveNumber" && !text.trim()) return null;
   const value = Number(text);
   return Number.isFinite(value) ? value : undefined;
@@ -78,10 +93,10 @@ const PriceBooks = () => {
 };
 
 const ConfigRow = ({ entry, onSaved }: { entry: BillingConfigEntry; onSaved: () => void }) => {
-  const [text, setText] = useState(entry.value === null ? "" : String(entry.value));
+  const [text, setText] = useState(configText(entry.value));
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const isChanged = text !== (entry.value === null ? "" : String(entry.value));
+  const isChanged = text !== configText(entry.value);
   const save = async () => {
     const value = parseConfigValue(entry, text);
     if (value === undefined) { setError("Enter a valid value."); return; }
@@ -105,7 +120,7 @@ const ConfigRow = ({ entry, onSaved }: { entry: BillingConfigEntry; onSaved: () 
       </td>
       <td className="p-2">
         <div className="flex items-center gap-2">
-          <input aria-label={entry.key} value={text} onChange={(event) => setText(event.target.value)} className="h-9 w-40 rounded-lg border border-borderGrayStrong bg-surface px-2 text-sm text-ink" placeholder={entry.kind === "optionalPositiveNumber" ? "off" : undefined} />
+          <input aria-label={entry.key} value={text} onChange={(event) => setText(event.target.value)} className="h-9 w-40 rounded-lg border border-borderGrayStrong bg-surface px-2 text-sm text-ink" placeholder={entry.kind === "optionalPositiveNumber" ? "off" : entry.kind === "boolean" ? "true or false" : entry.kind === "dayOffsets" ? "-7, 0, 7, 14" : undefined} />
           {isChanged && <Button size="sm" variant="primary" disabled={isSaving} onClick={() => void save()}>Save</Button>}
         </div>
         {error && <p className="text-xs text-danger">{error}</p>}

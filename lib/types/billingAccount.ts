@@ -28,10 +28,15 @@ export interface OrganisationBilling {
     committedQty: number | null;
   } | null;
   overdueInvoiceCount: number;
-  // Suspension is allowed 14 days after this.
-  firstOverdueNoticeAt: string | null;
+  // The earliest unpaid due date that has passed; suspension is allowed
+  // SUSPENSION_NOTICE_DAYS (14) after it.
+  firstOverdueDueOn: string | null;
   // A fair-use allowance reached 100% this month.
   usageFlagged: boolean;
+  // card or account (30-day terms), and where an application stands.
+  paymentType: "card" | "account" | null;
+  accountStatus: "none" | "pending" | "approved" | "rejected" | "on_hold" | null;
+  freePeriod: { freeUntil: string; freePercent: number } | null;
 }
 
 // POST /admin/billing/accounts

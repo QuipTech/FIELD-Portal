@@ -6,6 +6,7 @@ import {
   calculateFleetPriceCents,
   findBandRateCents,
 } from '../pricing/fleetPrice';
+import { recalculateDiscountCents } from '../discounts/discountRules';
 import { divideRoundHalfUp } from '../pricing/roundHalfUp';
 import {
   calculateTechExtraSeatUnitCents,
@@ -79,6 +80,9 @@ export const recalculateLineAmountCents = (
       );
     case 'ONBOARD_ASSISTED':
       return snapshot.seatCents ?? 0;
+    case 'FREE_PERIOD_DISCOUNT':
+    case 'PROMO_DISCOUNT':
+      return recalculateDiscountCents(snapshot);
     case 'ASSET_PRO_FINAL_DAYS':
       return divideRoundHalfUp(
         (snapshot.monthlyRateCents ?? 0) * (snapshot.daysUsed ?? 0),
