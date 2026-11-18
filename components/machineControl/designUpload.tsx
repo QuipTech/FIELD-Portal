@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { uploadDesign, type DesignVersion } from "@/lib/api/machineDesignApi";
@@ -9,20 +9,28 @@ import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import { designUploadBody, readDroppedDesignFiles, selectDesignFiles, type DesignUploadFile } from "@/lib/machineControl/designFolder";
 
 export function DesignUpload({ onUploaded }: { onUploaded: (version: DesignVersion) => void }) {
+  const filePicker = useRef<HTMLInputElement>(null);
+  const folderPicker = useRef<HTMLInputElement>(null);
   const [project, setProject] = useState("");
   const [files, setFiles] = useState<DesignUploadFile[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  function choose(event: ChangeEvent<HTMLInputElement>) {
+    const selected = event.target.files;
+    if (!selected?.length) return;
+    setFiles(selectDesignFiles(selected));
+    setError("");
+    event.target.value = "";
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
     setBusy(true);
     setError("");
     try {
       const version = await uploadDesign(requireAccessToken(), designUploadBody(project, files));
       setFiles([]);
-      form.reset();
       onUploaded(version);
     } catch (err) {
       setError(toApiErrorMessage(err, err instanceof Error ? err.message : "Could not upload the design folder."));
@@ -57,12 +65,21 @@ export function DesignUpload({ onUploaded }: { onUploaded: (version: DesignVersi
           }
         }}
       >
-        <p>Drop a design folder here or choose a folder.</p>
-        <input type="file" aria-label="Choose design folder" multiple disabled={busy}
-          {...{ webkitdirectory: "" }}
-          onChange={(event) => event.target.files && setFiles(selectDesignFiles(event.target.files))}
-        />
-        {files.length > 0 && <p>{files.length} files selected</p>}
+        <p>Drop files or a folder here.</p>
+        <div className="flex flex-wrap gap-2">
+          <input type="file" hidden ref={filePicker} aria-label="Select files" multiple disabled={busy} onChange={choose} />
+          <input type="file" hidden ref={folderPicker} aria-label="Select a folder" multiple disabled={busy}
+            {...{ webkitdirectory: "" }}
+            onChange={choose}
+          />
+          <Button type="button" disabled={busy} onClick={() => filePicker.current?.click()}>Choose files</Button>
+          <Button type="button" disabled={busy} onClick={() => folderPicker.current?.click()}>Choose folder</Button>
+        </div>
+        {files.length > 0 && (
+          <ul aria-label="Selected files" className="max-h-32 overflow-auto text-sm">
+            {files.map(({ path }, index) => <li key={`${index}-${path}`}>{path}</li>)}
+          </ul>
+        )}
       </div>
       <p className="text-sm text-mutedGray">Up to 32 files, 5 MiB per file and 20 MiB total. Use the same project name to add a version.</p>
       {error && <p role="alert">{error}</p>}

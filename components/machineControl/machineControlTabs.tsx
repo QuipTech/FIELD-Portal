@@ -9,7 +9,7 @@ const TABS: { href: string; label: string; isSoon?: boolean }[] = [
   { href: BASE, label: "Overview" },
   { href: `${BASE}/devices`, label: "Devices" },
   { href: `${BASE}/sites`, label: "Sites", isSoon: true },
-  { href: `${BASE}/files`, label: "Files", isSoon: true },
+  { href: `${BASE}/files`, label: "Files" },
   { href: `${BASE}/activity`, label: "Activity", isSoon: true },
 ];
 

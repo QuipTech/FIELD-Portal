@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Icon } from "@/components/icons/icon";
 import { ConnectMachineButton } from "./connectMachineButton";
 
@@ -5,6 +6,7 @@ interface MachineControlHeaderProps {
   // Null while the tablets load.
   onlineCount: number | null;
   connectedCount: number | null;
+  connectedMachineLabel?: string;
 }
 
 const Chip = ({ children }: { children: React.ReactNode }) => (
@@ -13,7 +15,7 @@ const Chip = ({ children }: { children: React.ReactNode }) => (
 
 // The module's banner: what it's for, how many tablets are live, and the one
 // action everyone starts with. Deep brand colours, the same in both themes.
-export const MachineControlHeader = ({ onlineCount, connectedCount }: MachineControlHeaderProps) => (
+export const MachineControlHeader = ({ onlineCount, connectedCount, connectedMachineLabel }: MachineControlHeaderProps) => (
   <section className="relative flex flex-wrap items-center gap-5 overflow-hidden rounded-2xl bg-gradient-to-br from-brandDeep via-[#2E2670] to-[#1B1640] p-6 text-white">
     <span aria-hidden className="pointer-events-none absolute -right-16 -top-24 h-72 w-72 rounded-full border border-white/10" />
     <span aria-hidden className="pointer-events-none absolute -right-4 -top-12 h-48 w-48 rounded-full border border-white/10" />
@@ -23,7 +25,7 @@ export const MachineControlHeader = ({ onlineCount, connectedCount }: MachineCon
     </span>
     <div className="relative flex min-w-0 flex-1 flex-col gap-1.5">
       <h1 className="text-[22px] font-medium leading-tight">Machine Control</h1>
-      <p className="max-w-xl text-sm text-white/75">Send design files to the tablets on your machines and watch them arrive. Start by connecting a machine&apos;s tablet.</p>
+      <p className="max-w-xl text-sm text-white/75">Send design files to the tablets on your machines and watch them arrive.{connectedCount === 0 && " Start by connecting a machine's tablet."}</p>
       {connectedCount !== null && (
         <div className="mt-1.5 flex flex-wrap gap-2">
           <Chip>
@@ -36,6 +38,11 @@ export const MachineControlHeader = ({ onlineCount, connectedCount }: MachineCon
         </div>
       )}
     </div>
-    <ConnectMachineButton variant="default" className="relative" />
+    {connectedCount === 0 && <ConnectMachineButton variant="default" className="relative" />}
+    {Boolean(connectedCount) && (
+      <Link href="/machine-control/devices" className="relative rounded-xl border border-white/25 bg-white/10 px-4 py-2 text-sm font-medium hover:bg-white/20">
+        {connectedMachineLabel ? `Connected machine · ${connectedMachineLabel}` : "Connected machines"}
+      </Link>
+    )}
   </section>
 );
