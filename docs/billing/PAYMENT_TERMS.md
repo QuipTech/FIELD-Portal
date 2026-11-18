@@ -7,7 +7,7 @@ account** approved by a platform administrator (the existing Owner /
 `platform.manage` role; "super admin" in the brief). Free periods and promo
 codes discount machine charges.
 
-Migrations: `0130_billing_payment_types.sql`, `0131_billing_free_periods_promo_codes.sql`.
+Migrations: `0131_billing_payment_types.sql`, `0132_billing_free_periods_promo_codes.sql`.
 
 ## Decisions
 

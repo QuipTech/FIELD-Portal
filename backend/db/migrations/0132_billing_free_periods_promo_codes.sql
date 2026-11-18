@@ -127,5 +127,5 @@ ALTER TABLE billing.invoice_lines ADD CONSTRAINT invoice_lines_unit_cents_sign C
 );
 
 INSERT INTO schema_migrations (version)
-VALUES ('0131_billing_free_periods_promo_codes')
+VALUES ('0132_billing_free_periods_promo_codes')
 ON CONFLICT (version) DO NOTHING;

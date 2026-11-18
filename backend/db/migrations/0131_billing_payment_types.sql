@@ -131,5 +131,5 @@ INSERT INTO billing.config (key, value, is_final, description) VALUES
 ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO schema_migrations (version)
-VALUES ('0130_billing_payment_types')
+VALUES ('0131_billing_payment_types')
 ON CONFLICT (version) DO NOTHING;
