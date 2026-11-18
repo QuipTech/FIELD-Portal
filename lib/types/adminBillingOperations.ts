@@ -56,11 +56,16 @@ export type BillingConfigKind =
   | "nonNegativeInteger"
   | "ratio"
   | "optionalPositiveNumber"
-  | "timeZone";
+  | "timeZone"
+  | "boolean"
+  // Free text, may be empty (bank details).
+  | "text"
+  // Whole days from a due date, e.g. [-7, 0, 7, 14].
+  | "dayOffsets";
 
 export interface BillingConfigEntry {
   key: string;
-  value: number | string | null;
+  value: number | string | boolean | number[] | null;
   isFinal: boolean;
   description: string;
   updatedAt: string;

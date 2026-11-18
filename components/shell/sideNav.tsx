@@ -10,6 +10,7 @@ import { useUnreadCaseCount } from "@/lib/hooks/useUnreadCaseCount";
 import { useSupportStaffAccess } from "@/lib/hooks/useSupportStaffAccess";
 import { usePermissions } from "@/lib/auth/usePermissions";
 import { PERMISSIONS } from "@/lib/auth/permissionCodes";
+import { usePersonalBilling } from "@/lib/hooks/usePersonalBilling";
 
 interface NavLink {
   href: string;
@@ -19,6 +20,7 @@ interface NavLink {
 
 // Only when the organisation has it turned on and the person may see it.
 const MACHINE_CONTROL_LINK: NavLink = { href: "/machine-control", label: "Machine Control", icon: "broadcast" };
+const BILLING_HREF = "/settings/billing";
 
 const primaryLinks: NavLink[] = [
   { href: "/dashboard", label: "Dashboard", icon: "grid" },
@@ -27,7 +29,7 @@ const primaryLinks: NavLink[] = [
   { href: "/knowledge", label: "Knowledge", icon: "book" },
   { href: "/assistant", label: "AI assistant", icon: "spark" },
   { href: "/cases", label: "Support cases", icon: "life" },
-  { href: "/settings/billing", label: "Billing", icon: "card" },
+  { href: BILLING_HREF, label: "Billing", icon: "card" },
 ];
 
 const NavItem = ({ href, label, icon, active, badgeCount = 0 }: NavLink & { active: boolean; badgeCount?: number }) => (
@@ -55,6 +57,15 @@ export const SideNav = () => {
   const staffCaseCount = useUnreadCaseCount("staff", isStaff && !isAdmin);
   const { can, machineControlEnabled } = usePermissions();
   const showMachineControl = machineControlEnabled && can(PERMISSIONS.viewMachineControl);
+  const canManageBilling = can(PERMISSIONS.manageBilling);
+  // Billing is for organisation admins, unless every user pays their own
+  // subscription (REQUIRE_USER_SUBSCRIPTION), when everyone needs it.
+  const personal = usePersonalBilling(!canManageBilling);
+  const showBilling = canManageBilling || personal.status?.userSubscriptionRequired === true;
+  const links = primaryLinks.filter(
+    (link) =>
+      (link.href !== BILLING_HREF || showBilling) && (link.href !== MACHINE_CONTROL_LINK.href || showMachineControl),
+  );
 
   return (
     <div
@@ -68,17 +79,15 @@ export const SideNav = () => {
       >
         <Icon name="panel" className="stroke-current" />
       </button>
-      {primaryLinks
-        .filter((link) => link.href !== MACHINE_CONTROL_LINK.href || showMachineControl)
-        .map((link) => (
-          <NavItem
-            key={link.href}
-            {...link}
-            label={collapsed ? "" : link.label}
-            active={pathname.startsWith(link.href)}
-            badgeCount={link.href === CASES_HREF ? unreadCaseCount + staffCaseCount : 0}
-          />
-        ))}
+      {links.map((link) => (
+        <NavItem
+          key={link.href}
+          {...link}
+          label={collapsed ? "" : link.label}
+          active={pathname.startsWith(link.href)}
+          badgeCount={link.href === CASES_HREF ? unreadCaseCount + staffCaseCount : 0}
+        />
+      ))}
       <div className="mt-auto flex flex-col gap-0.5 border-t border-white/[0.16] pt-2.5">
         {can(PERMISSIONS.managePlatform) && (
           <NavItem href="/admin/dashboard" label={collapsed ? "" : "Admin portal"} icon="shield" active={false} />

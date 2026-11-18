@@ -13,11 +13,11 @@ import { firstSuspensionDay } from './overdueRules';
 
 const ACCOUNT_NOT_FOUND_MESSAGE = 'Billing account not found.';
 const NOTHING_OVERDUE_MESSAGE =
-  'This account has no overdue invoice that has had its first notice, so it cannot be suspended.';
+  'This account has no overdue invoice, so it cannot be suspended.';
 
-// Suspension for non-payment (spec section 9): a platform admin's
-// decision, allowed SUSPENSION_NOTICE_DAYS after the first overdue
-// notice. It blocks new AI sessions and new activations only; nothing in
+// Suspension for non-payment (spec section 9): only ever a platform
+// admin's decision, allowed SUSPENSION_NOTICE_DAYS after the earliest
+// unpaid due date (reminders run from before the due date onwards). It blocks new AI sessions and new activations only; nothing in
 // progress is stopped, and reading and export stay available.
 @Injectable()
 export class AccountSuspensionService {
@@ -33,15 +33,15 @@ export class AccountSuspensionService {
     reason: string,
     now = new Date(),
   ) => {
-    const [firstNotice, config] = await Promise.all([
-      collectionsRepository.findFirstUnpaidNotice(
+    const [firstDueOn, config] = await Promise.all([
+      collectionsRepository.findFirstUnpaidDueOn(
         this.serviceDatabase,
         billingAccountId,
       ),
       this.billingConfig.loadConfig(),
     ]);
     const allowedFrom = firstSuspensionDay(
-      firstNotice,
+      firstDueOn,
       config.SUSPENSION_NOTICE_DAYS,
     );
     if (!allowedFrom) throw new ConflictException(NOTHING_OVERDUE_MESSAGE);

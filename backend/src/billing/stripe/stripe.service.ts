@@ -46,6 +46,10 @@ export interface CreateInvoiceInput {
   // Limits how the invoice can be paid, e.g. ['card'] for invoices paid in
   // the mobile Payment Sheet. Omitted: the account's default methods.
   paymentMethodTypes?: Stripe.InvoiceCreateParams.PaymentSettings.PaymentMethodType[];
+  // Printed on the invoice: bank details for a 30-day account, and the PO
+  // number.
+  footer?: string | null;
+  customFields?: { name: string; value: string }[];
 }
 
 export interface CreateCheckoutInput {
@@ -161,6 +165,10 @@ export class StripeService {
             payment_method_types: input.paymentMethodTypes,
           },
         }),
+        ...(input.footer && { footer: input.footer }),
+        ...(input.customFields?.length && {
+          custom_fields: input.customFields,
+        }),
         metadata: { fieldInvoiceId: input.fieldInvoiceId },
       },
       { idempotencyKey },
@@ -224,6 +232,15 @@ export class StripeService {
   // throws; Stripe's invoice.payment_failed webhook records it.
   payInvoice = (stripeInvoiceId: string, idempotencyKey: string) =>
     this.require().invoices.pay(stripeInvoiceId, {}, { idempotencyKey });
+
+  // Records a payment made outside Stripe (bank transfer, cheque): the
+  // invoice becomes paid and Stripe sends invoice.paid. Nothing is charged.
+  payInvoiceOutOfBand = (stripeInvoiceId: string, idempotencyKey: string) =>
+    this.require().invoices.pay(
+      stripeInvoiceId,
+      { paid_out_of_band: true },
+      { idempotencyKey },
+    );
 
   // True when the customer saved a card or direct debit for invoices (in
   // the Customer Portal), so invoices can be charged automatically.

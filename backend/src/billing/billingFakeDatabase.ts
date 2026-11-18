@@ -13,6 +13,9 @@ export interface FakeBillingState {
   invoices: InvoiceRow[];
   lines: InvoiceLineRow[];
   webhookEventIds: Set<string>;
+  // The billing account's payment terms (accountTerms.repository); none =
+  // no row, which the card flow treats as a card customer.
+  accountTerms?: Record<string, unknown>;
 }
 
 export const buildInvoiceRow = (
@@ -35,6 +38,14 @@ export const buildInvoiceRow = (
   review_until: null,
   held_at: null,
   hold_reason: null,
+  kind: 'manual',
+  po_number: null,
+  collection_method: null,
+  due_on: null,
+  marked_paid_on: null,
+  marked_paid_method: null,
+  marked_paid_reference: null,
+  no_charge_reason: null,
   created_at: new Date('2026-10-19T00:00:00Z'),
   updated_at: new Date('2026-10-19T00:00:00Z'),
   ...overrides,
@@ -65,6 +76,13 @@ const answer = (
   sql: string,
   params: unknown[],
 ): QueryResult => {
+  if (
+    sql.includes('a.payment_type') &&
+    sql.includes('FROM billing.billing_accounts a')
+  ) {
+    const rows = state.accountTerms ? [state.accountTerms] : [];
+    return { rows, rowCount: rows.length };
+  }
   if (sql.includes('INSERT INTO billing.stripe_webhook_events')) {
     const eventId = params[0] as string;
     if (state.webhookEventIds.has(eventId)) return updated(0);

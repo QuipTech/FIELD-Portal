@@ -78,7 +78,7 @@ export class OrganisationPlanService {
     const thisMonth =
       book && plan ? estimateMonth(plan, book.bands, counts.peakSoFar) : null;
     const suspensionFrom = firstSuspensionDay(
-      overdue.firstNoticeAt,
+      overdue.firstDueOn,
       config.SUSPENSION_NOTICE_DAYS,
     );
     return {
@@ -109,7 +109,6 @@ export class OrganisationPlanService {
       },
       overdue: {
         ...overdue,
-        firstNoticeAt: overdue.firstNoticeAt?.toISOString() ?? null,
         suspensionFrom: suspensionFrom?.toISOString() ?? null,
       },
       allowance: allowance.map((row) => ({

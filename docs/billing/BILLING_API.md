@@ -5,7 +5,16 @@ user, tenant, account or price. These come from the verified session and FIELD
 tables. Money is integer AUD cents, ex GST unless stated. Billing periods are
 calendar dates in the response timezone, with an exclusive periodEnd.
 
-## Personal TECH billing (every non-Owner)
+Card or 30-day accounts, free periods, promo codes, the overdue list and
+mark-as-paid are documented in PAYMENT_TERMS.md.
+
+## Personal TECH billing (only when REQUIRE_USER_SUBSCRIPTION is on)
+
+`billing.config REQUIRE_USER_SUBSCRIPTION` defaults to false. Then
+`GET /me/billing` returns `userSubscriptionRequired: false` and
+`paymentRequired: false` for everyone, and `POST /me/billing/payment` returns
+409 `user_subscription_not_required`. Everything below applies only when it's
+on.
 
 ### GET /me/billing
 

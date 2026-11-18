@@ -5,6 +5,10 @@ import {
   BillingConfigValueKind,
 } from './billingConfigKeys';
 
+const MAX_TEXT_LENGTH = 200;
+const MAX_DAY_OFFSETS = 10;
+const MAX_DAY_OFFSET = 365;
+
 const isKnownTimeZone = (value: string): boolean => {
   try {
     new Intl.DateTimeFormat('en-AU', { timeZone: value });
@@ -32,6 +36,20 @@ export const isValidConfigValue = (
       return value === null || (typeof value === 'number' && value > 0);
     case 'timeZone':
       return typeof value === 'string' && isKnownTimeZone(value);
+    case 'boolean':
+      return typeof value === 'boolean';
+    case 'text':
+      return typeof value === 'string' && value.length <= MAX_TEXT_LENGTH;
+    case 'dayOffsets':
+      return (
+        Array.isArray(value) &&
+        value.length <= MAX_DAY_OFFSETS &&
+        value.every(
+          (item) =>
+            Number.isSafeInteger(item) &&
+            Math.abs(item as number) <= MAX_DAY_OFFSET,
+        )
+      );
   }
 };
 

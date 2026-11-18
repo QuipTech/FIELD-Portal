@@ -33,9 +33,14 @@ export interface OrganisationBilling {
     committedQty: number | null;
   } | null;
   overdueInvoiceCount: number;
-  firstOverdueNoticeAt: string | null;
+  // The earliest unpaid due date that has passed (YYYY-MM-DD).
+  firstOverdueDueOn: string | null;
   // A fair-use allowance reached 100% this month.
   usageFlagged: boolean;
+  // card or account (30-day terms), and where its application stands.
+  paymentType: string | null;
+  accountStatus: string | null;
+  freePeriod: { freeUntil: string; freePercent: number } | null;
 }
 
 export const toBillingAccount = (row: BillingAccountRow): BillingAccount => ({
@@ -87,6 +92,14 @@ export const toOrganisationBilling = (
       }
     : null,
   overdueInvoiceCount: Number(row.overdue_count ?? 0),
-  firstOverdueNoticeAt: row.first_overdue_notice_at?.toISOString() ?? null,
+  firstOverdueDueOn: row.first_overdue_due_on,
   usageFlagged: row.usage_flagged === true,
+  paymentType: row.account_payment_type,
+  accountStatus: row.account_account_status,
+  freePeriod: row.account_free_until
+    ? {
+        freeUntil: row.account_free_until,
+        freePercent: row.account_free_percent ?? 100,
+      }
+    : null,
 });

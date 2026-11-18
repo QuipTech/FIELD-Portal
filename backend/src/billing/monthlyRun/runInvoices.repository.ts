@@ -106,6 +106,22 @@ export const insertRunInvoice = async (
   return invoiceId;
 };
 
+// A month that discounts brought to A$0: recorded as paid with nothing to
+// collect, and never pushed to Stripe or emailed.
+export const markNoCharge = async (
+  client: PoolClient,
+  invoiceId: string,
+  reason: 'fully_discounted',
+): Promise<void> => {
+  await client.query(
+    `UPDATE billing.invoices SET status = 'paid', no_charge_reason = $2,
+       total_ex_gst_cents = 0, gst_cents = 0, total_cents = 0,
+       review_until = NULL, updated_at = now()
+     WHERE id = $1 AND status = 'draft'`,
+    [invoiceId, reason],
+  );
+};
+
 // Run drafts whose review window has passed and nobody has held.
 export const listInvoicesDueForFinalisation = async (
   client: BillingReader,

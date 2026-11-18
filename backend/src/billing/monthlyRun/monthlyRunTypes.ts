@@ -36,7 +36,11 @@ export type LineFormula =
   // Assisted onboarding, one site at the price book's flat price.
   | 'ONBOARD_ASSISTED'
   // A machine being deleted: its monthly rate × days used ÷ days in the month.
-  | 'ASSET_PRO_FINAL_DAYS';
+  | 'ASSET_PRO_FINAL_DAYS'
+  // Discounts on the machine charges (negative): the free period's percent,
+  // then the promo's percent or fixed amount, of discountBaseCents.
+  | 'FREE_PERIOD_DISCOUNT'
+  | 'PROMO_DISCOUNT';
 
 // Everything a line's amount depends on, stored with the line so it can be
 // recalculated to the cent without reading anything else (T31).
@@ -59,6 +63,15 @@ export interface LineCalcSnapshot {
   monthlyRateCents?: number;
   daysUsed?: number;
   daysInMonth?: number;
+  // FREE_PERIOD_DISCOUNT and PROMO_DISCOUNT only: the machine charges left
+  // before this discount, and its terms.
+  discountBaseCents?: number;
+  discountPercent?: number;
+  discountFixedCents?: number;
+  freeUntil?: string;
+  promoCodeId?: string;
+  promoCode?: string;
+  promoRedemptionId?: string;
 }
 
 export interface CalculatedLine {

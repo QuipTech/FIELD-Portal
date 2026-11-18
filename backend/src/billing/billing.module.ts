@@ -50,6 +50,14 @@ import { BillingNotifier } from './billingNotices/billingNotifier.service';
 import { AllowanceService } from './allowance/allowance.service';
 import { UpFrontInvoiceService } from './invoices/upFrontInvoice.service';
 import { SubscriptionRenewalService } from './subscriptions/subscriptionRenewal.service';
+import { AccountTermsService } from './accountTerms/accountTerms.service';
+import { FreePeriodService } from './accountTerms/freePeriod.service';
+import { OrganisationPaymentTermsController } from './accountTerms/organisationPaymentTerms.controller';
+import { AdminPaymentTermsController } from './accountTerms/adminPaymentTerms.controller';
+import { DiscountService } from './discounts/discount.service';
+import { PromoCodesService } from './discounts/promoCodes.service';
+import { OverdueListService } from './collections/overdueList.service';
+import { MarkInvoicePaidService } from './invoices/markInvoicePaid.service';
 
 @Module({
   imports: [StripeModule, EmailModule],
@@ -64,6 +72,8 @@ import { SubscriptionRenewalService } from './subscriptions/subscriptionRenewal.
     PlanOptionsController,
     OrganisationPlanController,
     AdminBillingOperationsController,
+    OrganisationPaymentTermsController,
+    AdminPaymentTermsController,
   ],
   providers: [
     PersonalSubscriptionService,
@@ -101,6 +111,12 @@ import { SubscriptionRenewalService } from './subscriptions/subscriptionRenewal.
     AllowanceService,
     UpFrontInvoiceService,
     SubscriptionRenewalService,
+    AccountTermsService,
+    FreePeriodService,
+    DiscountService,
+    PromoCodesService,
+    OverdueListService,
+    MarkInvoicePaidService,
   ],
   exports: [
     BillingConfigService,

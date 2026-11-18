@@ -11,7 +11,8 @@ import { MonthlyRunService } from './monthlyRun.service';
 // time zone: snapshot finished days, draft closed months, renew or end
 // subscriptions whose term is over (after the drafts, so a month is billed
 // on the term it was in), finalise drafts whose review window has passed,
-// send overdue notices, then work out fair-use allowances. Every step is
+// send payment reminders, warn about credit limits, then work out
+// fair-use allowances. Every step is
 // safe to repeat, and one failing never stops the others.
 // It creates real Stripe invoices, so it only runs with
 // BILLING_RUN_ENABLED=true.
@@ -56,8 +57,13 @@ export class BillingRunWorker {
         [],
       );
       const notices = await this.step(
-        'overdue',
+        'reminders',
         () => this.overdue.sendDueNotices(now),
+        0,
+      );
+      const creditWarnings = await this.step(
+        'credit limit',
+        () => this.overdue.checkCreditLimits(),
         0,
       );
       await this.step(
@@ -65,9 +71,15 @@ export class BillingRunWorker {
         () => this.allowances.runAllAccounts(now),
         undefined,
       );
-      if (drafted.length || renewed || finalised.length || notices) {
+      if (
+        drafted.length ||
+        renewed ||
+        finalised.length ||
+        notices ||
+        creditWarnings
+      ) {
         this.logger.log(
-          `Billing run: ${drafted.length} drafted, ${renewed} renewed or ended, ${finalised.length} finalised, ${notices} overdue notices.`,
+          `Billing run: ${drafted.length} drafted, ${renewed} renewed or ended, ${finalised.length} finalised, ${notices} reminders, ${creditWarnings} credit limit warnings.`,
         );
       }
     } finally {

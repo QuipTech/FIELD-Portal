@@ -15,7 +15,8 @@ export const PersonalPaymentPrompt = () => {
   // Billing remains reachable so users can inspect invoices while unpaid.
   const onBillingPage = pathname.startsWith("/settings/billing");
   const { status, error, refresh } = usePersonalBilling(enabled);
-  if (!enabled || onBillingPage || status?.exempt) return null;
+  // With no user subscription (the default) nobody is ever asked to pay.
+  if (!enabled || onBillingPage || status?.exempt || status?.userSubscriptionRequired === false) return null;
   if (error) return (
     <Modal title="Subscription status unavailable">
       <div className="flex flex-col gap-4 p-5">

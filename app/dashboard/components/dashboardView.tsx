@@ -19,6 +19,7 @@ import { RecentActivityCard } from "./recentActivityCard";
 import { MyMachinesCard } from "./myMachinesCard";
 import { PortalGuideModal } from "./portalGuideModal";
 import { describePlanBadge } from "./planBadge";
+import { BillingSetupBanner } from "@/components/billing/billingSetupBanner";
 
 const DOWN_LABELS_SHOWN = 3;
 
@@ -81,6 +82,7 @@ export const DashboardView = () => {
             {[profile?.tenant?.name, todayLabel()].filter(Boolean).join(" · ")}
           </span>
         </div>
+        <BillingSetupBanner />
         {!summary ? (
           <div className="flex flex-1 items-center justify-center gap-2 text-sm text-mutedGray">
             {dashboard.isLoading ? (

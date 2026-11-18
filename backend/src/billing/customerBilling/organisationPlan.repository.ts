@@ -56,23 +56,23 @@ export const findMachineCounts = async (
   };
 };
 
-// Unpaid invoices past their due date, and the first notice still open.
+// Unpaid invoices past their due date, and the earliest of those dates.
 export const findOverdueSummary = async (
   database: Reader,
   billingAccountId: string,
 ): Promise<{
   count: number;
   amountCents: number;
-  firstNoticeAt: Date | null;
+  firstDueOn: string | null;
 }> => {
   const result = await database.query<{
     count: string;
     amount: string | null;
-    first_notice: Date | null;
+    first_due_on: string | null;
   }>(
     `SELECT count(*) AS count,
             sum(coalesce(total_cents, total_ex_gst_cents) - amount_paid_cents) AS amount,
-            min(overdue_notice_1_at) AS first_notice
+            min(i.due_on)::text AS first_due_on
      FROM billing.invoices i JOIN billing.billing_accounts a ON a.id = i.billing_account_id
      WHERE i.billing_account_id = $1 AND i.status IN ('synced', 'payment_failed')
        AND i.due_on < (now() AT TIME ZONE a.timezone)::date`,
@@ -82,6 +82,6 @@ export const findOverdueSummary = async (
   return {
     count: Number(row?.count ?? 0),
     amountCents: Number(row?.amount ?? 0),
-    firstNoticeAt: row?.first_notice ?? null,
+    firstDueOn: row?.first_due_on ?? null,
   };
 };

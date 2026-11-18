@@ -33,12 +33,16 @@ export interface OrganisationBillingRow {
   account_suspension_reason: string | null;
   account_created_at: Date | null;
   account_updated_at: Date | null;
+  account_payment_type: string | null;
+  account_account_status: string | null;
+  account_free_until: string | null;
+  account_free_percent: number | null;
   plan_code: string | null;
   plan_term: string | null;
   plan_status: string | null;
   plan_cancel_at: string | null;
   plan_committed_qty: number | null;
   overdue_count: string | null;
-  first_overdue_notice_at: Date | null;
+  first_overdue_due_on: string | null;
   usage_flagged: boolean | null;
 }
