@@ -6,7 +6,7 @@ const documentsPath = (machineId: string) => `/machines/${machineId}/documents`;
 
 // Newest first; filtered on screen, so switching type needs no request.
 export const listMachineDocumentsRequest = (accessToken: string, machineId: string): Promise<MachineDocument[]> =>
-  apiRequest<MachineDocument[]>(documentsPath(machineId), { headers: { Authorization: `Bearer ${accessToken}` } });
+  apiRequest<MachineDocument[]>(documentsPath(machineId), { headers: { Authorization: `Bearer ${accessToken}` }, cache: "no-store" });
 
 export const uploadMachineDocumentRequest = (
   accessToken: string,

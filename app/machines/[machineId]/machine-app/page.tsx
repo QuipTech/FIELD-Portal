@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { PermissionButton } from "@/components/auth/permissionButton";
 import { Icon } from "@/components/icons/icon";
@@ -81,6 +82,17 @@ const MachineAppPage = () => {
             {device.serialNumber && <span>Tablet serial: {device.serialNumber}</span>}
             {device.platform && <span className="capitalize">{device.platform}</span>}
             {device.appVersion && <span>App version {device.appVersion}</span>}
+          </div>
+          <div className="flex flex-col items-start gap-2 border-t border-borderGray pt-4">
+            <span className="text-[15px] font-medium text-ink">File transfer</span>
+            <p className="text-sm text-bodyGray">Use Send to Portal on the paired tablet. Files appear automatically in this machine&apos;s Documents.</p>
+            <Link
+              href={`/machines/${machineId}/documents`}
+              className={`${buttonBaseClasses} ${buttonVariantClasses.primary} ${buttonSizeClasses.md}`}
+            >
+              <Icon name="file" />
+              View machine documents
+            </Link>
           </div>
           <div className="mt-2 flex flex-col items-start gap-2 border-t border-borderGray pt-4">
             <span className="text-[15px] font-medium text-ink">Remote access</span>
