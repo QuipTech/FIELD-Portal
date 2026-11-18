@@ -1,3 +1,7 @@
+import { randomUUID } from 'crypto';
+import { MachineAppPairingService } from '../../src/machineControl/pairing/machineAppPairing.service';
+import { DeviceSessionService } from '../../src/machineControl/session/deviceSession.service';
+import { DeviceFileTransferService } from '../../src/machineControl/transfers/deviceFileTransfer.service';
 import { StorageService } from '../../src/storage/storage.service';
 import { MachineDocumentsService } from '../../src/machineHistory/machineDocuments.service';
 import { MachineHistoryService } from '../../src/machineHistory/machineHistory.service';
@@ -61,6 +65,59 @@ describe('machine documents', () => {
     actors = actorsOf(fixture, world);
   });
   afterEach(() => fixture.db.exec('ROLLBACK'));
+
+  it('files a paired tablet upload once and rejects sends after disconnect', async () => {
+    const machineId = world.shared1.id;
+    await fixture.query(
+      'UPDATE tenants SET machine_control_enabled = true WHERE id = $1',
+      [fixture.ids.customerTenant],
+    );
+    const pairing = new MachineAppPairingService(fixture.database);
+    const sessions = new DeviceSessionService(fixture.database);
+    const transfers = new DeviceFileTransferService(
+      fixture.database,
+      storage as unknown as StorageService,
+    );
+    const { code } = await pairing.createPairingCode(actors.adminA, machineId);
+    const { deviceToken } = await pairing.pairDevice({
+      code: code!,
+      platform: 'windows',
+    });
+    const device = (await sessions.authenticate(deviceToken))!;
+    const transferId = randomUUID();
+
+    const receipt = await transfers.upload(
+      device,
+      deviceToken,
+      pdf,
+      transferId,
+      'inspection',
+    );
+    expect(
+      await transfers.upload(
+        device,
+        deviceToken,
+        pdf,
+        transferId,
+        'inspection',
+      ),
+    ).toEqual(receipt);
+    expect(storage.uploadMachineDocument).toHaveBeenCalledTimes(1);
+    expect(
+      await documents.listDocuments(actors.adminA, machineId, null),
+    ).toMatchObject([
+      { id: receipt.id, fileName: 'report.pdf', documentType: 'inspection' },
+    ]);
+    expect(
+      await documents.listDocuments(actors.adminA, world.shared2.id, null),
+    ).toEqual([]);
+
+    await sessions.endSession(deviceToken);
+    await expect(
+      transfers.upload(device, deviceToken, pdf, randomUUID(), 'inspection'),
+    ).rejects.toMatchObject({ status: 401 });
+    expect(storage.uploadMachineDocument).toHaveBeenCalledTimes(1);
+  });
 
   const shareWithB = async (accessLevel: 'view' | 'contribute') => {
     const group = await createSharedGroup(services, actors.owner, world);

@@ -14,6 +14,15 @@ import { McDevicesController } from './devices/mcDevices.controller';
 import { McDevicesService } from './devices/mcDevices.service';
 import { AdminMachineControlController } from './admin/adminMachineControl.controller';
 import { AdminMachineControlService } from './admin/adminMachineControl.service';
+import { DeviceFileTransferController } from './transfers/deviceFileTransfer.controller';
+import { DeviceFileTransferService } from './transfers/deviceFileTransfer.service';
+
+import {
+  DesignLibraryController,
+  DeviceDesignDeliveryController,
+} from './designs/designDelivery.controller';
+import { DesignLibraryService } from './designs/designLibrary.service';
+import { DeviceDesignDeliveryService } from './designs/deviceDesignDelivery.service';
 
 @Module({
   imports: [JwtModule.register({})],
@@ -21,12 +30,18 @@ import { AdminMachineControlService } from './admin/adminMachineControl.service'
     MachineAppConnectionController,
     DevicePairingController,
     DeviceSessionController,
+    DeviceFileTransferController,
+    DesignLibraryController,
+    DeviceDesignDeliveryController,
     McDevicesController,
     AdminMachineControlController,
   ],
   providers: [
     MachineAppPairingService,
     DeviceSessionService,
+    DeviceFileTransferService,
+    DesignLibraryService,
+    DeviceDesignDeliveryService,
     DeviceTokenGuard,
     MachineAppGateway,
     MachineAppEventListenerService,
