@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import {
   AdminCreateUserCommand,
   AdminDeleteUserCommand,
-  AdminDisableUserCommand,
   CognitoIdentityProviderClient,
   ListUsersCommand,
   UserNotFoundException,
@@ -23,9 +22,8 @@ const buildListUsersFilter = (
 // Admin access to the Cognito user pool (COGNITO_USER_POOL_ID). Credentials
 // come from the AWS SDK default chain (IAM role, or AWS_ACCESS_KEY_ID /
 // AWS_SECRET_ACCESS_KEY) and need cognito-idp:ListUsers,
-// cognito-idp:AdminDeleteUser, cognito-idp:AdminDisableUser (an admin
-// removing a user) and (for invitations) cognito-idp:AdminCreateUser on
-// this user pool.
+// cognito-idp:AdminDeleteUser and (for invitations)
+// cognito-idp:AdminCreateUser on this user pool.
 @Injectable()
 export class CognitoUserDirectoryService {
   private readonly userPoolId: string;
@@ -93,21 +91,6 @@ export class CognitoUserDirectoryService {
       );
     } catch (error) {
       // Already gone (e.g. a concurrent retry) is the outcome we wanted.
-      if (!(error instanceof UserNotFoundException)) throw error;
-    }
-  };
-
-  // Sign-in then fails with "User is disabled.", which the portal shows as
-  // "an administrator removed your account".
-  disableUser = async (username: string): Promise<void> => {
-    try {
-      await this.client.send(
-        new AdminDisableUserCommand({
-          UserPoolId: this.userPoolId,
-          Username: username,
-        }),
-      );
-    } catch (error) {
       if (!(error instanceof UserNotFoundException)) throw error;
     }
   };

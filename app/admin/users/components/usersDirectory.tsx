@@ -16,6 +16,7 @@ import { UsersTable } from "./usersTable";
 import { InviteUserModal } from "./inviteUserModal";
 import { ChangeRoleModal } from "./changeRoleModal";
 import { RemoveUserDialog } from "./removeUserDialog";
+import { UserStatusDialog } from "./userStatusDialog";
 import { EditMachineAccessModal } from "./editMachineAccessModal";
 import type { AdminUser } from "@/lib/types/adminUser";
 import type { AdminRole } from "@/lib/types/adminRole";
@@ -40,6 +41,7 @@ export const UsersDirectory = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [roleTarget, setRoleTarget] = useState<AdminUser | null>(null);
   const [removeTarget, setRemoveTarget] = useState<AdminUser | null>(null);
+  const [statusTarget, setStatusTarget] = useState<AdminUser | null>(null);
   const [accessTarget, setAccessTarget] = useState<AdminUser | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const dismissToast = useCallback(() => setToast(null), []);
@@ -112,6 +114,7 @@ export const UsersDirectory = () => {
           onChangeRole={setRoleTarget}
           canEditMachineAccess={(user) => Boolean(user.machineAccess)}
           onEditMachineAccess={setAccessTarget}
+          onToggleDisabled={setStatusTarget}
           onRemove={setRemoveTarget}
         />
         {!errorMessage && !isLoading && (
@@ -139,6 +142,17 @@ export const UsersDirectory = () => {
             reload();
           }}
           onClose={() => setRemoveTarget(null)}
+        />
+      )}
+      {statusTarget && (
+        <UserStatusDialog
+          user={statusTarget}
+          onChanged={(isDisabled) => {
+            const name = `${statusTarget.firstName} ${statusTarget.lastName}`.trim();
+            setNotice(isDisabled ? `${name} was disabled.` : `${name} was enabled.`);
+            reload();
+          }}
+          onClose={() => setStatusTarget(null)}
         />
       )}
       {accessTarget && (

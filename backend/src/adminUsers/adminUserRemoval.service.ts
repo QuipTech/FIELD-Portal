@@ -20,13 +20,12 @@ const USER_NOT_FOUND_MESSAGE = 'User not found.';
 const LAST_OWNER_MESSAGE =
   'This is the last Owner. Make someone else an Owner first, or no one could manage FIELD.';
 const COGNITO_UNAVAILABLE_MESSAGE =
-  "We couldn't disable their sign-in right now, so nothing was removed. Please try again.";
+  "We couldn't delete their sign-in right now, so nothing was removed. Please try again.";
 
 // Users → Remove user (the Owner, via AdminScopeGuard): deletes the
 // person's FIELD account completely, like deleting your own, in any
-// organisation. Their Cognito sign-ins are disabled first — if that fails
-// nothing is removed — so their next sign-in says an administrator removed
-// them (removed_accounts covers a first-time Google/Apple sign-in too).
+// organisation. Their Cognito sign-ins are deleted first — if that fails
+// nothing is removed — so the email is free to sign up again.
 @Injectable()
 export class AdminUserRemovalService {
   private readonly logger = new Logger(AdminUserRemovalService.name);
@@ -52,11 +51,11 @@ export class AdminUserRemovalService {
     if (!target) throw new NotFoundException(USER_NOT_FOUND_MESSAGE);
 
     // The last-Owner rule is checked again (and enforced) when removing;
-    // checking it first avoids disabling a sign-in that then stays.
+    // checking it first avoids deleting a sign-in whose account then stays.
     if (target.is_last_owner) {
       throw new ConflictException(LAST_OWNER_MESSAGE);
     }
-    await this.disableSignIns(userId, target);
+    await this.deleteSignIns(userId, target);
     // Best effort, before the rows that name the endpoints are deleted.
     await this.pushDevices?.removeAllForUser(userId, target.tenant_id);
 
@@ -81,15 +80,15 @@ export class AdminUserRemovalService {
     }
   };
 
-  private disableSignIns = async (
+  private deleteSignIns = async (
     userId: string,
     target: removalRepository.RemovableUserRow,
   ): Promise<void> => {
     try {
-      await this.cognitoUsers.disableCognitoUsersForAccount(target);
+      await this.cognitoUsers.deleteCognitoUsersForAccount(target);
     } catch (error) {
       this.logger.error(
-        `Disabling Cognito sign-in failed for user ${userId}`,
+        `Deleting Cognito sign-in failed for user ${userId}`,
         error instanceof Error ? error.stack : String(error),
       );
       throw new ServiceUnavailableException(COGNITO_UNAVAILABLE_MESSAGE);

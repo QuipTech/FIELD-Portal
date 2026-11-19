@@ -1,6 +1,6 @@
 import { DatabaseService } from '../database/database.service';
 
-// SECURITY DEFINER functions from migration 0077: the user may be in any
+// SECURITY DEFINER functions from migrations 0077 and 0135: the user may be in any
 // organisation.
 
 export interface RemovableUserRow {

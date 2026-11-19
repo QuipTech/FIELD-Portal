@@ -7,6 +7,7 @@ import { AdminUsersService } from './adminUsers.service';
 import { AdminUserInvitationsService } from './adminUserInvitations.service';
 import { AdminUserRolesService } from './adminUserRoles.service';
 import { AdminUserRemovalService } from './adminUserRemoval.service';
+import { AdminUserStatusService } from './adminUserStatus.service';
 
 @Module({
   imports: [UsersModule, MachineSharingModule],
@@ -16,6 +17,7 @@ import { AdminUserRemovalService } from './adminUserRemoval.service';
     AdminUserInvitationsService,
     AdminUserRolesService,
     AdminUserRemovalService,
+    AdminUserStatusService,
   ],
   // Reused by the organisation's own Team screen (src/team).
   exports: [
@@ -23,6 +25,7 @@ import { AdminUserRemovalService } from './adminUserRemoval.service';
     AdminUserInvitationsService,
     AdminUserRolesService,
     AdminUserRemovalService,
+    AdminUserStatusService,
   ],
 })
 export class AdminUsersModule {}
