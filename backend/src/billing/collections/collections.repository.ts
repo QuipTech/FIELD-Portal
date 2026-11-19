@@ -132,7 +132,8 @@ export interface CreditLimitRow {
 }
 
 // Accounts that have a credit limit or a warning to clear, with what they
-// owe on invoices sent but not yet paid (due or not).
+// owe on invoices sent but not yet paid (due or not), and on statements
+// invoiced in Zoho but not yet paid.
 export const listCreditLimitAccounts = async (
   database: Reader,
 ): Promise<CreditLimitRow[]> => {
@@ -140,7 +141,11 @@ export const listCreditLimitAccounts = async (
     `SELECT a.id, a.name, a.credit_limit_cents, a.credit_limit_warned_at,
             coalesce((SELECT sum(${OUTSTANDING}) FROM billing.invoices i
                       WHERE i.billing_account_id = a.id AND ${UNPAID}
-                        AND i.kind <> 'personal'), 0) AS unpaid_cents
+                        AND i.kind <> 'personal'), 0)
+            -- Statements invoiced in Zoho and not yet paid.
+            + coalesce((SELECT sum(s.total_inc_gst_cents) FROM billing.statements s
+                        WHERE s.billing_account_id = a.id
+                          AND s.status = 'invoiced_external'), 0) AS unpaid_cents
      FROM billing.billing_accounts a
      WHERE a.deleted_at IS NULL
        AND (a.credit_limit_cents IS NOT NULL OR a.credit_limit_warned_at IS NOT NULL)`,

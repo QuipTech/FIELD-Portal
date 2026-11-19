@@ -13,6 +13,9 @@ import { DiscountService } from '../discounts/discount.service';
 import { PriceBooksService } from '../priceBooks/priceBooks.service';
 import { PLAN_CODES } from '../subscriptions/planCodes';
 import { sumAmountCents } from '../invoices/invoiceAmounts';
+import { usesAccountTerms } from '../accountTerms/accountTermsTypes';
+import { StatementsService } from '../statements/statements.service';
+import { hasRunStatement } from '../statements/statements.repository';
 import * as countsRepository from './dailyBillableCounts.repository';
 import {
   buildDailyCounts,
@@ -26,7 +29,8 @@ const HOUR_MS = 60 * 60 * 1000;
 
 // Monthly run, steps 1 and 2 (billing spec section 9), per billing account
 // in its own time zone: snapshot every finished day, then once the month
-// has closed, draft its invoice in arrears. Safe to repeat: snapshots never
+// has closed, draft its invoice in arrears (a 30-day account gets a Zoho
+// statement instead). Safe to repeat: snapshots never
 // overwrite and a month is drafted once (uq_invoices_account_period).
 @Injectable()
 export class MonthlyRunService {
@@ -37,6 +41,7 @@ export class MonthlyRunService {
     private readonly billingConfig: BillingConfigService,
     private readonly priceBooks: PriceBooksService,
     private readonly discounts: DiscountService,
+    private readonly statements: StatementsService,
   ) {}
 
   runAllAccounts = async (now: Date): Promise<string[]> => {
@@ -74,11 +79,12 @@ export class MonthlyRunService {
       );
       await this.writeSnapshots(client, account.id, periodStart, today);
       if (
-        await runInvoicesRepository.hasRunInvoice(
+        (await runInvoicesRepository.hasRunInvoice(
           client,
           account.id,
           periodStart,
-        )
+        )) ||
+        (await hasRunStatement(client, account.id, periodStart))
       )
         return null;
       // With no user paywall (REQUIRE_USER_SUBSCRIPTION off) only active
@@ -118,6 +124,16 @@ export class MonthlyRunService {
         charges,
       );
       const lines = [...charges, ...discounts];
+      // A 30-day account is invoiced in Zoho: the month goes on its
+      // statement for the month-end report, and nothing reaches Stripe.
+      if (usesAccountTerms(account))
+        return this.statements.addCharges(client, null, {
+          billingAccountId: account.id,
+          periodStart,
+          lines,
+          reason: 'monthly billing run (30-day account statement)',
+          markRun: true,
+        });
       const totalExGstCents = Math.max(
         0,
         sumAmountCents(lines.map((l) => l.amountCents)),

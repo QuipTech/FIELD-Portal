@@ -21,8 +21,10 @@ export const ensurePersonalAccount = async (
   const existing = await findPersonalAccount(client, actor);
   if (existing) return existing.billing_account_id;
   const result = await client.query<{ id: string }>(
-    `INSERT INTO billing.billing_accounts (name, billing_email, timezone)
-     VALUES ($1, $1, $2) RETURNING id`,
+    // A personal TECH subscription pays by card, never on a 30-day account.
+    `INSERT INTO billing.billing_accounts
+       (name, billing_email, timezone, payment_type, account_status)
+     VALUES ($1, $1, $2, 'card', 'none') RETURNING id`,
     [actor.email, timezone],
   );
   const accountId = result.rows[0].id;

@@ -8,6 +8,10 @@ type BillingReader = Pick<ServiceDatabaseService, 'query'>;
 export interface RunAccountRow {
   id: string;
   timezone: string;
+  // An approved 30-day account is invoiced in Zoho: its month goes on a
+  // statement, never to Stripe.
+  payment_type: 'card' | 'account';
+  account_status: 'none' | 'pending' | 'approved' | 'rejected' | 'on_hold';
 }
 
 // Organisation billing accounts. Personal TECH accounts pay up front
@@ -16,7 +20,8 @@ export const listRunAccounts = async (
   client: BillingReader,
 ): Promise<RunAccountRow[]> => {
   const result = await client.query<RunAccountRow>(
-    `SELECT a.id, a.timezone FROM billing.billing_accounts a
+    `SELECT a.id, a.timezone, a.payment_type, a.account_status
+     FROM billing.billing_accounts a
      WHERE a.deleted_at IS NULL
        AND NOT EXISTS (SELECT 1 FROM billing.personal_accounts p
                        WHERE p.billing_account_id = a.id)

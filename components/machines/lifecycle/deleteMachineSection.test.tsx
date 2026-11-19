@@ -14,7 +14,17 @@ vi.mock("@/lib/api/machineLifecycleApi", () => ({
 vi.mock("@/lib/api/requireAccessToken", () => ({ requireAccessToken: () => "test-token" }));
 afterEach(cleanup);
 
-const allowed = { canDelete: true, blocker: null, message: null, finalInvoiceFrom: null, unpaidInvoices: [], finalCharge: null, bankTransferAvailable: false, bankTransfer: null };
+const allowed = {
+  canDelete: true,
+  blocker: null,
+  message: null,
+  finalInvoiceFrom: null,
+  unpaidInvoices: [],
+  finalCharge: null,
+  billing: "card" as const,
+  bankTransferAvailable: false,
+  bankTransfer: null,
+};
 const renderSection = () => render(<DeleteMachineSection machineId="m1" machineLabel="ABC-01" lifecycleState="registered" />);
 const deleteButton = (name = "Delete machine") => screen.getAllByRole("button", { name }).at(-1) as HTMLButtonElement;
 
@@ -22,6 +32,20 @@ describe("deleting a machine", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(deleteMachineRequest).mockResolvedValue(null);
+  });
+
+  it("lets a 30-day account delete without paying: the days go on its statement", async () => {
+    vi.mocked(getMachineDeletionCheckRequest).mockResolvedValue({
+      ...allowed,
+      billing: "account",
+      message: "The days this machine was used are billed on your next monthly statement from QuipTech accounts.",
+    });
+    renderSection();
+    await screen.findByText(/next monthly statement/);
+    expect(screen.getByText("Nothing to pay now. This machine can be deleted.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Pay online" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Pay by bank transfer" })).toBeNull();
+    expect(deleteButton().disabled).toBe(false);
   });
 
   it("explains why it's blocked and when the final invoice comes", async () => {

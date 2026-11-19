@@ -139,8 +139,9 @@ export const PaymentTermsCard = ({ terms, onChanged, onAddCard }: PaymentTermsCa
       {terms.usesAccountTerms ? (
         <div className="flex flex-wrap items-center gap-3">
           <p className="flex-1 text-sm text-bodyGray">
-            Invoices are emailed{terms.application.accountsEmail ? ` to ${terms.application.accountsEmail}` : ""} with{" "}
-            {terms.termsDays} days to pay by bank transfer. Bank details are printed on each invoice. No card is charged.
+            Machines are billed monthly in arrears. QuipTech accounts emails your invoice
+            {terms.application.accountsEmail ? ` to ${terms.application.accountsEmail}` : ""} from Zoho each month, with{" "}
+            {terms.termsDays} days to pay by bank transfer. No card is charged.
           </p>
           <Button size="sm" variant="ghost" onClick={() => setIsSwitchingToCard(true)}>
             Pay by card instead

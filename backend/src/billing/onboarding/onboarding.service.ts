@@ -91,13 +91,35 @@ export class OnboardingService {
           today,
         );
         const line = calculateOnboardingLine(job.site_name, today, book);
+        const reason = `assisted onboarding completed: ${job.site_name}`;
+        // A 30-day account: on its Zoho statement, no invoice.
+        const statementId = await this.upFrontInvoices.chargeOnStatement(
+          client,
+          actor,
+          {
+            billingAccountId: job.billing_account_id,
+            periodStart: today,
+            lines: [line],
+            reason,
+          },
+        );
+        if (statementId) {
+          await onboardingRepository.closeOnboardingJob(client, {
+            jobId,
+            status: 'completed',
+            invoiceId: null,
+            waivedReason: null,
+            closedBy: actor.userId,
+          });
+          return { invoiceId: null, billingAccountId: job.billing_account_id };
+        }
         const id = await this.upFrontInvoices.draft(client, actor, {
           billingAccountId: job.billing_account_id,
           kind: 'onboarding',
           periodStart: null,
           periodEnd: null,
           lines: [line],
-          reason: `assisted onboarding completed: ${job.site_name}`,
+          reason,
         });
         await onboardingRepository.closeOnboardingJob(client, {
           jobId,
@@ -106,9 +128,13 @@ export class OnboardingService {
           waivedReason: null,
           closedBy: actor.userId,
         });
-        return { invoiceId: id, billingAccountId: job.billing_account_id };
+        return {
+          invoiceId: id as string | null,
+          billingAccountId: job.billing_account_id,
+        };
       });
-    await this.upFrontInvoices.finalise(invoiceId, billingAccountId);
+    if (invoiceId)
+      await this.upFrontInvoices.finalise(invoiceId, billingAccountId);
     return { id: jobId, invoiceId };
   };
 

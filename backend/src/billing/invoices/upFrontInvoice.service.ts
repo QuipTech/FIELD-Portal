@@ -1,7 +1,20 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { PersonalCheckoutService } from '../personalSubscription/personalCheckout.service';
 import { toStripeGatewayError } from '../stripe/stripeErrors';
 import { findInvoice } from './invoices.repository';
+import { findAccountTerms } from '../accountTerms/accountTerms.repository';
+import {
+  usesAccountTerms,
+  ZOHO_BILLED_MESSAGE,
+} from '../accountTerms/accountTermsTypes';
+import { StatementsService } from '../statements/statements.service';
+import { hasStatementLine } from '../statements/statements.repository';
+import { firstDayOfMonth } from '../billingCalendar/billingDay';
 import { ServiceDatabaseService } from '../../database/serviceDatabase.service';
 import { BillingAccountsService } from '../billingAccounts/billingAccounts.service';
 import { BillingActor, recordBillingAudit } from '../billingAudit/billingAudit';
@@ -38,6 +51,7 @@ export class UpFrontInvoiceService {
     private readonly checkout: PersonalCheckoutService,
     private readonly paymentSheets: InvoicePaymentSheetService,
     private readonly stripe: StripeService,
+    private readonly statements: StatementsService,
   ) {}
 
   // Once per annual term (uq_invoices_account_annual_term). The invoice
@@ -68,6 +82,31 @@ export class UpFrontInvoiceService {
     );
     if (!line || line.amountCents === 0) return null;
     const invoiceId = await this.serviceDatabase.transaction(async (client) => {
+      // A 30-day account: the term goes on its statement, once.
+      if (
+        await this.statements.isZohoBilled(
+          subscription.billingAccountId,
+          client,
+        )
+      ) {
+        const isCharged = await hasStatementLine(
+          client,
+          subscription.billingAccountId,
+          line.lineType,
+          {
+            subscriptionId: subscription.id,
+            periodStart: subscription.currentPeriodStart,
+          },
+        );
+        if (!isCharged)
+          await this.statements.addCharges(client, actor, {
+            billingAccountId: subscription.billingAccountId,
+            periodStart: firstDayOfMonth(subscription.currentPeriodStart),
+            lines: [line],
+            reason: 'annual term on the 30-day account statement',
+          });
+        return null;
+      }
       const existing = await client.query<{ id: string }>(
         `SELECT id FROM billing.invoices
          WHERE billing_account_id = $1 AND kind = 'annual'
@@ -153,6 +192,7 @@ export class UpFrontInvoiceService {
   ): Promise<string | null> => {
     try {
       const invoice = await this.requireInvoiceRow(invoiceId);
+      await this.assertCardBilled(invoice);
       const account = await this.billingAccounts.ensureStripeCustomer(
         await this.billingAccounts.requireAccount(invoice.billing_account_id),
       );
@@ -185,6 +225,7 @@ export class UpFrontInvoiceService {
     try {
       const invoice = await this.requireInvoiceRow(invoiceId);
       if (invoice.status === 'paid') return 'paid';
+      await this.assertCardBilled(invoice);
       const account = await this.billingAccounts.ensureStripeCustomer(
         await this.billingAccounts.requireAccount(invoice.billing_account_id),
       );
@@ -232,6 +273,7 @@ export class UpFrontInvoiceService {
     }
     try {
       const invoice = await this.requireInvoiceRow(invoiceId);
+      await this.assertCardBilled(invoice);
       // Not finalised on Stripe yet, so GST is still to be worked out.
       if (!invoice.hosted_invoice_url) {
         const account = await this.billingAccounts.ensureStripeCustomer(
@@ -288,6 +330,42 @@ export class UpFrontInvoiceService {
       );
     }
     return isAnyPaid;
+  };
+
+  // A 30-day account is invoiced in Zoho: an up-front charge (assisted
+  // onboarding) goes on its statement for the month instead of a Stripe
+  // invoice. The statement's id, or null for a card client, who gets an
+  // invoice as before.
+  chargeOnStatement = async (
+    client: Parameters<typeof insertRunInvoice>[0],
+    actor: BillingActor | null,
+    params: {
+      billingAccountId: string;
+      periodStart: string;
+      lines: CalculatedLine[];
+      reason: string;
+    },
+  ): Promise<string | null> => {
+    if (!(await this.statements.isZohoBilled(params.billingAccountId, client)))
+      return null;
+    return this.statements.addCharges(client, actor, {
+      ...params,
+      periodStart: firstDayOfMonth(params.periodStart),
+    });
+  };
+
+  // Paying online is for card clients; a 30-day account is invoiced in Zoho.
+  private assertCardBilled = async (invoice: {
+    billing_account_id: string;
+    stripe_invoice_id: string | null;
+  }) => {
+    if (invoice.stripe_invoice_id) return;
+    const terms = await findAccountTerms(
+      this.serviceDatabase,
+      invoice.billing_account_id,
+    );
+    if (terms && usesAccountTerms(terms))
+      throw new ConflictException(ZOHO_BILLED_MESSAGE);
   };
 
   private requireInvoiceRow = async (invoiceId: string) => {

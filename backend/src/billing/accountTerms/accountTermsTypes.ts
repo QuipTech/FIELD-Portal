@@ -42,6 +42,11 @@ export interface AccountTerms {
   } | null;
 }
 
+// An approved 30-day account is invoiced by QuipTech in Zoho Books: nothing
+// for it is ever created in Stripe (statements.service.ts).
+export const ZOHO_BILLED_MESSAGE =
+  'This organisation is on a 30-day account: QuipTech invoices it from Zoho, so nothing is paid online.';
+
 export const usesAccountTerms = (
   row: Pick<AccountTermsRow, 'payment_type' | 'account_status'>,
 ): boolean =>

@@ -9,8 +9,10 @@ import { PricesAndSettingsPanel } from "./pricesAndSettingsPanel";
 import { AccountApplicationsPanel } from "./accountApplicationsPanel";
 import { OverduePanel } from "./overduePanel";
 import { PromoCodesPanel } from "./promoCodesPanel";
+import { MonthEndReportPanel } from "./monthEndReportPanel";
 
 const TABS = [
+  { id: "monthEnd", label: "Month-end report" },
   { id: "invoices", label: "Invoices" },
   { id: "accounts", label: "Billing accounts" },
   { id: "applications", label: "Account applications" },
@@ -22,6 +24,7 @@ const TABS = [
 ] as const;
 
 const PANELS: Record<TabId, () => JSX.Element> = {
+  monthEnd: MonthEndReportPanel,
   invoices: InvoicesOverview,
   accounts: BillingAccountsManager,
   applications: AccountApplicationsPanel,
@@ -34,12 +37,13 @@ const PANELS: Record<TabId, () => JSX.Element> = {
 
 type TabId = (typeof TABS)[number]["id"];
 
-// The platform admin's billing page: every user's and organisation's
-// invoices, billing accounts (suspension, card or account, free periods,
+// The platform admin's billing page: the month-end report of 30-day
+// account statements (invoiced in Zoho), every user's and organisation's
+// Stripe invoices, billing accounts (suspension, card or account, free periods,
 // Enterprise, onboarding), 30-day account applications, overdue invoices,
 // promo codes, review tasks, onboarding jobs, and prices and settings.
 export const BillingAdminView = () => {
-  const [tab, setTab] = useState<TabId>("invoices");
+  const [tab, setTab] = useState<TabId>("monthEnd");
   const Panel = PANELS[tab];
   return (
     <>

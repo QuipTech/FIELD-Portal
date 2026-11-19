@@ -88,6 +88,9 @@ export interface MachineDeletionCheck {
     // Being paid by bank transfer: settled once an administrator approves it.
     payByBankTransfer: boolean;
   }[];
+  // "account": a 30-day account, invoiced monthly from Zoho. Nothing is paid
+  // before deleting; the days used go on the monthly statement.
+  billing: "account" | "card";
   // Bank details are set up, so paying by bank transfer can be offered.
   bankTransferAvailable: boolean;
   // Where to send the bank transfer already chosen.

@@ -17,18 +17,23 @@ import { audMoney } from "@/lib/format/audMoney";
 import { formatBillingDay } from "@/lib/format/billingDay";
 import { AllowanceUsageCard } from "./allowanceUsageCard";
 import { OrganisationInvoicesCard } from "./organisationInvoicesCard";
+import { OrganisationStatementsCard } from "./organisationStatementsCard";
+import { listOrganisationStatementsRequest } from "@/lib/api/statementsApi";
 import { OrganisationPlanCard, ThisMonthCard } from "./organisationPlanCard";
 
 // The organisation's billing (billing.manage): plan, this month, payment
-// state, fair use and invoices. Machines are billed monthly in arrears; a
-// card or direct debit saved in Stripe is charged automatically.
+// state, fair use and invoices. Machines are billed monthly in arrears: a
+// 30-day account (the default) gets a monthly statement that QuipTech
+// invoices from Zoho; on card, a card or direct debit saved in Stripe is
+// charged automatically.
 export const OrganisationBillingView = () => {
   const summary = useApiResource(getOrganisationBillingRequest, [], "Couldn't load your organisation's billing.");
   const invoices = useApiResource(listOrganisationInvoicesRequest, [], "Couldn't load invoices.");
   const paymentTerms = useApiResource(getPaymentTermsRequest, [], "Couldn't load how your organisation pays.");
+  const statements = useApiResource(listOrganisationStatementsRequest, [], "Couldn't load your statements.");
   const [portalError, setPortalError] = useState<string | null>(null);
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
-  const reload = () => { summary.reload(); invoices.reload(); paymentTerms.reload(); };
+  const reload = () => { summary.reload(); invoices.reload(); paymentTerms.reload(); statements.reload(); };
 
   const openPaymentMethods = async () => {
     setIsOpeningPortal(true);
@@ -81,7 +86,12 @@ export const OrganisationBillingView = () => {
       <OrganisationPlanCard summary={summary.data} onChanged={reload} />
       <ThisMonthCard summary={summary.data} />
       <AllowanceUsageCard allowance={summary.data.allowance} />
-      {invoices.data && <OrganisationInvoicesCard invoices={invoices.data} />}
+      {(paymentTerms.data?.usesAccountTerms || (statements.data?.length ?? 0) > 0) && statements.data && (
+        <OrganisationStatementsCard statements={statements.data} />
+      )}
+      {invoices.data && (!paymentTerms.data?.usesAccountTerms || invoices.data.length > 0) && (
+        <OrganisationInvoicesCard invoices={invoices.data} />
+      )}
       {invoices.error && <p className="text-sm text-danger">{invoices.error}</p>}
       {!paymentTerms.data?.usesAccountTerms && (
         <p className="px-1 text-xs text-bodyGray">
