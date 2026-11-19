@@ -1,21 +1,23 @@
 import {
   BadRequestException,
   Injectable,
-  NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { randomBytes, randomInt } from 'crypto';
+import { randomInt } from 'crypto';
 import * as authRepository from '../../auth/auth.repository';
 import { AuthenticatedUser } from '../../auth/types/authenticatedUser';
 import { hashToken } from '../../common/security/tokenHasher';
 import { DatabaseService } from '../../database/database.service';
 import { requireMachineAccess } from '../../machineSharing/access/machineAccess';
+import { findSessionState } from '../session/deviceSession.repository';
+import { newDeviceToken } from '../session/deviceSession.service';
+import { SessionState } from '../session/machineAppEvents';
+import { assertMachineControlEnabled } from '../access/machineControlAccess';
 import { PairDeviceDto } from './machineAppPairing.dtos';
 import * as pairingRepository from './machineAppPairing.repository';
 
 const MAX_CODE_ATTEMPTS = 10;
 const CODE_REFUSED_MESSAGE = "That code isn't valid or has expired.";
-const NOT_CONNECTED_MESSAGE = 'This machine has no machine app connected.';
 
 export interface MachineAppConnection {
   connected: boolean;
@@ -25,7 +27,10 @@ export interface MachineAppConnection {
     platform: string | null;
     appVersion: string | null;
     pairedAt: string;
+    online: boolean;
   } | null;
+  // Null when no tablet is connected.
+  session: SessionState | null;
 }
 
 // connected: the machine already has a tablet, so there's no code.
@@ -46,6 +51,13 @@ const generateCode = (): string =>
 export class MachineAppPairingService {
   constructor(private readonly databaseService: DatabaseService) {}
 
+  // For the portal socket, which has no route guard: 403 when the caller's
+  // organisation doesn't have Machine Control turned on.
+  assertMachineControlOn = (actor: AuthenticatedUser): Promise<void> =>
+    this.databaseService.withActor(actor, (client) =>
+      assertMachineControlEnabled(client, actor.tenantId),
+    );
+
   getConnection = (
     actor: AuthenticatedUser,
     machineId: string,
@@ -64,7 +76,9 @@ export class MachineAppPairingService {
           platform: device.platform,
           appVersion: device.app_version,
           pairedAt: new Date(device.paired_at).toISOString(),
+          online: device.online_since !== null,
         },
+        session: device && (await findSessionState(client, machineId)),
       };
     });
 
@@ -114,7 +128,7 @@ export class MachineAppPairingService {
         client,
         machineId,
       );
-      if (!wasConnected) throw new NotFoundException(NOT_CONNECTED_MESSAGE);
+      if (!wasConnected) return;
       await authRepository.insertAuditLog(client, {
         tenantId: actor.tenantId,
         userId: actor.userId,
@@ -127,7 +141,7 @@ export class MachineAppPairingService {
 
   // The token is only ever returned here; the database keeps its hash.
   pairDevice = async (dto: PairDeviceDto) => {
-    const deviceToken = randomBytes(32).toString('base64url');
+    const deviceToken = newDeviceToken();
     const paired = await this.databaseService.transaction((client) =>
       pairingRepository.pairDevice(client, {
         code: dto.code,

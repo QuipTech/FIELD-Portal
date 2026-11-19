@@ -4,7 +4,7 @@ import { PersonalPaymentPrompt } from "./personalPaymentPrompt";
 
 const state = vi.hoisted(() => ({
   pathname: "/dashboard",
-  billing: { status: null as null | { exempt: boolean; paymentRequired: boolean }, error: null as string | null, refresh: vi.fn() },
+  billing: { status: null as null | { exempt: boolean; paymentRequired: boolean; userSubscriptionRequired?: boolean }, error: null as string | null, refresh: vi.fn() },
 }));
 vi.mock("next/navigation", () => ({ usePathname: () => state.pathname }));
 vi.mock("@/lib/hooks/usePersonalBilling", () => ({ usePersonalBilling: () => state.billing }));
@@ -35,6 +35,12 @@ describe("subscription popup", () => {
       expect(screen.queryByText("Subscription payment required")).toBeNull();
     },
   );
+  it("never prompts anyone when there is no user subscription", () => {
+    // Defensive: even a status that claims payment is due is ignored.
+    state.billing.status = { exempt: false, paymentRequired: true, userSubscriptionRequired: false };
+    render(<PersonalPaymentPrompt />);
+    expect(screen.queryByText("Subscription payment required")).toBeNull();
+  });
   it("shows a retry when billing cannot be checked", () => {
     state.billing.error = "Unable to check subscription";
     render(<PersonalPaymentPrompt />);

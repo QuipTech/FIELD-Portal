@@ -21,8 +21,9 @@ import { INVOICE_CATEGORY_LABELS } from "../invoiceCategoryLabels";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/actionMenu";
 import { createCreditNoteRequest, holdInvoiceRequest, releaseInvoiceRequest } from "@/lib/api/adminBillingOperationsApi";
 import { AdminPromptDialog } from "./adminPromptDialog";
+import { MarkPaidDialog } from "./markPaidDialog";
 
-type InvoiceAction = { invoice: AdminInvoice; action: "credit" | "hold" };
+type InvoiceAction = { invoice: AdminInvoice; action: "credit" | "hold" | "markPaid" };
 
 const CREDITABLE = ["synced", "paid", "payment_failed"];
 
@@ -35,6 +36,8 @@ const actionsFor = (
   const creditable = (invoice.totalCents ?? 0) - invoice.amountCreditedCents;
   if (invoice.stripeInvoiceId && CREDITABLE.includes(invoice.status) && creditable > 0)
     items.push({ label: "Issue credit note", icon: "file", onSelect: () => start({ invoice, action: "credit" }) });
+  if (invoice.canMarkPaid)
+    items.push({ label: "Mark as paid", icon: "check", onSelect: () => start({ invoice, action: "markPaid" }) });
   if (invoice.invoiceKind === "monthly" && invoice.status === "draft")
     items.push(
       invoice.heldAt
@@ -82,6 +85,11 @@ const InvoiceRow = ({ invoice, actions }: { invoice: AdminInvoice; actions: Acti
       <TableCell className="flex flex-wrap items-center gap-1">
         <span title={category.hint}><Tag tone={category.tone}>{category.label}</Tag></span>
         {invoice.heldAt && <Tag tone="amber">Held</Tag>}
+        {invoice.payByBankTransfer && invoice.status !== "paid" && (
+          <span title="The customer is paying by bank transfer. Use Mark as paid once the money arrives.">
+            <Tag tone="amber">Bank transfer</Tag>
+          </span>
+        )}
       </TableCell>
       <TableCell className="text-sm">
         {invoice.hostedInvoiceUrl ? (
@@ -254,6 +262,18 @@ export const InvoicesOverview = () => {
             await createCreditNoteRequest(requireAccessToken(), acting.invoice.id, { amountCents: Number(amount), reason: String(reason) });
             setActing(null);
             setActionMessage("Credit note issued on Stripe.");
+            list.reload();
+          }}
+          onClose={() => setActing(null)}
+        />
+      )}
+      {acting?.action === "markPaid" && (
+        <MarkPaidDialog
+          invoiceId={acting.invoice.id}
+          label={`${acting.invoice.organisationName} · ${formatMonth(acting.invoice.periodStart)} · ${formatTotal(acting.invoice)}`}
+          onSaved={() => {
+            setActing(null);
+            setActionMessage("Invoice marked as paid.");
             list.reload();
           }}
           onClose={() => setActing(null)}

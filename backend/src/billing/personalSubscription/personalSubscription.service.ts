@@ -48,6 +48,8 @@ export class PersonalSubscriptionService {
       this.isOwner(actor),
       this.config.loadConfig(),
     ]);
+    if (!config.REQUIRE_USER_SUBSCRIPTION)
+      return noUserSubscription(exempt, config.DEFAULT_BILLING_TIMEZONE, now);
     const [account, periods] = await Promise.all([
       exempt ? undefined : findPersonalAccount(this.serviceDatabase, actor),
       exempt ? [] : findPersonalPeriods(this.serviceDatabase, actor),
@@ -66,6 +68,7 @@ export class PersonalSubscriptionService {
           hasOrganisationTechSeat(this.serviceDatabase, actor.userId, today),
         ]);
     return {
+      userSubscriptionRequired: true,
       exempt,
       coveredByOrganisation,
       paymentRequired:
@@ -85,6 +88,7 @@ export class PersonalSubscriptionService {
     };
   };
 
+  // Earlier personal invoices stay visible, even with the paywall off.
   listInvoices = async (actor: AuthenticatedUser) =>
     (await findPersonalInvoiceHistory(this.serviceDatabase, actor))
       .filter((period) => period.status !== 'draft')
@@ -100,3 +104,30 @@ export class PersonalSubscriptionService {
         hostedInvoiceUrl: period.hosted_invoice_url,
       }));
 }
+
+// No user paywall: nobody owes a personal subscription, so the portal and
+// the mobile app never show "subscription is due".
+const noUserSubscription = (
+  exempt: boolean,
+  timezone: string,
+  now: Date,
+): PersonalBillingStatus => {
+  const today = toBillingDay(now, timezone);
+  return {
+    userSubscriptionRequired: false,
+    exempt,
+    coveredByOrganisation: false,
+    paymentRequired: false,
+    monthlyCents: 0,
+    currency: 'AUD',
+    timezone,
+    priceBookId: null,
+    periodStart: firstDayOfMonth(today),
+    periodEnd: firstDayOfNextMonth(today),
+    invoiceId: null,
+    invoiceStatus: null,
+    gstCents: null,
+    totalCents: null,
+    hostedInvoiceUrl: null,
+  };
+};

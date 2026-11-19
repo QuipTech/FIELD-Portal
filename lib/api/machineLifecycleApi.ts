@@ -9,6 +9,7 @@ import type {
   MachineLifecycle,
   MachineTransfer,
 } from "../types/machineLifecycle";
+import type { PromoPreview, PromoRedemption } from "../types/paymentTerms";
 
 // Activating, deactivating, archiving or reactivating a machine. Needs the
 // machine.lifecycle permission and a billing account on the organisation.
@@ -35,11 +36,19 @@ export const getMachineDeletionCheckRequest = (accessToken: string, machineId: s
 // Raises the days-used charge for a machine being deleted and returns the
 // Stripe Checkout URL to pay it, which comes back to the machine's page on
 // returnOrigin (only a portal origin is accepted). Safe to repeat.
-export const payMachineFinalChargeRequest = (accessToken: string, machineId: string, returnOrigin: string) =>
+// "online" (the default) returns Stripe Checkout's paymentUrl; "bank_transfer"
+// emails the invoice with the bank details instead, settled once an
+// administrator marks it paid.
+export const payMachineFinalChargeRequest = (
+  accessToken: string,
+  machineId: string,
+  returnOrigin: string,
+  paymentMethod: "online" | "bank_transfer" = "online",
+) =>
   apiRequest<FinalChargePayment>(`/machines/${machineId}/final-charge`, {
     method: "POST",
     headers: authorizationHeader(accessToken),
-    body: JSON.stringify({ returnOrigin }),
+    body: JSON.stringify({ returnOrigin, paymentMethod }),
   });
 
 // Soft delete; 409 until it's out of active and its billing is settled.
@@ -98,4 +107,23 @@ export const getChainOfCustodyRequest = (accessToken: string, machineId: string)
 export const getActivationQuoteRequest = (accessToken: string, count = 1): Promise<ActivationQuote> =>
   apiRequest<ActivationQuote>(`/machines/lifecycle/activation-quote?count=${count}`, {
     headers: authorizationHeader(accessToken),
+  });
+
+// Promo codes in the Activate dialog (machine.lifecycle): the organisation's
+// current promo, checking a code, and applying it just before activating.
+export const getActivationPromoRequest = (accessToken: string) =>
+  apiRequest<PromoRedemption | null>("/machines/lifecycle/activation-promo", { headers: authorizationHeader(accessToken) });
+
+export const validateActivationPromoRequest = (accessToken: string, code: string) =>
+  apiRequest<PromoPreview>("/machines/lifecycle/activation-promo/validate", {
+    method: "POST",
+    headers: authorizationHeader(accessToken),
+    body: JSON.stringify({ code }),
+  });
+
+export const redeemActivationPromoRequest = (accessToken: string, code: string) =>
+  apiRequest<PromoRedemption>("/machines/lifecycle/activation-promo", {
+    method: "POST",
+    headers: authorizationHeader(accessToken),
+    body: JSON.stringify({ code }),
   });

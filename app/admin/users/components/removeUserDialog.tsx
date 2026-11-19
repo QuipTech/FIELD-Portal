@@ -31,8 +31,8 @@ export const RemoveUserDialog = ({ user, onRemoved, onClose }: RemoveUserDialogP
       </p>
       <p className="text-sm text-mutedGray">
         Their account and personal data are deleted and they&apos;re signed out. Records they created for the
-        organisation (machine history, support cases) stay, without their name. If they try to sign in, they&apos;re
-        told an administrator removed their account. You can invite them again later.
+        organisation (machine history, support cases) stay, without their name. Their sign-in is deleted too, so
+        the email can sign up or be invited again.
       </p>
     </ConfirmDialog>
   );

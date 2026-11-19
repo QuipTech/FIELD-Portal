@@ -1,5 +1,9 @@
 import { ConfigService } from '@nestjs/config';
-import { assertStripeKeyAllowed, stripeModeOf } from './stripeConfig';
+import {
+  assertPublishableKeyMatches,
+  assertStripeKeyAllowed,
+  stripeModeOf,
+} from './stripeConfig';
 import { StripeService } from './stripe.service';
 
 const LIVE_KEY = 'sk_live_example';
@@ -56,5 +60,56 @@ describe('Stripe live-key guard', () => {
     expect(stripeModeOf(RESTRICTED_LIVE_KEY)).toBe('live');
     expect(stripeModeOf('rk_test_example')).toBe('test');
     expect(stripeModeOf(undefined)).toBe('not_configured');
+  });
+});
+
+describe('Stripe publishable key guard', () => {
+  it('accepts a publishable key from the same mode, or none at all', () => {
+    expect(() =>
+      assertPublishableKeyMatches(TEST_KEY, 'pk_test_example'),
+    ).not.toThrow();
+    expect(() =>
+      assertPublishableKeyMatches(LIVE_KEY, 'pk_live_example'),
+    ).not.toThrow();
+    expect(() =>
+      assertPublishableKeyMatches(TEST_KEY, undefined),
+    ).not.toThrow();
+  });
+
+  it.each([
+    [TEST_KEY, 'pk_live_example'],
+    [LIVE_KEY, 'pk_test_example'],
+    [RESTRICTED_LIVE_KEY, 'pk_test_example'],
+  ])('refuses %s with %s (different modes)', (secret, publishable) => {
+    expect(() => assertPublishableKeyMatches(secret, publishable)).toThrow(
+      /same Stripe account and mode/,
+    );
+  });
+
+  it('refuses a secret key put in the publishable key setting', () => {
+    expect(() => assertPublishableKeyMatches(TEST_KEY, TEST_KEY)).toThrow(
+      /Never put a secret key there/,
+    );
+  });
+
+  it('stops the app booting on a mismatch, and exposes a matching key', () => {
+    expect(
+      () =>
+        new StripeService(
+          configWith({
+            STRIPE_SECRET_KEY: TEST_KEY,
+            STRIPE_PUBLISHABLE_KEY: 'pk_live_example',
+            NODE_ENV: 'staging',
+          }),
+        ),
+    ).toThrow(/Refusing to start/);
+    const service = new StripeService(
+      configWith({
+        STRIPE_SECRET_KEY: TEST_KEY,
+        STRIPE_PUBLISHABLE_KEY: 'pk_test_example',
+        NODE_ENV: 'staging',
+      }),
+    );
+    expect(service.publishableKey).toBe('pk_test_example');
   });
 });

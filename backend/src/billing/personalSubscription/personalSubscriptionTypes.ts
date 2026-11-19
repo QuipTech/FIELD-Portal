@@ -17,6 +17,9 @@ export interface PersonalPeriodRow {
 }
 
 export interface PersonalBillingStatus {
+  // billing.config REQUIRE_USER_SUBSCRIPTION. false (the default): there is
+  // no personal subscription for anyone and paymentRequired is always false.
+  userSubscriptionRequired: boolean;
   exempt: boolean;
   // An active TECH seat on the organisation's account pays for this month.
   coveredByOrganisation: boolean;

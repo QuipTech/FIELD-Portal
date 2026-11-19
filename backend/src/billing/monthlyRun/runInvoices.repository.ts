@@ -55,7 +55,8 @@ export const MACHINE_FINAL_INVOICE_KIND = 'machine_final';
 
 // kind 'monthly' (the run, in arrears, waits for review), 'annual' (a
 // term's up-front invoice), 'onboarding' (assisted onboarding on
-// completion) or 'machine_final' (paid on the spot through Stripe Checkout);
+// completion) or 'machine_final' (paid on the spot: Stripe Checkout, or the
+// mobile app's Payment Sheet);
 // annual and onboarding are finalised straight away.
 export const insertRunInvoice = async (
   client: PoolClient,
@@ -105,6 +106,22 @@ export const insertRunInvoice = async (
   return invoiceId;
 };
 
+// A month that discounts brought to A$0: recorded as paid with nothing to
+// collect, and never pushed to Stripe or emailed.
+export const markNoCharge = async (
+  client: PoolClient,
+  invoiceId: string,
+  reason: 'fully_discounted',
+): Promise<void> => {
+  await client.query(
+    `UPDATE billing.invoices SET status = 'paid', no_charge_reason = $2,
+       total_ex_gst_cents = 0, gst_cents = 0, total_cents = 0,
+       review_until = NULL, updated_at = now()
+     WHERE id = $1 AND status = 'draft'`,
+    [invoiceId, reason],
+  );
+};
+
 // Run drafts whose review window has passed and nobody has held.
 export const listInvoicesDueForFinalisation = async (
   client: BillingReader,
@@ -115,8 +132,9 @@ export const listInvoicesDueForFinalisation = async (
      WHERE (status = 'draft' AND kind = 'monthly' AND held_at IS NULL
             AND review_until <= $1)
         -- Up-front invoices whose Stripe push failed: retried. Not
-        -- machine_final: it's paid through Stripe Checkout, which creates its
-        -- own Stripe invoice, so pushing one too would bill it twice.
+        -- machine_final: it's paid on the spot (Stripe Checkout, which creates
+        -- its own Stripe invoice, or the app's Payment Sheet, which pushes it
+        -- itself), so pushing it here could bill it twice.
         OR (status IN ('draft', 'final') AND kind IN ('annual', 'onboarding')
             AND created_at <= $1::timestamptz - interval '10 minutes')
      ORDER BY coalesce(review_until, created_at), id`,

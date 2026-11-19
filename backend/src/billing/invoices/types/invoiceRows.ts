@@ -20,6 +20,19 @@ export interface InvoiceRow {
   review_until: Date | null;
   held_at: Date | null;
   hold_reason: string | null;
+  kind: string;
+  po_number: string | null;
+  collection_method: 'charge_automatically' | 'send_invoice' | null;
+  due_on: string | null;
+  // Set when a platform administrator records a payment made outside
+  // Stripe (bank transfer, cheque).
+  marked_paid_on: string | null;
+  marked_paid_method: string | null;
+  marked_paid_reference: string | null;
+  // Why it was never sent to Stripe (e.g. discounted to A$0).
+  no_charge_reason: string | null;
+  // The customer chose to pay by bank transfer (a machine's final charge).
+  pay_by_bank_transfer: boolean;
   created_at: Date;
   updated_at: Date;
 }

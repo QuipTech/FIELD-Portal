@@ -6,8 +6,8 @@ import { invalidateCached } from "@/lib/machineDetail/resourceCache";
 import { useCachedResource } from "@/lib/machineDetail/useCachedResource";
 import type { MachineDetailService } from "@/lib/types/machineDetailService";
 
-// Before the 15-minute signed links expire on a page left open.
-const REFRESH_LINKS_EVERY_MS = 10 * 60 * 1000;
+// Pick up files sent by a tablet while the user is viewing Documents.
+const REFRESH_DOCUMENTS_EVERY_MS = 10_000;
 
 export const useMachineDocuments = (service: MachineDetailService, machineId: string) => {
   const documents = useCachedResource(
@@ -18,8 +18,15 @@ export const useMachineDocuments = (service: MachineDetailService, machineId: st
   const { reload } = documents;
 
   useEffect(() => {
-    const timer = setInterval(reload, REFRESH_LINKS_EVERY_MS);
-    return () => clearInterval(timer);
+    const refreshIfVisible = () => {
+      if (document.visibilityState === "visible") reload();
+    };
+    const timer = setInterval(refreshIfVisible, REFRESH_DOCUMENTS_EVERY_MS);
+    document.addEventListener("visibilitychange", refreshIfVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", refreshIfVisible);
+    };
   }, [reload]);
 
   // A deleted file may also be on a history entry, so everything cached for

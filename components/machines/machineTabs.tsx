@@ -7,11 +7,13 @@ interface MachineTabsProps {
   active: MachineTab;
   // Null while it loads or when it couldn't be counted.
   openCaseCount: number | null;
+  // The Machine app tab: only with Machine Control on and permission to see it.
+  showMachineApp?: boolean;
 }
 
 // Every tab stays inside the machine page; a case row then opens the case.
-export const MachineTabs = ({ machineId, active, openCaseCount }: MachineTabsProps) => {
-  const tabs: { key: MachineTab; label: string; href: string }[] = [
+export const MachineTabs = ({ machineId, active, openCaseCount, showMachineApp = true }: MachineTabsProps) => {
+  const allTabs: { key: MachineTab; label: string; href: string }[] = [
     { key: "components", label: "Components", href: `/machines/${machineId}` },
     { key: "history", label: "History", href: `/machines/${machineId}/history` },
     { key: "documents", label: "Documents", href: `/machines/${machineId}/documents` },
@@ -20,6 +22,7 @@ export const MachineTabs = ({ machineId, active, openCaseCount }: MachineTabsPro
     { key: "manuals", label: "Manuals", href: `/machines/${machineId}/manuals` },
     { key: "cases", label: "Open cases", href: `/machines/${machineId}/cases` },
   ];
+  const tabs = allTabs.filter((tab) => tab.key !== "machine-app" || showMachineApp);
 
   return (
     // flex-none: the page is a scrolling flex column, and overflow-x-auto would

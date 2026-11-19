@@ -1,4 +1,7 @@
 export interface PersonalBillingStatus {
+  // false (the default): there is no personal subscription for anyone, so
+  // nothing is ever due and the Billing page is for organisation admins.
+  userSubscriptionRequired: boolean;
   exempt: boolean;
   // An active TECH seat paid by the user's organisation covers this month.
   coveredByOrganisation: boolean;

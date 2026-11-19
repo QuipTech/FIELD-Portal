@@ -6,6 +6,7 @@ import { requireAccessToken } from "@/lib/api/requireAccessToken";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import type { LifecycleState } from "@/lib/types/machineLifecycle";
 import { ActivationPriceSummary } from "./activationPriceSummary";
+import { useActivationPromo } from "@/lib/hooks/useActivationPromo";
 
 export interface BulkActivationMachine {
   id: string;
@@ -24,7 +25,10 @@ interface BulkActivateDialogProps {
 // first. Each machine succeeds or fails on its own.
 export const BulkActivateDialog = ({ machines, onDone, onClose }: BulkActivateDialogProps) => {
   const count = machines.length;
+  const promo = useActivationPromo();
   const activate = async () => {
+    // First, so a code that can no longer be used stops the activation.
+    await promo.redeemPending();
     const token = requireAccessToken();
     const groups = [
       { action: "activate" as const, ids: machines.filter((machine) => machine.lifecycleState === "registered").map((machine) => machine.id) },
@@ -53,7 +57,7 @@ export const BulkActivateDialog = ({ machines, onDone, onClose }: BulkActivateDi
           They count toward this month&apos;s billing from today, and their full history, components, photos, AI and
           support open for everyone in your organisation.
         </p>
-        <ActivationPriceSummary count={count} />
+        <ActivationPriceSummary count={count} promo={promo} />
       </div>
     </ConfirmDialog>
   );

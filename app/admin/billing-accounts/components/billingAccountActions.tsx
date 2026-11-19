@@ -9,6 +9,7 @@ import {
 import { requireAccessToken } from "@/lib/api/requireAccessToken";
 import type { OrganisationBilling } from "@/lib/types/billingAccount";
 import { AdminPromptDialog } from "./adminPromptDialog";
+import { FreePeriodDialog, PaymentTermsDialog } from "./paymentTermsDialogs";
 import type { BillingAccountAction } from "./billingAccountsTable";
 
 interface BillingAccountActionsProps {
@@ -24,11 +25,15 @@ export const BillingAccountActions = ({ organisation, action, onDone, onClose }:
   const name = organisation.organisationName;
   const token = () => requireAccessToken();
 
+  if (action === "paymentTerms")
+    return <PaymentTermsDialog organisation={organisation} onDone={onDone} onClose={onClose} />;
+  if (action === "freePeriod")
+    return <FreePeriodDialog organisation={organisation} onDone={onDone} onClose={onClose} />;
   if (action === "suspend")
     return (
       <AdminPromptDialog
         title={`Suspend ${name}`}
-        description="Pauses new machine activations and new AI sessions until overdue invoices are paid. Nothing in progress stops, and reading and export stay available. Allowed 14 days after the first overdue notice."
+        description="Pauses new machine activations and new AI sessions until overdue invoices are paid. Nothing in progress stops, and reading and export stay available. Allowed 14 days after the earliest unpaid due date."
         confirmLabel="Suspend account"
         confirmVariant="danger"
         fields={[{ name: "reason", label: "Reason (audit log)" }]}

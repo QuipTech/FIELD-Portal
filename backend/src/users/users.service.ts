@@ -10,7 +10,6 @@ import * as authRepository from '../auth/auth.repository';
 import { UserRow } from '../auth/types/authRows';
 import { CognitoIdentity } from '../auth/types/cognitoIdentity';
 import * as usersRepository from './users.repository';
-import { isRemovedAccount } from './removedAccounts.repository';
 import { createTenantAndFirstUserFromCognito } from './cognitoSignup';
 import {
   CognitoSignupProfile,
@@ -20,10 +19,9 @@ import {
 const SUSPENDED_TENANT_STATUS = 'suspended';
 const ACCOUNT_UNAVAILABLE_MESSAGE =
   'This account is disabled or its organisation is suspended.';
-// The portal shows this as is (and the same words when Cognito says the
-// sign-in is disabled).
-export const ACCOUNT_REMOVED_MESSAGE =
-  'An administrator removed your FIELD account. Contact your administrator if you think this is a mistake.';
+// Admin portal → Users → Disable user. The portal shows it as is.
+export const ACCOUNT_DISABLED_MESSAGE =
+  'An administrator disabled your FIELD account. Contact your administrator to get access again.';
 const UNVERIFIED_EMAIL_MESSAGE =
   'Verify your email address before signing in with this account.';
 
@@ -41,8 +39,12 @@ interface SignInCandidate {
 // An invited user (admin portal → Invite user) may sign in; their first
 // sign-in makes them active (recordCognitoSignIn / linkCognitoIdentity).
 const SIGN_IN_STATUSES = ['active', 'invited'];
+const DISABLED_USER_STATUS = 'disabled';
 
 const assertCanSignIn = (candidate: SignInCandidate): void => {
+  if (candidate.status === DISABLED_USER_STATUS) {
+    throw new ForbiddenException(ACCOUNT_DISABLED_MESSAGE);
+  }
   if (
     !SIGN_IN_STATUSES.includes(candidate.status) ||
     candidate.tenant_status === SUSPENDED_TENANT_STATUS
@@ -88,20 +90,13 @@ export class UsersService {
 
   // Login and signup are the same call: an existing account (by Cognito sub,
   // then by email) is signed in; otherwise a new one is created — but only
-  // once the caller has sent the company name + phone number it needs, and
-  // never for an email an admin removed.
+  // once the caller has sent the company name + phone number it needs.
   findOrCreateFromCognito = async (
     identity: CognitoIdentity,
     signupProfile?: CognitoSignupProfile,
   ): Promise<CognitoUserResolution> => {
     const existingUser = await this.findExistingUser(identity);
     if (existingUser) return { status: 'resolved', user: existingUser };
-    // Removed by an admin: say so, rather than offering a new signup (e.g.
-    // a first Google sign-in with the same email).
-    if (await isRemovedAccount(this.databaseService, identity.email)) {
-      throw new ForbiddenException(ACCOUNT_REMOVED_MESSAGE);
-    }
-
     assertEmailTrusted(identity);
     if (!signupProfile) return { status: 'profileRequired' };
 

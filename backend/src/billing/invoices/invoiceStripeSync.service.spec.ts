@@ -64,7 +64,13 @@ beforeEach(() => {
     billingAccounts as unknown as BillingAccountsService,
     stripe as unknown as StripeService,
     {
-      loadConfig: async () => ({ PAYMENT_TERMS_DAYS: 21 }),
+      loadConfig: async () => ({
+        PAYMENT_TERMS_DAYS: 21,
+        BANK_ACCOUNT_NAME: 'QuipTech Pty Ltd',
+        BANK_BSB: '064-000',
+        BANK_ACCOUNT_NUMBER: '12345678',
+        PAYMENT_REFERENCE_FORMAT: 'FIELD-{invoiceRef}',
+      }),
     } as unknown as BillingConfigService,
   );
 });
@@ -152,6 +158,83 @@ describe('InvoiceStripeSyncService', () => {
     expect(state.invoices[0]).toMatchObject({ status: 'synced' });
   });
 
+  describe('30-day account', () => {
+    const approvedAccount = (overrides: Record<string, unknown> = {}) => ({
+      id: account.id,
+      name: 'Acme Mining',
+      payment_type: 'account',
+      account_status: 'approved',
+      terms_days: 30,
+      po_required: false,
+      default_po_number: null,
+      ...overrides,
+    });
+
+    it('sends the invoice with its terms and never charges a card', async () => {
+      state.accountTerms = approvedAccount();
+      stripe.hasDefaultPaymentMethod.mockResolvedValue(true);
+      await service.pushInvoice(state.invoices[0]);
+      expect(stripe.createInvoice).toHaveBeenCalledWith(
+        expect.objectContaining({
+          chargeAutomatically: false,
+          daysUntilDue: 30,
+        }),
+        expect.any(String),
+      );
+      expect(stripe.hasDefaultPaymentMethod).not.toHaveBeenCalled();
+      expect(stripe.payInvoice).not.toHaveBeenCalled();
+      expect(state.invoices[0]).toMatchObject({ status: 'synced' });
+    });
+
+    it('prints bank details and the payment reference in the footer', async () => {
+      state.accountTerms = approvedAccount();
+      await service.pushInvoice(state.invoices[0]);
+      const input = stripe.createInvoice.mock.calls[0][0];
+      expect(input.footer).toContain('within 30 days');
+      expect(input.footer).toContain('BSB: 064-000');
+      expect(input.footer).toContain('Account number: 12345678');
+      expect(input.footer).toContain('Payment reference: FIELD-11111111');
+    });
+
+    it("prints the invoice's PO number, falling back to the standing one", async () => {
+      state.accountTerms = approvedAccount({
+        default_po_number: 'PO-STANDING',
+      });
+      state.invoices[0].po_number = 'PO-778';
+      await service.pushInvoice(state.invoices[0]);
+      expect(stripe.createInvoice.mock.calls[0][0].customFields).toEqual([
+        { name: 'PO number', value: 'PO-778' },
+      ]);
+    });
+
+    it("sends a card customer's bank transfer invoice with the bank details, never charging the card", async () => {
+      state.invoices[0].pay_by_bank_transfer = true;
+      stripe.hasDefaultPaymentMethod.mockResolvedValue(true);
+      await service.pushInvoice(state.invoices[0]);
+      const input = stripe.createInvoice.mock.calls[0][0];
+      expect(input).toMatchObject({
+        chargeAutomatically: false,
+        daysUntilDue: 21,
+      });
+      expect(input.footer).toContain('BSB: 064-000');
+      expect(input.footer).toContain('Payment reference: FIELD-11111111');
+      expect(stripe.payInvoice).not.toHaveBeenCalled();
+    });
+
+    it('keeps the card flow while an application is pending', async () => {
+      state.accountTerms = approvedAccount({
+        payment_type: 'card',
+        account_status: 'pending',
+      });
+      stripe.hasDefaultPaymentMethod.mockResolvedValue(true);
+      await service.pushInvoice(state.invoices[0]);
+      expect(stripe.createInvoice).toHaveBeenCalledWith(
+        expect.objectContaining({ chargeAutomatically: true, footer: null }),
+        expect.any(String),
+      );
+    });
+  });
+
   describe('refreshPaidStatus', () => {
     const query = jest.fn().mockResolvedValue({ rowCount: 1 });
     const retrieveInvoice = jest.fn();
@@ -203,5 +286,30 @@ describe('InvoiceStripeSyncService', () => {
       ).resolves.toBe(false);
       expect(retrieveInvoice).not.toHaveBeenCalled();
     });
+  });
+
+  it('makes a card-only invoice for the Payment Sheet and never charges a saved card', async () => {
+    stripe.hasDefaultPaymentMethod.mockResolvedValue(true);
+    await service.pushInvoice(state.invoices[0], { forPaymentSheet: true });
+    expect(stripe.createInvoice).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chargeAutomatically: false,
+        paymentMethodTypes: ['card'],
+      }),
+      expect.any(String),
+    );
+    expect(stripe.hasDefaultPaymentMethod).not.toHaveBeenCalled();
+    expect(stripe.payInvoice).not.toHaveBeenCalled();
+    expect(state.invoices[0]).toMatchObject({
+      status: 'synced',
+      hosted_invoice_url: 'https://invoice.stripe.com/i/test',
+    });
+  });
+
+  it('leaves other invoices on the account defaults', async () => {
+    await service.pushInvoice(state.invoices[0]);
+    expect(stripe.createInvoice.mock.calls[0][0]).not.toHaveProperty(
+      'paymentMethodTypes',
+    );
   });
 });

@@ -21,6 +21,15 @@ vi.mock("@/lib/api/organisationBillingApi", () => ({
   getOrganisationInvoicePdfRequest: vi.fn(),
 }));
 vi.mock("@/lib/api/requireAccessToken", () => ({ requireAccessToken: () => "test-token" }));
+vi.mock("@/lib/api/paymentTermsApi", () => ({
+  getPaymentTermsRequest: vi.fn(),
+  applyForAccountRequest: vi.fn(),
+  choosePayByCardRequest: vi.fn(),
+  setDefaultPoNumberRequest: vi.fn(),
+  setInvoicePoNumberRequest: vi.fn(),
+  validatePromoCodeRequest: vi.fn(),
+  redeemPromoCodeRequest: vi.fn(),
+}));
 
 const bands = [
   { bandNo: 1, lowerQty: 1, upperQty: 25, unitCents: 3500 },
@@ -36,7 +45,7 @@ const summary = (overrides: Partial<OrganisationBillingSummary> = {}): Organisat
     priceBookVersion: 1, unitCents: null, bands,
   },
   thisMonth: { periodStart: "2026-10-01", invoicedOn: "2026-11-01", activeToday: 3, peakSoFar: 3, rateCents: 3500, estimateCents: 10500 },
-  overdue: { count: 0, amountCents: 0, firstNoticeAt: null, suspensionFrom: null },
+  overdue: { count: 0, amountCents: 0, firstDueOn: null, suspensionFrom: null },
   allowance: [{ metric: "ai_turns", allowance: 300, used: 270, thresholdState: "notified" }],
   ...overrides,
 });
@@ -59,7 +68,7 @@ describe("organisation billing", () => {
 
   it("warns about overdue invoices before suspension", async () => {
     vi.mocked(getOrganisationBillingRequest).mockResolvedValue(
-      summary({ overdue: { count: 1, amountCents: 5390, firstNoticeAt: "2026-10-15T00:00:00Z", suspensionFrom: "2026-10-29T00:00:00Z" } }),
+      summary({ overdue: { count: 1, amountCents: 5390, firstDueOn: "2026-10-15", suspensionFrom: "2026-10-29T00:00:00Z" } }),
     );
     render(<OrganisationBillingView />);
     expect((await screen.findByRole("alert")).textContent).toContain("may be paused from 29 October 2026");

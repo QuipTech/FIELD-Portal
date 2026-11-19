@@ -603,10 +603,30 @@ the API runs normally.
     HEIC, up to 20 MB, stored under `documents/{tenantId}/machines/`.
   - `GET /machines/:machineId/app-connection` (`machine.view`);
     `POST …/app-connection/pairing-code` and `DELETE …/app-connection`
-    (`machine.manage`; own machines and `contribute` shares, active only).
+    (`mc.view` / `mc.manage_devices`; own machines and `contribute` shares,
+    active only; Machine Control must be on for the caller's organisation).
     `POST /mc/device/pair` is the tablet's signed-out call: `code`, optional
     `serialNumber`, `platform`, `appVersion`; returns its `deviceToken` once.
     Limited to 5 tries a minute per IP.
+  - **Machine app live session** (`src/machineControl/session/`): the
+    pairing is the session. The tablet calls `GET /mc/device/session`,
+    `POST /mc/device/session/refresh` (new `deviceToken`; the old one works
+    5 more minutes) and `DELETE /mc/device/session` (removes itself) with
+    `Authorization: Bearer <deviceToken>`; a dead token is 401
+    `code: DEVICE_TOKEN_REVOKED`. Socket.IO `/machine-app`: the tablet
+    connects with `auth.deviceToken`, the portal with `auth.token` and emits
+    `watch {machineId}`. Both get `session:status` (`active` / `pending`,
+    `tabletOnline`, `portalOnline`) and `session:ended` (`reason`:
+    `portal_disconnected`, `tablet_disconnected`, `replaced`,
+    `connection_timeout`); the portal also gets `session:started`. A tablet
+    offline longer than `MC_SESSION_PENDING_TIMEOUT_MINUTES` (default 30)
+    is ended by the sweep.
+  - Machine Control (`src/machineControl/`), only for organisations the
+    platform administrator has turned it on for (`RequireMachineControlGuard`,
+    403 `machine_control_disabled`; `/auth/me` returns
+    `machineControlEnabled`): `GET /mc/devices` (`mc.view`) lists connected
+    tablets with online status. The switch: `GET /admin/machine-control/organisations`
+    and `PATCH …/:tenantId { enabled }` (platform administrator).
   - `PATCH /users/me` (first/last name), `POST /users/me/avatar`.
 - **Uploads** go S3 first, then the database; if the database write fails
   the object is deleted again. Upload responses include `file:
@@ -768,6 +788,9 @@ archived, and only the caller's organisation + the shared library
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_TAX_ENABLED` —
   Stripe, used only by `src/billing`; unset key = billing endpoints answer
   503; a live key (`sk_live_`) outside `NODE_ENV=production` stops startup
+- `STRIPE_PUBLISHABLE_KEY` — `pk_` key returned to the mobile app's Payment
+  Sheet; must match the secret key's account and mode (a mismatch stops
+  startup); unset = no `paymentSheet`, the app pays on a Stripe page
 - `AI_LOG_RETENTION_JOB_ENABLED` (default on), `AI_LOG_RETENTION_HOUR_UTC`
   (default 17) — the nightly AI query log purge
 - `DATA_EXPORT_WORKER_ENABLED` (default on; needs S3) — "My data" exports

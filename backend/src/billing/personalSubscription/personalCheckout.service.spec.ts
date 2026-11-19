@@ -34,6 +34,7 @@ const setup = (sessions: ReturnType<typeof session>[]) => {
   };
   const stripe = {
     listCheckoutSessions: jest.fn().mockResolvedValue(sessions),
+    expireCheckoutSession: jest.fn().mockResolvedValue({}),
     createCheckoutSession: jest
       .fn()
       .mockResolvedValue({ url: 'https://checkout.stripe.com/c/pay/new' }),
@@ -147,5 +148,68 @@ describe('personal Checkout', () => {
     expect(toReturnOrigin(ORIGIN)).toBe(ORIGIN);
     expect(toReturnOrigin('https://evil.example')).toBe(ORIGIN);
     expect(toReturnOrigin(undefined)).toBe(ORIGIN);
+  });
+});
+
+describe('closing Checkout before the Payment Sheet', () => {
+  it('expires every open session so it can no longer be paid', async () => {
+    const { service, stripe } = setup([
+      session({ id: 'cs_portal' }),
+      session({
+        id: 'cs_app',
+        success_url: `${ORIGIN}/app-return/billing?payment=complete`,
+      }),
+      session({ id: 'cs_old', status: 'expired' }),
+    ]);
+    expect(await service.closeCheckout(invoice, 'cus_a')).toBe('closed');
+    expect(stripe.expireCheckoutSession.mock.calls).toEqual([
+      ['cs_portal'],
+      ['cs_app'],
+    ]);
+  });
+
+  it('records a completed Checkout payment instead, and expires nothing', async () => {
+    const { service, stripe, client } = setup([
+      session({ id: 'cs_open' }),
+      session({
+        id: 'cs_paid',
+        status: 'complete',
+        payment_status: 'paid',
+        invoice: 'in_checkout',
+      }),
+    ]);
+    expect(await service.closeCheckout(invoice, 'cus_a')).toBe('paid');
+    expect(applyInvoiceEventUpdate).toHaveBeenCalledWith(
+      client,
+      expect.objectContaining({
+        stripeInvoiceId: 'in_checkout',
+        status: 'paid',
+      }),
+    );
+    expect(stripe.expireCheckoutSession).not.toHaveBeenCalled();
+  });
+
+  it('counts a session completed between the list and the expire as paid', async () => {
+    const { service, stripe } = setup([session({ id: 'cs_open' })]);
+    stripe.expireCheckoutSession.mockRejectedValue(new Error('complete'));
+    stripe.listCheckoutSessions
+      .mockResolvedValueOnce([session({ id: 'cs_open' })])
+      .mockResolvedValueOnce([
+        session({
+          id: 'cs_open',
+          status: 'complete',
+          payment_status: 'paid',
+          invoice: 'in_checkout',
+        }),
+      ]);
+    expect(await service.closeCheckout(invoice, 'cus_a')).toBe('paid');
+  });
+
+  it('fails rather than go on when an open session cannot be expired', async () => {
+    const { service, stripe } = setup([session({ id: 'cs_open' })]);
+    stripe.expireCheckoutSession.mockRejectedValue(new Error('Stripe down'));
+    await expect(service.closeCheckout(invoice, 'cus_a')).rejects.toThrow(
+      'Stripe down',
+    );
   });
 });

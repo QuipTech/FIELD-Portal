@@ -2,24 +2,22 @@
 
 import { useState, type MouseEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Tag } from "@/components/ui/tag";
 import { Button } from "@/components/ui/button";
 import { MachineSharingBadges } from "@/components/machines/machineSharingBadges";
 import { Table, TableHeaderRow, TableHeaderCell, TableRow, TableCell } from "@/components/ui/table";
 import { ActivateMachineDialog, activationActionFor } from "@/components/machines/activateMachineDialog";
 import { BulkActivateDialog } from "@/components/machines/bulkActivateDialog";
-import { ConnectMachineAppDialog } from "@/components/machines/machineApp/connectMachineAppDialog";
 import { MoveToGroupDialog } from "@/components/machines/moveToGroupDialog";
 import { PERMISSIONS } from "@/lib/auth/permissionCodes";
 import { usePermissions } from "@/lib/auth/usePermissions";
 import { getMachineStatusMeta, toMachineStatus } from "@/lib/format/machineStatus";
 import { canContributeTo } from "@/lib/machineDetail/machineAccessRules";
-import { machineAppPagePath } from "@/lib/types/machineAppConnection";
 import type { FleetMachine } from "@/lib/types/machineFleet";
 import { MachineRowPhotos } from "./machineRowPhotos";
 import { MachinesBulkBar } from "./machinesBulkBar";
 import { ConnectMachineAppButton } from "./connectMachineAppButton";
+import { useConnectMachineApp } from "./useConnectMachineApp";
 
 interface MachinesTableProps {
   machines: FleetMachine[];
@@ -36,16 +34,16 @@ const canActivate = (machine: FleetMachine) =>
   Boolean(machine.availableActions?.some((action) => action === "activate" || action === "reactivate"));
 
 export const MachinesTable = ({ machines, emptyMessage, onChanged }: MachinesTableProps) => {
-  const router = useRouter();
+  const connectApp = useConnectMachineApp();
   const [activating, setActivating] = useState<FleetMachine | null>(null);
-  const [connecting, setConnecting] = useState<FleetMachine | null>(null);
   // Machines ticked for activating together.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkActivating, setIsBulkActivating] = useState(false);
   const [bulkNotice, setBulkNotice] = useState<string | null>(null);
   // Machines to move between groups; platform administrators only.
   const [moving, setMoving] = useState<FleetMachine[] | null>(null);
-  const { isLoaded, can } = usePermissions();
+  // Connecting tablets is part of Machine Control.
+  const { isLoaded, can, machineControlEnabled } = usePermissions();
   const canMoveGroups = isLoaded && can(PERMISSIONS.managePlatform);
   // Ticked for activating together, or (platform administrators) moving.
   const isSelectable = (machine: FleetMachine) => canMoveGroups || canActivate(machine);
@@ -148,11 +146,8 @@ export const MachinesTable = ({ machines, emptyMessage, onChanged }: MachinesTab
                         Move to group
                       </Button>
                     )}
-                    {canContributeTo(machine) && (
-                      <ConnectMachineAppButton
-                        isConnected={Boolean(machine.appConnected)}
-                        onClick={() => (machine.appConnected ? router.push(machineAppPagePath(machine.id)) : setConnecting(machine))}
-                      />
+                    {machineControlEnabled && canContributeTo(machine) && (
+                      <ConnectMachineAppButton isConnected={Boolean(machine.appConnected)} onClick={() => connectApp.open(machine)} />
                     )}
                   </TableCell>
                 </TableRow>
@@ -161,14 +156,7 @@ export const MachinesTable = ({ machines, emptyMessage, onChanged }: MachinesTab
           })
         )}
       </Table>
-      {connecting && (
-        <ConnectMachineAppDialog
-          machineId={connecting.id}
-          machineLabel={connecting.label}
-          onConnected={() => router.push(machineAppPagePath(connecting.id))}
-          onClose={() => setConnecting(null)}
-        />
-      )}
+      {connectApp.dialog}
       {moving && (
         <MoveToGroupDialog
           machines={moving.map((machine) => ({ id: machine.id, label: machine.label }))}

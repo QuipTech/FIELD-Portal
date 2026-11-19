@@ -2,6 +2,8 @@ export interface TenantRow {
   id: string;
   name: string;
   slug: string;
+  // Only read by /auth/me; other lookups leave it out.
+  machine_control_enabled?: boolean;
 }
 
 export interface UserRow {

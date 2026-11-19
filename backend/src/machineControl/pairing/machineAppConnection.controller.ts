@@ -16,16 +16,24 @@ import { RequirePermissionsGuard } from '../../auth/guards/requirePermissions.gu
 import { AuthenticatedUser } from '../../auth/types/authenticatedUser';
 import { RequireActiveMachineGuard } from '../../machineLifecycle/activeMachine/requireActiveMachine.guard';
 import { MachineAppPairingService } from './machineAppPairing.service';
+import { MC_PERMISSIONS } from '../access/machineControlAccess';
+import { RequireMachineControlGuard } from '../access/requireMachineControl.guard';
 
-// The portal's side of connecting a machine's tablet.
+// The portal's side of connecting a machine's tablet. Needs Machine Control
+// turned on for the caller's organisation.
 @Controller('machines/:machineId/app-connection')
-@UseGuards(JwtAuthGuard, RequirePermissionsGuard, RequireActiveMachineGuard)
+@UseGuards(
+  JwtAuthGuard,
+  RequirePermissionsGuard,
+  RequireMachineControlGuard,
+  RequireActiveMachineGuard,
+)
 export class MachineAppConnectionController {
   constructor(private readonly pairing: MachineAppPairingService) {}
 
   // Polled while a code is waiting to be used.
   @Get()
-  @RequirePermissions('machine.view')
+  @RequirePermissions(MC_PERMISSIONS.view)
   get(
     @CurrentUser() user: AuthenticatedUser,
     @Param('machineId', ParseUUIDPipe) machineId: string,
@@ -34,7 +42,7 @@ export class MachineAppConnectionController {
   }
 
   @Post('pairing-code')
-  @RequirePermissions('machine.manage')
+  @RequirePermissions(MC_PERMISSIONS.manageDevices)
   createCode(
     @CurrentUser() user: AuthenticatedUser,
     @Param('machineId', ParseUUIDPipe) machineId: string,
@@ -44,7 +52,7 @@ export class MachineAppConnectionController {
 
   @Delete()
   @HttpCode(HttpStatus.NO_CONTENT)
-  @RequirePermissions('machine.manage')
+  @RequirePermissions(MC_PERMISSIONS.manageDevices)
   disconnect(
     @CurrentUser() user: AuthenticatedUser,
     @Param('machineId', ParseUUIDPipe) machineId: string,

@@ -20,7 +20,7 @@ const TARGET = {
 
 const setup = () => {
   const cognitoUsers = {
-    disableCognitoUsersForAccount: jest.fn().mockResolvedValue(undefined),
+    deleteCognitoUsersForAccount: jest.fn().mockResolvedValue(undefined),
   };
   const storage = { deleteFile: jest.fn().mockResolvedValue(undefined) };
   jest.mocked(removalRepository.findRemovableUser).mockResolvedValue(TARGET);
@@ -36,10 +36,10 @@ const setup = () => {
 describe('AdminUserRemovalService.removeUser', () => {
   afterEach(() => jest.resetAllMocks());
 
-  it('disables their sign-in, then deletes the account and avatar', async () => {
+  it('deletes their sign-in, then deletes the account and avatar', async () => {
     const { service, cognitoUsers, storage } = setup();
     await service.removeUser(actor, 'user-2');
-    expect(cognitoUsers.disableCognitoUsersForAccount).toHaveBeenCalledWith(
+    expect(cognitoUsers.deleteCognitoUsersForAccount).toHaveBeenCalledWith(
       TARGET,
     );
     expect(removalRepository.removeUser).toHaveBeenCalledWith(
@@ -68,7 +68,7 @@ describe('AdminUserRemovalService.removeUser', () => {
     await expect(service.removeUser(actor, 'user-2')).rejects.toThrow(
       ConflictException,
     );
-    expect(cognitoUsers.disableCognitoUsersForAccount).not.toHaveBeenCalled();
+    expect(cognitoUsers.deleteCognitoUsersForAccount).not.toHaveBeenCalled();
   });
 
   it('answers 404 for an unknown user', async () => {
@@ -79,9 +79,9 @@ describe('AdminUserRemovalService.removeUser', () => {
     );
   });
 
-  it('removes nothing when their sign-in could not be disabled', async () => {
+  it('removes nothing when their sign-in could not be deleted', async () => {
     const { service, cognitoUsers } = setup();
-    cognitoUsers.disableCognitoUsersForAccount.mockRejectedValue(
+    cognitoUsers.deleteCognitoUsersForAccount.mockRejectedValue(
       new Error('AccessDeniedException'),
     );
     await expect(service.removeUser(actor, 'user-2')).rejects.toThrow(

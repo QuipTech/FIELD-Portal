@@ -8,6 +8,8 @@ COPY . .
 RUN npm run build && npm prune --omit=dev
 
 FROM node:22-alpine AS runtime
+ARG BUILD_SHA=unknown
+ENV BUILD_SHA=$BUILD_SHA
 WORKDIR /app
 # psql runs db/applyMigrations.sh during each deploy. certs/ is created up
 # front because ADD --chmod would otherwise apply 644 to the folder too,

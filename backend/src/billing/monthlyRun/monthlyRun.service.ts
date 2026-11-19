@@ -9,7 +9,9 @@ import {
   toBillingDay,
 } from '../billingCalendar/billingDay';
 import { BillingConfigService } from '../billingConfig/billingConfig.service';
+import { DiscountService } from '../discounts/discount.service';
 import { PriceBooksService } from '../priceBooks/priceBooks.service';
+import { PLAN_CODES } from '../subscriptions/planCodes';
 import { sumAmountCents } from '../invoices/invoiceAmounts';
 import * as countsRepository from './dailyBillableCounts.repository';
 import {
@@ -34,6 +36,7 @@ export class MonthlyRunService {
     private readonly serviceDatabase: ServiceDatabaseService,
     private readonly billingConfig: BillingConfigService,
     private readonly priceBooks: PriceBooksService,
+    private readonly discounts: DiscountService,
   ) {}
 
   runAllAccounts = async (now: Date): Promise<string[]> => {
@@ -78,11 +81,14 @@ export class MonthlyRunService {
         )
       )
         return null;
-      const subscriptions = await this.loadSubscriptions(
-        client,
-        account,
-        periodStart,
-        periodEnd,
+      // With no user paywall (REQUIRE_USER_SUBSCRIPTION off) only active
+      // machines are billed: TECH seats add nothing.
+      const subscriptions = (
+        await this.loadSubscriptions(client, account, periodStart, periodEnd)
+      ).filter(
+        (subscription) =>
+          config.REQUIRE_USER_SUBSCRIPTION ||
+          subscription.planCode !== PLAN_CODES.tech,
       );
       const counts = await countsRepository.listDailyCounts(
         client,
@@ -97,34 +103,61 @@ export class MonthlyRunService {
           periodStart,
           periodEnd,
         );
-      const lines = calculateMonthlyLines({
+      const charges = calculateMonthlyLines({
         periodStart,
         periodEnd,
         counts: withoutFinalChargedMachines(counts, finalCharged),
         subscriptions,
       });
-      if (lines.length === 0) return null;
-      const totalExGstCents = sumAmountCents(lines.map((l) => l.amountCents));
+      if (charges.length === 0) return null;
+      // Free period first, then promo; never below A$0.
+      const discounts = await this.discounts.discountLinesForMonth(
+        client,
+        account.id,
+        periodStart,
+        charges,
+      );
+      const lines = [...charges, ...discounts];
+      const totalExGstCents = Math.max(
+        0,
+        sumAmountCents(lines.map((l) => l.amountCents)),
+      );
+      // A month discounted to A$0 is kept, with its lines, but never sent.
+      const noCharge = totalExGstCents === 0;
       const invoiceId = await runInvoicesRepository.insertRunInvoice(client, {
         billingAccountId: account.id,
         periodStart,
         periodEnd,
-        reviewUntil: new Date(
-          now.getTime() + config.INVOICE_REVIEW_HOURS * HOUR_MS,
-        ),
+        reviewUntil: noCharge
+          ? null
+          : new Date(now.getTime() + config.INVOICE_REVIEW_HOURS * HOUR_MS),
         totalExGstCents,
         lines,
       });
+      if (noCharge)
+        await runInvoicesRepository.markNoCharge(
+          client,
+          invoiceId,
+          'fully_discounted',
+        );
       await recordBillingAudit(client, null, {
         action: 'create',
         entityType: 'billing_invoice',
         entityId: invoiceId,
         billingAccountId: account.id,
         from: null,
-        to: { status: 'draft', periodStart, periodEnd, totalExGstCents },
-        reason: 'monthly billing run',
+        to: {
+          status: noCharge ? 'paid' : 'draft',
+          periodStart,
+          periodEnd,
+          totalExGstCents,
+        },
+        reason: noCharge
+          ? 'monthly billing run: discounted to A$0, not sent'
+          : 'monthly billing run',
         metadata: {
           lineCount: lines.length,
+          discountLines: discounts.length,
           machinesWithFinalCharge: finalCharged.length,
         },
       });

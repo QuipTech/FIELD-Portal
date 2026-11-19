@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PoolClient } from 'pg';
@@ -11,12 +12,24 @@ import {
   firstDayOfNextMonth,
   toBillingDay,
 } from '../billing/billingCalendar/billingDay';
-import { UpFrontInvoiceService } from '../billing/invoices/upFrontInvoice.service';
+import {
+  PAYMENT_SHEET_UNAVAILABLE,
+  UpFrontInvoiceService,
+} from '../billing/invoices/upFrontInvoice.service';
+import { PaymentSheet } from '../billing/invoices/invoicePaymentSheet.service';
 import {
   hasRunInvoice,
   MACHINE_FINAL_INVOICE_KIND,
+  markNoCharge,
 } from '../billing/monthlyRun/runInvoices.repository';
 import { findBandRateCents } from '../billing/pricing/fleetPrice';
+import { BillingConfigService } from '../billing/billingConfig/billingConfig.service';
+import { DiscountService } from '../billing/discounts/discount.service';
+import { CalculatedLine } from '../billing/monthlyRun/monthlyRunTypes';
+import { sumAmountCents } from '../billing/invoices/invoiceAmounts';
+import { formatPaymentReference } from '../billing/invoices/accountInvoiceTerms';
+import { findInvoice } from '../billing/invoices/invoices.repository';
+import { FinalChargePaymentMethod } from './dto/lifecycleActionDtos';
 import { PriceBooksService } from '../billing/priceBooks/priceBooks.service';
 import { PLAN_CODES } from '../billing/subscriptions/planCodes';
 import { listLiveSubscriptions } from '../billing/subscriptions/subscriptions.repository';
@@ -28,6 +41,7 @@ import { findPeakSoFar } from './machineActivations.repository';
 import * as deletionRepository from './machineDeletion.repository';
 import {
   assessMachineDeletion,
+  BankTransferDetails,
   billedMonthRange,
   BillingIntervalUse,
   FinalChargeDue,
@@ -46,10 +60,23 @@ const NO_PRICE_MESSAGE =
   "This machine's plan has no price to charge. Contact support.";
 const NOTHING_TO_PAY_MESSAGE =
   "This machine doesn't have a final charge to pay.";
+const BANK_TRANSFER_UNAVAILABLE_MESSAGE =
+  "Paying by bank transfer isn't set up yet. Pay online instead, or contact support.";
 
 export type FinalChargePayment = MachineDeletionCheck & {
   paymentUrl: string | null;
+  // The mobile app's Payment Sheet for the final charge; null when nothing
+  // is left to pay, for the portal, or when only Checkout can take it.
+  paymentSheet: PaymentSheet | null;
 };
+
+export interface FinalChargePaymentOptions {
+  // From the mobile app: pay in the Payment Sheet rather than Checkout.
+  inApp?: boolean;
+  // 'bank_transfer': send the invoice to pay by transfer, approved by a
+  // platform administrator, instead of paying online.
+  method?: FinalChargePaymentMethod;
+}
 
 const formatRate = (cents: number) => `A$${(cents / 100).toFixed(2)}`;
 const formatMonth = (day: string) =>
@@ -64,17 +91,30 @@ const formatMonth = (day: string) =>
 // leaves every read, and its records, activation intervals and invoices stay.
 @Injectable()
 export class MachineDeletionService {
+  private readonly logger = new Logger(MachineDeletionService.name);
+
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly serviceDatabase: ServiceDatabaseService,
     private readonly priceBooks: PriceBooksService,
     private readonly upFrontInvoices: UpFrontInvoiceService,
+    private readonly billingConfig: BillingConfigService,
+    private readonly discounts: DiscountService,
   ) {}
 
+  // The deletion check, plus whether bank transfer can be offered and where
+  // to send one already chosen.
   checkDeletion = async (
     actor: AuthenticatedUser,
     machineId: string,
     now = new Date(),
+  ): Promise<MachineDeletionCheck> =>
+    this.withBankTransfer(await this.checkSettlement(actor, machineId, now));
+
+  private checkSettlement = async (
+    actor: AuthenticatedUser,
+    machineId: string,
+    now: Date,
   ): Promise<MachineDeletionCheck> => {
     const { check, machine, intervals, today } = await this.readCheck(
       actor,
@@ -96,7 +136,7 @@ export class MachineDeletionService {
             viaCheckout,
             machine.billing_account_id,
           )));
-      return isAnyPaid ? this.checkDeletion(actor, machineId, now) : check;
+      return isAnyPaid ? this.checkSettlement(actor, machineId, now) : check;
     }
     if (check.blocker !== 'final_charge_due') return check;
     return {
@@ -109,23 +149,38 @@ export class MachineDeletionService {
   // Stripe Checkout to pay it: paymentUrl is where to send the payer, who
   // comes back to returnPage. Null once nothing is left to pay here. If Stripe
   // fails they get the error, and the invoice stays saved. Safe to repeat: a
-  // second call finds the first charge and its open Checkout.
+  // second call finds the first charge and its open Checkout. From the app
+  // (inApp) it returns paymentSheet instead, paying the same invoice.
   payFinalCharge = async (
     actor: AuthenticatedUser,
     machineId: string,
     returnPage: string,
     now = new Date(),
+    options: FinalChargePaymentOptions = {},
   ): Promise<FinalChargePayment> => {
+    const isBankTransfer = options.method === 'bank_transfer';
+    if (isBankTransfer && !(await this.isBankTransferAvailable())) {
+      throw new ConflictException(BANK_TRANSFER_UNAVAILABLE_MESSAGE);
+    }
     const { check, machine, intervals, today, label } = await this.readCheck(
       actor,
       machineId,
       now,
     );
     if (check.blocker === 'unpaid_invoices') {
-      return this.openPayment(actor, machineId, label, returnPage, now);
+      if (isBankTransfer) return this.sendBankTransfer(actor, machineId, now);
+      return this.openPayment(
+        actor,
+        machineId,
+        label,
+        returnPage,
+        now,
+        options,
+      );
     }
     if (check.blocker !== 'final_charge_due') {
-      if (check.canDelete) return { ...check, paymentUrl: null };
+      if (check.canDelete)
+        return { ...check, paymentUrl: null, paymentSheet: null };
       throw new ConflictException({
         statusCode: 409,
         code: check.blocker,
@@ -159,6 +214,13 @@ export class MachineDeletionService {
         if (!isCharged) toCharge.push(month);
       }
       if (toCharge.length === 0) return null;
+      const lines = await this.finalChargeLines(client, {
+        billingAccountId,
+        machineId,
+        label,
+        book,
+        months: toCharge,
+      });
       const invoice = await this.upFrontInvoices.draft(client, actor, {
         billingAccountId,
         kind: MACHINE_FINAL_INVOICE_KIND,
@@ -167,34 +229,13 @@ export class MachineDeletionService {
           toCharge[toCharge.length - 1].periodStart,
         ),
         reason: 'final charge for a machine being deleted',
-        lines: toCharge.map((month) => ({
-          lineType: 'ASSET_PRO_FINAL_DAYS',
-          description: `Final charge for ${label}: ${month.daysUsed} of ${month.daysInMonth} days in ${formatMonth(month.periodStart)} at ${formatRate(month.monthlyRateCents)} a month`,
-          // invoice_lines needs amount = quantity × unit: a daily rate
-          // wouldn't round to the same total, so this is one final charge.
-          quantity: 1,
-          unitCents: month.amountCents,
-          amountCents: month.amountCents,
-          calcSnapshot: {
-            formula: 'ASSET_PRO_FINAL_DAYS',
-            subscriptionId: null,
-            periodStart: month.periodStart,
-            periodEnd: firstDayOfNextMonth(month.periodStart),
-            peak: 0,
-            peakDay: null,
-            priceBookId: book.id,
-            priceBookVersion: book.version,
-            bands: book.bands,
-            seatCents: null,
-            committedQty: null,
-            monthsCharged: null,
-            machineId,
-            monthlyRateCents: month.monthlyRateCents,
-            daysUsed: month.daysUsed,
-            daysInMonth: month.daysInMonth,
-          },
-        })),
+        lines,
       });
+      // A promo or free period covering all of it: nothing to pay, so it's
+      // recorded as paid and never sent to Stripe.
+      if (sumAmountCents(lines.map((line) => line.amountCents)) <= 0) {
+        await markNoCharge(client, invoice, 'fully_discounted');
+      }
       for (const month of toCharge) {
         await deletionRepository.insertFinalCharge(client, {
           machineId,
@@ -205,7 +246,119 @@ export class MachineDeletionService {
       }
       return invoice;
     });
-    return this.openPayment(actor, machineId, label, returnPage, now);
+    if (isBankTransfer) return this.sendBankTransfer(actor, machineId, now);
+    return this.openPayment(actor, machineId, label, returnPage, now, options);
+  };
+
+  // Sends the machine's unpaid final charge to pay by bank transfer. The
+  // machine can be deleted once a platform administrator marks it paid.
+  private sendBankTransfer = async (
+    actor: AuthenticatedUser,
+    machineId: string,
+    now: Date,
+  ): Promise<FinalChargePayment> => {
+    const check = await this.checkSettlement(actor, machineId, now);
+    const finalCharge = check.unpaidInvoices.find(
+      (invoice) => invoice.isFinalCharge,
+    );
+    if (finalCharge && !finalCharge.payByBankTransfer) {
+      await this.upFrontInvoices.sendForBankTransfer(finalCharge.id);
+      this.logger.log(
+        `Final charge ${finalCharge.id} for machine ${machineId}: sent to pay by bank transfer.`,
+      );
+    }
+    return {
+      ...(await this.checkDeletion(actor, machineId, now)),
+      paymentUrl: null,
+      paymentSheet: null,
+    };
+  };
+
+  // The final charge's lines: one per month, then that month's free period
+  // and promo discounts, as the monthly run would have applied them.
+  private finalChargeLines = async (
+    database: Pick<ServiceDatabaseService, 'query'>,
+    params: {
+      billingAccountId: string;
+      machineId: string;
+      label: string;
+      book: Awaited<ReturnType<MachineDeletionService['pinnedBook']>>;
+      months: FinalChargeQuote[];
+    },
+  ): Promise<CalculatedLine[]> => {
+    const { machineId, label, book } = params;
+    const lines: CalculatedLine[] = [];
+    for (const month of params.months) {
+      const charge: CalculatedLine = {
+        lineType: 'ASSET_PRO_FINAL_DAYS',
+        description: `Final charge for ${label}: ${month.daysUsed} of ${month.daysInMonth} days in ${formatMonth(month.periodStart)} at ${formatRate(month.monthlyRateCents)} a month`,
+        // invoice_lines needs amount = quantity × unit: a daily rate
+        // wouldn't round to the same total, so this is one final charge.
+        quantity: 1,
+        unitCents: month.amountCents,
+        amountCents: month.amountCents,
+        calcSnapshot: {
+          formula: 'ASSET_PRO_FINAL_DAYS',
+          subscriptionId: null,
+          periodStart: month.periodStart,
+          periodEnd: firstDayOfNextMonth(month.periodStart),
+          peak: 0,
+          peakDay: null,
+          priceBookId: book.id,
+          priceBookVersion: book.version,
+          bands: book.bands,
+          seatCents: null,
+          committedQty: null,
+          monthsCharged: null,
+          machineId,
+          monthlyRateCents: month.monthlyRateCents,
+          daysUsed: month.daysUsed,
+          daysInMonth: month.daysInMonth,
+        },
+      };
+      lines.push(
+        charge,
+        ...(await this.discounts.discountLinesForMonth(
+          database,
+          params.billingAccountId,
+          month.periodStart,
+          [charge],
+        )),
+      );
+    }
+    return lines;
+  };
+
+  private isBankTransferAvailable = async (): Promise<boolean> => {
+    const config = await this.billingConfig.loadConfig();
+    return Boolean(config.BANK_BSB && config.BANK_ACCOUNT_NUMBER);
+  };
+
+  private withBankTransfer = async (
+    check: MachineDeletionCheck,
+  ): Promise<MachineDeletionCheck> => {
+    const config = await this.billingConfig.loadConfig();
+    const bankTransferAvailable = Boolean(
+      config.BANK_BSB && config.BANK_ACCOUNT_NUMBER,
+    );
+    const awaiting = check.unpaidInvoices.find(
+      (invoice) => invoice.payByBankTransfer,
+    );
+    let bankTransfer: BankTransferDetails | null = null;
+    if (awaiting) {
+      const invoice = await findInvoice(this.serviceDatabase, awaiting.id);
+      bankTransfer = {
+        invoiceId: awaiting.id,
+        accountName: config.BANK_ACCOUNT_NAME,
+        bsb: config.BANK_BSB,
+        accountNumber: config.BANK_ACCOUNT_NUMBER,
+        reference: formatPaymentReference(config.PAYMENT_REFERENCE_FORMAT, {
+          invoiceId: awaiting.id,
+          accountName: invoice?.billing_account_name ?? '',
+        }),
+      };
+    }
+    return { ...check, bankTransferAvailable, bankTransfer };
   };
 
   // The payment page for the machine's unpaid final charge: its Stripe
@@ -217,14 +370,41 @@ export class MachineDeletionService {
     label: string,
     returnPage: string,
     now: Date,
+    { inApp = false }: FinalChargePaymentOptions = {},
   ): Promise<FinalChargePayment> => {
     const check = await this.checkDeletion(actor, machineId, now);
     const finalCharge = check.unpaidInvoices.find(
       (invoice) => invoice.isFinalCharge,
     );
-    if (!finalCharge) return { ...check, paymentUrl: null };
+    if (!finalCharge) return { ...check, paymentUrl: null, paymentSheet: null };
+    if (!inApp) {
+      this.logger.log(
+        `Final charge ${finalCharge.id} for machine ${machineId}: portal request (X-Field-Client: web), so Checkout or the hosted page and no Payment Sheet.`,
+      );
+    } else {
+      const paymentSheet = await this.upFrontInvoices.openPaymentSheet(
+        finalCharge.id,
+      );
+      if (paymentSheet !== PAYMENT_SHEET_UNAVAILABLE) {
+        // Read again: the invoice is now on Stripe (paymentUrl is its hosted
+        // page, for older app builds), or was found paid.
+        const fresh = await this.checkDeletion(actor, machineId, now);
+        const charge = fresh.unpaidInvoices.find(
+          (invoice) => invoice.id === finalCharge.id,
+        );
+        return {
+          ...fresh,
+          paymentUrl: charge?.hostedInvoiceUrl ?? null,
+          paymentSheet: charge ? paymentSheet : null,
+        };
+      }
+    }
     if (finalCharge.hostedInvoiceUrl) {
-      return { ...check, paymentUrl: finalCharge.hostedInvoiceUrl };
+      return {
+        ...check,
+        paymentUrl: finalCharge.hostedInvoiceUrl,
+        paymentSheet: null,
+      };
     }
     const paymentUrl = await this.upFrontInvoices.openCheckout(finalCharge.id, {
       returnPage,
@@ -233,8 +413,12 @@ export class MachineDeletionService {
     });
     // Null: Checkout was already paid, and is now recorded.
     return paymentUrl
-      ? { ...check, paymentUrl }
-      : { ...(await this.checkDeletion(actor, machineId, now)), paymentUrl };
+      ? { ...check, paymentUrl, paymentSheet: null }
+      : {
+          ...(await this.checkDeletion(actor, machineId, now)),
+          paymentUrl,
+          paymentSheet: null,
+        };
   };
 
   // Checked again inside the transaction, whatever the screen showed.
@@ -379,9 +563,33 @@ export class MachineDeletionService {
       }
       return results;
     });
+    const amountCents = quotes.reduce(
+      (sum, month) => sum + month.amountCents,
+      0,
+    );
+    const discounts = (
+      await this.finalChargeLines(this.serviceDatabase, {
+        billingAccountId,
+        machineId: machine.id,
+        label: '',
+        book,
+        months: quotes,
+      })
+    )
+      .filter((line) => line.amountCents < 0)
+      .map((line) => ({
+        description: line.description,
+        amountCents: line.amountCents,
+      }));
     return {
-      amountCents: quotes.reduce((sum, month) => sum + month.amountCents, 0),
+      amountCents,
       months: quotes,
+      discounts,
+      amountDueCents: Math.max(
+        0,
+        amountCents +
+          discounts.reduce((sum, line) => sum + line.amountCents, 0),
+      ),
     };
   };
 

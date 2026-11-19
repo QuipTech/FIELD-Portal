@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { PermissionButton } from "@/components/auth/permissionButton";
 import { Icon } from "@/components/icons/icon";
@@ -12,29 +13,28 @@ import { EmptyState } from "@/components/ui/emptyState";
 import { LoadErrorState } from "@/components/ui/loadErrorState";
 import { LoadingSpinner } from "@/components/ui/loadingSpinner";
 import { Tag } from "@/components/ui/tag";
-import { disconnectMachineAppRequest, getMachineAppConnectionRequest } from "@/lib/api/machineAppConnectionApi";
+import { disconnectMachineAppRequest } from "@/lib/api/machineAppConnectionApi";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import { PERMISSIONS } from "@/lib/auth/permissionCodes";
 import { formatShortDateTime } from "@/lib/format/shortDate";
 import { canContributeTo } from "@/lib/machineDetail/machineAccessRules";
-import { machineCacheKeys } from "@/lib/machineDetail/machineDetailCacheKeys";
-import { useCachedResource } from "@/lib/machineDetail/useCachedResource";
+import { useMachineAppStatus } from "@/components/machines/machineApp/useMachineAppStatus";
 import { useMachineDetail } from "../machineDetailContext";
+import { usePermissions } from "@/lib/auth/usePermissions";
+import { MachineControlOffNotice } from "@/components/machineControl/machineControlOffNotice";
 
 // Machine app tab: connect this machine's tablet, then reach it remotely.
 const MachineAppPage = () => {
   const { machineId, machine, notify } = useMachineDetail();
+  const { machineControlEnabled } = usePermissions();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
-  const connection = useCachedResource(
-    machineCacheKeys.appConnection(machineId),
-    () => getMachineAppConnectionRequest(machineId),
-    "Couldn't load this machine's connection.",
-  );
+  const connection = useMachineAppStatus(machineId, machineControlEnabled);
   const canManage = canContributeTo(machine);
   const label = machine?.assetId ?? "";
   const device = connection.data?.device ?? null;
 
+  if (!machineControlEnabled) return <MachineControlOffNotice />;
   if (connection.isLoading && !connection.data) {
     return (
       <div className="flex justify-center py-10 text-mutedGray">
@@ -46,14 +46,15 @@ const MachineAppPage = () => {
 
   return (
     <section className="flex flex-col gap-4">
+      {connection.error && <p role="status" className="text-sm text-bodyGray">{connection.error}</p>}
       {!device ? (
         <EmptyState
           icon="cloud"
-          title="Machine app not connected"
+          title="Machine app unpaired"
           description="Connect this machine's tablet to the FIELD machine app with a 6-digit code."
           actions={
             canManage && (
-              <PermissionButton permission={PERMISSIONS.manageMachine} variant="primary" onClick={() => setIsConnecting(true)}>
+              <PermissionButton permission={PERMISSIONS.manageMachineControlDevices} variant="primary" onClick={() => setIsConnecting(true)}>
                 <Icon name="cloud" />
                 Connect app
               </PermissionButton>
@@ -65,11 +66,14 @@ const MachineAppPage = () => {
           <div className="flex flex-wrap items-center gap-2">
             <Tag tone="ok">
               <Icon name="check" className="h-3.5 w-3.5" />
-              Connected
+              Paired
+            </Tag>
+            <Tag tone={!connection.error && connection.data?.session?.tabletOnline ? "ok" : "default"}>
+              {connection.error || !connection.data?.session ? "Status unavailable" : connection.data.session.tabletOnline ? "Online" : "Offline"}
             </Tag>
             <span className="text-sm text-bodyGray">Since {formatShortDateTime(device.pairedAt)}</span>
             {canManage && (
-              <PermissionButton permission={PERMISSIONS.manageMachine} size="sm" variant="ghost" className="ml-auto" onClick={() => setIsDisconnecting(true)}>
+              <PermissionButton permission={PERMISSIONS.manageMachineControlDevices} size="sm" variant="ghost" className="ml-auto" onClick={() => setIsDisconnecting(true)}>
                 Disconnect
               </PermissionButton>
             )}
@@ -78,6 +82,17 @@ const MachineAppPage = () => {
             {device.serialNumber && <span>Tablet serial: {device.serialNumber}</span>}
             {device.platform && <span className="capitalize">{device.platform}</span>}
             {device.appVersion && <span>App version {device.appVersion}</span>}
+          </div>
+          <div className="flex flex-col items-start gap-2 border-t border-borderGray pt-4">
+            <span className="text-[15px] font-medium text-ink">File transfer</span>
+            <p className="text-sm text-bodyGray">Use Send to Portal on the paired tablet. Files appear automatically in this machine&apos;s Documents.</p>
+            <Link
+              href={`/machines/${machineId}/documents`}
+              className={`${buttonBaseClasses} ${buttonVariantClasses.primary} ${buttonSizeClasses.md}`}
+            >
+              <Icon name="file" />
+              View machine documents
+            </Link>
           </div>
           <div className="mt-2 flex flex-col items-start gap-2 border-t border-borderGray pt-4">
             <span className="text-[15px] font-medium text-ink">Remote access</span>

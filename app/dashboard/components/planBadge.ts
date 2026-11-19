@@ -6,8 +6,9 @@ export interface PlanBadge {
   showUpgrade: boolean;
 }
 
-// What the top bar shows about the user's plan. A non-Owner's own monthly
-// FIELD Technician payment decides it: once paid there is nothing to
+// What the top bar shows about the user's plan. With no user subscription
+// (the default) it's the organisation's plan. Otherwise a non-Owner's own
+// monthly FIELD Technician payment decides it: once paid there is nothing to
 // upgrade. Owners keep their organisation's plan.
 export const describePlanBadge = (
   personal: PersonalBillingStatus | null,
@@ -15,6 +16,9 @@ export const describePlanBadge = (
 ): PlanBadge => {
   // Wait for the personal status so a paid user never sees "Free plan" flash.
   if (!personal) return { label: null, showUpgrade: false };
+  // No user subscription: everyone works under the organisation's plan.
+  if (!personal.userSubscriptionRequired)
+    return { label: organisation ? `${organisation.planName} plan` : null, showUpgrade: false };
   if (!personal.exempt && !personal.paymentRequired)
     return {
       label: personal.coveredByOrganisation ? "Technician · paid by organisation" : "Technician plan · Paid",

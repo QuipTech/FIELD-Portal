@@ -2,6 +2,7 @@ export const IconSprite = () => {
   return (
     <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden="true">
       <defs>
+        <symbol id="i-broadcast" viewBox="0 0 24 24"><circle cx="12" cy="10" r="2"></circle><path d="M12 12v9"></path><path d="M8.5 6.5a5 5 0 0 0 0 7"></path><path d="M15.5 6.5a5 5 0 0 1 0 7"></path><path d="M5.6 3.6a9 9 0 0 0 0 12.8"></path><path d="M18.4 3.6a9 9 0 0 1 0 12.8"></path></symbol>
         <symbol id="i-panel" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"></rect><path d="M9.5 4v16"></path></symbol>
         <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect></symbol>
         <symbol id="i-truck" viewBox="0 0 24 24"><path d="M2 7h12v9H2z"></path><path d="M14 10h4l3 3.5V16h-7"></path><circle cx="6" cy="18.5" r="2"></circle><circle cx="17.5" cy="18.5" r="2"></circle></symbol>

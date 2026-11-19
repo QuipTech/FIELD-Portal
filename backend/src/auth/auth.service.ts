@@ -92,6 +92,7 @@ export class AuthService {
         machineAccessMode: machineAccess.effectiveMode,
         accessibleGroups: machineAccess.groups,
         tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug },
+        machineControlEnabled: tenant.machine_control_enabled ?? false,
       };
     });
 

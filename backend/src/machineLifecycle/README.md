@@ -69,8 +69,13 @@ Part of the API (`npm run start:dev` from `backend/`). Tests:
   month still open. The same call returns a Stripe Checkout URL for the total
   (`paymentUrl`): Checkout asks for the billing address (saved on the customer,
   so Stripe Tax can add GST), creates the paid Stripe invoice itself, and comes
-  back to `/machines/:id?payment=complete`. A machine_final invoice is never
-  pushed as a Stripe invoice too (the hourly retry skips it). Stripe's errors
+  back to `/machines/:id?payment=complete`. From the mobile app (any
+  `X-Field-Client` but `web`) the response also carries `paymentSheet`: the
+  invoice is pushed as a card-only Stripe Invoice (open Checkout sessions for
+  it expired first) and the sheet pays that invoice's own PaymentIntent;
+  `paymentUrl` is then its hosted page. If Stripe Tax has no address for the
+  customer yet, the app gets Checkout as before (`paymentSheet: null`). The
+  hourly retry never pushes a machine_final invoice itself. Stripe's errors
   reach the caller; the invoice stays saved and calling again retries. The
   deletion check asks Stripe about unpaid invoices and Checkout sessions, so a
   payment counts before its webhook arrives. Annual plans wait for the month-end run; Enterprise

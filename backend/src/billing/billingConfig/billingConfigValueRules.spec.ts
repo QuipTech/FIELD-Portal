@@ -1,7 +1,7 @@
 import { BILLING_CONFIG_KEYS } from './billingConfigKeys';
 import { isValidConfigValue, toBillingConfig } from './billingConfigValueRules';
 
-// The values migration 0095 seeds.
+// The values migrations 0095, 0109 and 0130 seed.
 const SEEDED_VALUES: Record<string, unknown> = {
   ENTERPRISE_THRESHOLD_MACHINES: 500,
   ANNUAL_MONTHS_CHARGED: 10,
@@ -21,6 +21,14 @@ const SEEDED_VALUES: Record<string, unknown> = {
   CANCEL_EXPORT_DAYS: 30,
   CANCEL_DELETE_DAYS: 90,
   SUSPENSION_NOTICE_DAYS: 14,
+  // Migration 0130.
+  REQUIRE_USER_SUBSCRIPTION: false,
+  ACCOUNT_DEFAULT_TERMS_DAYS: 30,
+  BANK_ACCOUNT_NAME: '',
+  BANK_BSB: '',
+  BANK_ACCOUNT_NUMBER: '',
+  PAYMENT_REFERENCE_FORMAT: 'FIELD-{invoiceRef}',
+  INVOICE_REMINDER_OFFSET_DAYS: [-7, 0, 7, 14],
 };
 
 const seededRows = () =>
@@ -59,6 +67,19 @@ describe('toBillingConfig', () => {
 });
 
 describe('isValidConfigValue', () => {
+  it('checks booleans, text and day offsets', () => {
+    expect(isValidConfigValue('boolean', false)).toBe(true);
+    expect(isValidConfigValue('boolean', 'false')).toBe(false);
+    expect(isValidConfigValue('text', '')).toBe(true);
+    expect(isValidConfigValue('text', 12)).toBe(false);
+    expect(isValidConfigValue('text', 'x'.repeat(201))).toBe(false);
+    expect(isValidConfigValue('dayOffsets', [-7, 0, 7, 14])).toBe(true);
+    expect(isValidConfigValue('dayOffsets', [])).toBe(true);
+    expect(isValidConfigValue('dayOffsets', [1.5])).toBe(false);
+    expect(isValidConfigValue('dayOffsets', [400])).toBe(false);
+    expect(isValidConfigValue('dayOffsets', '7')).toBe(false);
+  });
+
   it('accepts null only for the optional abuse ceiling', () => {
     expect(isValidConfigValue('optionalPositiveNumber', null)).toBe(true);
     expect(isValidConfigValue('positiveInteger', null)).toBe(false);

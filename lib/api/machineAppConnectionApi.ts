@@ -6,7 +6,7 @@ const connectionPath = (machineId: string) => `/machines/${machineId}/app-connec
 const authorization = () => ({ Authorization: `Bearer ${requireAccessToken()}` });
 
 export const getMachineAppConnectionRequest = (machineId: string): Promise<MachineAppConnection> =>
-  apiRequest<MachineAppConnection>(connectionPath(machineId), { headers: authorization() });
+  apiRequest<MachineAppConnection>(connectionPath(machineId), { headers: authorization(), cache: "no-store" });
 
 // A new code replaces any earlier one for this machine.
 export const createPairingCodeRequest = (machineId: string): Promise<PairingCodeResult> =>

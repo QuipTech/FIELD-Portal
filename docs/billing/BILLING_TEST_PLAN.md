@@ -10,6 +10,11 @@ at the end. Don't log bugs against those.
 
 ---
 
+Machine-only billing, 30-day accounts, free periods and promo codes have their
+own manual tests: PAYMENT_TERMS.md, "Manual test plan". With
+`REQUIRE_USER_SUBSCRIPTION` false (the default) section A does not apply; set
+it to true under Admin → Billing → Prices & settings to test it.
+
 ## 0. Setup (do once)
 
 1. Apply migrations from `backend/`:

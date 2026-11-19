@@ -1,11 +1,13 @@
 export interface MachineAppConnection {
   connected: boolean;
+  session?: { status: "active" | "pending"; tabletOnline: boolean; portalOnline: boolean } | null;
   device: {
     id: string;
     serialNumber: string | null;
     platform: string | null;
     appVersion: string | null;
     pairedAt: string;
+    online?: boolean;
   } | null;
 }
 

@@ -4,7 +4,7 @@ import type { OrganisationSubscription } from "@/lib/types/organisationSubscript
 import type { PersonalBillingStatus } from "@/lib/types/personalBilling";
 
 const personal = (fields: Partial<PersonalBillingStatus>) => ({
-  exempt: false, coveredByOrganisation: false, paymentRequired: true, ...fields,
+  userSubscriptionRequired: true, exempt: false, coveredByOrganisation: false, paymentRequired: true, ...fields,
 }) as PersonalBillingStatus;
 const freePlan = { planName: "Free" } as OrganisationSubscription;
 
@@ -26,6 +26,15 @@ describe("top bar plan badge", () => {
   it("keeps the organisation plan for Owners", () => {
     expect(describePlanBadge(personal({ exempt: true, paymentRequired: false }), { planName: "Fleet" } as OrganisationSubscription))
       .toEqual({ label: "Fleet plan", showUpgrade: true });
+  });
+
+  it("shows the organisation plan with no upgrade when there is no user subscription", () => {
+    expect(
+      describePlanBadge(
+        personal({ userSubscriptionRequired: false, paymentRequired: false }),
+        { planName: "Fleet" } as OrganisationSubscription,
+      ),
+    ).toEqual({ label: "Fleet plan", showUpgrade: false });
   });
 
   it("shows nothing until the payment status has loaded", () => {

@@ -25,6 +25,18 @@ export interface AdminInvoice {
   heldAt: string | null;
   amountCreditedCents: number;
   dueOn: string | null;
+  // How Stripe collects it, set once it's on Stripe.
+  collectionMethod: "charge_automatically" | "send_invoice" | null;
+  poNumber: string | null;
+  paymentType: "card" | "account";
+  // Paid outside Stripe (recorded by a platform administrator).
+  markedPaidOn: string | null;
+  // e.g. "fully_discounted": a A$0 month that was never sent.
+  noChargeReason: string | null;
+  // The customer chose to pay by bank transfer; Mark as paid approves it.
+  payByBankTransfer: boolean;
+  // Unpaid and emailed (not charged to a card): can be marked paid.
+  canMarkPaid: boolean;
   createdAt: string;
   updatedAt: string;
 }

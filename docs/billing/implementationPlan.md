@@ -1,6 +1,14 @@
 # Billing implementation
 
-## Confirmed override
+## Current direction (18 November 2026)
+
+Billing is for **active machines per organisation only**. The personal TECH
+paywall below is now behind `billing.config REQUIRE_USER_SUBSCRIPTION`, which
+defaults to **false**: no user pays a personal subscription and the monthly run
+adds no TECH seat lines. Organisations pay by card or on an approved 30-day
+account, with free periods and promo codes. See PAYMENT_TERMS.md.
+
+## Earlier override (now off by default)
 
 The user confirmed on 20 October 2026 that **every non-Owner**, including
 invited organisation members and support staff, pays for a personal monthly

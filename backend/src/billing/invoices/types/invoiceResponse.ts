@@ -22,6 +22,16 @@ export interface InvoiceSummary {
   reviewUntil: string | null;
   heldAt: string | null;
   holdReason: string | null;
+  kind: string;
+  poNumber: string | null;
+  collectionMethod: 'charge_automatically' | 'send_invoice' | null;
+  dueOn: string | null;
+  markedPaid: {
+    paidOn: string;
+    method: string | null;
+    reference: string | null;
+  } | null;
+  noChargeReason: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -71,6 +81,18 @@ export const toInvoiceSummary = (row: InvoiceRow): InvoiceSummary => ({
   reviewUntil: row.review_until?.toISOString() ?? null,
   heldAt: row.held_at?.toISOString() ?? null,
   holdReason: row.hold_reason,
+  kind: row.kind,
+  poNumber: row.po_number,
+  collectionMethod: row.collection_method,
+  dueOn: row.due_on,
+  markedPaid: row.marked_paid_on
+    ? {
+        paidOn: row.marked_paid_on,
+        method: row.marked_paid_method,
+        reference: row.marked_paid_reference,
+      }
+    : null,
+  noChargeReason: row.no_charge_reason,
   createdAt: row.created_at.toISOString(),
   updatedAt: row.updated_at.toISOString(),
 });

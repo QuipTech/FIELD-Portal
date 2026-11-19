@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as Stripe from 'stripe';
 import { ServiceDatabaseService } from '../../database/serviceDatabase.service';
 import { BillingAccountsService } from '../billingAccounts/billingAccounts.service';
+import { findAccountTerms } from '../accountTerms/accountTerms.repository';
+import { usesAccountTerms } from '../accountTerms/accountTermsTypes';
 import { BillingConfigService } from '../billingConfig/billingConfig.service';
 import { StripeService } from '../stripe/stripe.service';
 import { toStripeGatewayError } from '../stripe/stripeErrors';
@@ -15,9 +17,17 @@ import { toInvoiceEventUpdate } from '../webhooks/stripeInvoiceEvents';
 import { applyInvoiceEventUpdate } from '../webhooks/stripeWebhookEvents.repository';
 import * as invoicesRepository from './invoices.repository';
 import * as invoiceSyncRepository from './invoiceSync.repository';
+import { buildInvoicePresentation } from './accountInvoiceTerms';
 import { toInvoiceTotals } from './invoiceAmounts';
 import { formatCents } from './formatCents';
 import { InvoiceLineRow, InvoiceRow } from './types/invoiceRows';
+
+export interface PushInvoiceOptions {
+  // The payer pays it in the mobile Payment Sheet: card only (no delayed
+  // methods such as BECS debit), and never charged to a saved card here.
+  // Applies when the Stripe invoice is first created.
+  forPaymentSheet?: boolean;
+}
 
 // Pushes one FIELD invoice to Stripe: an empty Stripe Invoice, one Invoice
 // Item per line, then finalise. Every step is idempotent twice over — a
@@ -34,7 +44,10 @@ export class InvoiceStripeSyncService {
     private readonly billingConfig: BillingConfigService,
   ) {}
 
-  pushInvoice = async (invoice: InvoiceRow): Promise<void> => {
+  pushInvoice = async (
+    invoice: InvoiceRow,
+    options: PushInvoiceOptions = {},
+  ): Promise<void> => {
     try {
       const account = await this.billingAccountsService.ensureStripeCustomer(
         await this.billingAccountsService.requireAccount(
@@ -49,6 +62,7 @@ export class InvoiceStripeSyncService {
       const stripeInvoiceId = await this.ensureStripeInvoice(
         invoice,
         customerId,
+        options,
       );
       const lines = await invoicesRepository.listInvoiceLines(
         this.serviceDatabase,
@@ -110,19 +124,45 @@ export class InvoiceStripeSyncService {
   private ensureStripeInvoice = async (
     invoice: InvoiceRow,
     customerId: string,
+    { forPaymentSheet = false }: PushInvoiceOptions,
   ): Promise<string> => {
     if (invoice.stripe_invoice_id) return invoice.stripe_invoice_id;
-    const [{ PAYMENT_TERMS_DAYS }, chargeAutomatically] = await Promise.all([
+    const [config, terms] = await Promise.all([
       this.billingConfig.loadConfig(),
-      this.stripeService.hasDefaultPaymentMethod(customerId),
+      findAccountTerms(this.serviceDatabase, invoice.billing_account_id),
     ]);
+    // An approved 30-day account, or an invoice the customer chose to pay
+    // by bank transfer, is sent with the bank details and never charged to
+    // a card.
+    const presentation = buildInvoicePresentation({
+      invoiceId: invoice.id,
+      accountName: terms?.name ?? invoice.billing_account_name,
+      usesAccountTerms:
+        invoice.pay_by_bank_transfer ||
+        (terms ? usesAccountTerms(terms) : false),
+      termsDays: terms?.terms_days ?? config.PAYMENT_TERMS_DAYS,
+      poRequired: terms?.po_required ?? false,
+      invoicePoNumber: invoice.po_number ?? null,
+      defaultPoNumber: terms?.default_po_number ?? null,
+      bank: config,
+    });
+    // The Payment Sheet pays the invoice itself, so it's never charged
+    // to a saved card.
+    const chargeAutomatically =
+      !forPaymentSheet &&
+      presentation.accountTermsDays === null &&
+      (await this.stripeService.hasDefaultPaymentMethod(customerId));
     const stripeInvoice = await this.stripeService.createInvoice(
       {
         customerId,
         currency: invoice.currency,
         fieldInvoiceId: invoice.id,
-        daysUntilDue: PAYMENT_TERMS_DAYS,
+        daysUntilDue:
+          presentation.accountTermsDays ?? config.PAYMENT_TERMS_DAYS,
         chargeAutomatically,
+        ...(forPaymentSheet && { paymentMethodTypes: ['card' as const] }),
+        footer: presentation.footer,
+        customFields: presentation.customFields,
       },
       invoiceCreateKey(invoice.id),
     );
@@ -169,6 +209,7 @@ export class InvoiceStripeSyncService {
       toInvoiceTotals(finalized),
       finalized.hosted_invoice_url ?? null,
       toDueDay(finalized),
+      finalized.collection_method ?? null,
     );
     return finalized;
   };

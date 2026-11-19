@@ -55,7 +55,7 @@ export interface InviteUserPayload {
 export const adminUserStatusLabel: Record<AdminUserStatus, string> = {
   active: "Active",
   invited: "Invited",
-  disabled: "Suspended",
+  disabled: "Disabled",
 };
 
 export const adminUserStatusTone: Record<AdminUserStatus, Tone> = {

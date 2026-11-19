@@ -46,6 +46,19 @@ const toAdminInvoice = (row: AdminInvoiceRow) => ({
   heldAt: row.held_at,
   amountCreditedCents: Number(row.amount_credited_cents),
   dueOn: row.due_on,
+  collectionMethod: row.collection_method,
+  poNumber: row.po_number,
+  paymentType: row.payment_type,
+  markedPaidOn: row.marked_paid_on,
+  noChargeReason: row.no_charge_reason,
+  // The customer chose bank transfer: mark it paid once the money arrives.
+  payByBankTransfer: row.pay_by_bank_transfer,
+  // Paid outside Stripe (bank transfer): only invoices Stripe emails rather
+  // than charging a saved card, while they're unpaid.
+  canMarkPaid:
+    row.kind === 'organisation' &&
+    ['synced', 'payment_failed'].includes(row.status) &&
+    row.collection_method !== 'charge_automatically',
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });

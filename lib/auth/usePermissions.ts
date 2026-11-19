@@ -26,6 +26,7 @@ const refreshPermissions = (): Promise<string[] | null> => {
           avatarUrl: currentUser.avatarUrl,
           roles: currentUser.roles,
           permissions: currentUser.permissions,
+          machineControlEnabled: currentUser.machineControlEnabled ?? false,
         });
       }
       return currentUser.permissions;
@@ -42,12 +43,16 @@ const refreshPermissions = (): Promise<string[] | null> => {
 // and first client render agree; callers treat that as "not yet known".
 export const usePermissions = () => {
   const [permissions, setPermissions] = useState<string[] | null>(null);
+  const [machineControlEnabled, setMachineControlEnabled] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
     setPermissions(getStoredUser()?.permissions ?? []);
+    setMachineControlEnabled(getStoredUser()?.machineControlEnabled ?? false);
     refreshPermissions().then((fresh) => {
       if (isMounted && fresh) setPermissions(fresh);
+      // The refresh saved the organisation's switch with the user.
+      if (isMounted) setMachineControlEnabled(getStoredUser()?.machineControlEnabled ?? false);
     });
     return () => {
       isMounted = false;
@@ -57,5 +62,7 @@ export const usePermissions = () => {
   return {
     isLoaded: permissions !== null,
     can: (permission: PermissionCode) => permissions?.includes(permission) ?? false,
+    // The organisation has Machine Control turned on (the platform admin's switch).
+    machineControlEnabled,
   };
 };

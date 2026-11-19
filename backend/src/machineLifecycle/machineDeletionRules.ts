@@ -37,6 +37,18 @@ export interface DeletionInvoice {
   hostedInvoiceUrl: string | null;
   // This machine's own final charge, rather than a monthly invoice.
   isFinalCharge: boolean;
+  // The customer chose to pay it by bank transfer: it's paid once a
+  // platform administrator marks it paid.
+  payByBankTransfer: boolean;
+}
+
+// Where to send a bank transfer, for an invoice awaiting one.
+export interface BankTransferDetails {
+  invoiceId: string;
+  accountName: string;
+  bsb: string;
+  accountNumber: string;
+  reference: string;
 }
 
 export interface BillingIntervalUse {
@@ -74,10 +86,13 @@ export interface FinalChargeQuote {
   amountCents: number;
 }
 
-// Everything to pay in one go, oldest month first.
+// Everything to pay in one go, oldest month first. amountCents is before
+// discounts; any free period or promo comes off it (never below A$0).
 export interface FinalChargeDue {
   amountCents: number;
   months: FinalChargeQuote[];
+  discounts: { description: string; amountCents: number }[];
+  amountDueCents: number;
 }
 
 export interface MachineDeletionCheck {
@@ -92,11 +107,16 @@ export interface MachineDeletionCheck {
     status: string;
     hostedInvoiceUrl: string | null;
     isFinalCharge: boolean;
+    payByBankTransfer: boolean;
   }[];
   // The months paying now would cover, when final_charge_due.
   monthsDue: string[];
   // What paying now would cost, when final_charge_due.
   finalCharge: FinalChargeDue | null;
+  // Set by the service: whether bank details are configured, so paying by
+  // bank transfer can be offered, and where to pay one already chosen.
+  bankTransferAvailable: boolean;
+  bankTransfer: BankTransferDetails | null;
 }
 
 const blocked = (
@@ -111,6 +131,8 @@ const blocked = (
   unpaidInvoices: [],
   monthsDue: [],
   finalCharge: null,
+  bankTransferAvailable: false,
+  bankTransfer: null,
   ...details,
 });
 
@@ -122,6 +144,8 @@ const ALLOWED: MachineDeletionCheck = {
   unpaidInvoices: [],
   monthsDue: [],
   finalCharge: null,
+  bankTransferAvailable: false,
+  bankTransfer: null,
 };
 
 const previousMonthStart = (day: string): string =>
@@ -219,9 +243,14 @@ export const assessMachineDeletion = (
       invoice.totalExGstCents > 0,
   );
   if (unpaid.length > 0) {
+    const isAwaitingBankTransfer = unpaid.every(
+      (invoice) => invoice.payByBankTransfer,
+    );
     return blocked(
       'unpaid_invoices',
-      'Pay the invoices below, then you can delete this machine.',
+      isAwaitingBankTransfer
+        ? 'Your bank transfer is awaiting approval. You can delete this machine once your payment has been confirmed.'
+        : 'Pay the invoices below, then you can delete this machine.',
       {
         unpaidInvoices: unpaid.map((invoice) => ({
           id: invoice.id,
@@ -229,6 +258,7 @@ export const assessMachineDeletion = (
           status: invoice.status,
           hostedInvoiceUrl: invoice.hostedInvoiceUrl,
           isFinalCharge: invoice.isFinalCharge,
+          payByBankTransfer: invoice.payByBankTransfer,
         })),
       },
     );

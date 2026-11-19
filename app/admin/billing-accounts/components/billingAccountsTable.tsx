@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/actionMenu";
 import { Table, TableHeaderRow, TableHeaderCell, TableRow, TableCell } from "@/components/ui/table";
 import { getInitials } from "@/lib/format/nameInitials";
+import { formatBillingDay } from "@/lib/format/billingDay";
 import type { OrganisationBilling } from "@/lib/types/billingAccount";
 
-export type BillingAccountAction = "suspend" | "unsuspend" | "enterprise" | "onboarding";
+export type BillingAccountAction = "suspend" | "unsuspend" | "enterprise" | "onboarding" | "paymentTerms" | "freePeriod";
 
 interface BillingAccountsTableProps {
   organisations: OrganisationBilling[];
@@ -31,6 +32,8 @@ const actionsFor = (organisation: OrganisationBilling, onAction: BillingAccounts
     account.suspendedAt
       ? { label: "Lift suspension", icon: "check", onSelect: () => onAction(organisation, "unsuspend") }
       : { label: "Suspend for non-payment", icon: "lock", tone: "danger", onSelect: () => onAction(organisation, "suspend") },
+    { label: "Card or 30-day account", icon: "card", onSelect: () => onAction(organisation, "paymentTerms") },
+    { label: "Free period", icon: "clock", onSelect: () => onAction(organisation, "freePeriod") },
     { label: "Set up Enterprise contract", icon: "file", onSelect: () => onAction(organisation, "enterprise") },
     { label: "Schedule assisted onboarding", icon: "tool", onSelect: () => onAction(organisation, "onboarding") },
   ];
@@ -65,6 +68,16 @@ export const BillingAccountsTable = ({ organisations, onSetUp, onAction }: Billi
             </TableCell>
             <TableCell flex={1.3} className="flex flex-wrap items-center gap-1.5">
               {account?.suspendedAt && <Tag tone="danger">Suspended</Tag>}
+              {organisation.paymentType === "account" && <Tag>30-day account</Tag>}
+              {(organisation.accountStatus === "pending" || organisation.accountStatus === "on_hold") && (
+                <Tag tone="amber">Account application</Tag>
+              )}
+              {organisation.freePeriod && (
+                <Tag tone="ok">
+                  {organisation.freePeriod.freePercent === 100 ? "Free" : `${organisation.freePeriod.freePercent}% off`} until{" "}
+                  {formatBillingDay(organisation.freePeriod.freeUntil)}
+                </Tag>
+              )}
               {organisation.overdueInvoiceCount > 0 && (
                 <Tag tone="amber">{organisation.overdueInvoiceCount} overdue</Tag>
               )}

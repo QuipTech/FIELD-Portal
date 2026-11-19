@@ -2,6 +2,8 @@ import { BillingAccountsService } from '../../src/billing/billingAccounts/billin
 import { BillingConfigService } from '../../src/billing/billingConfig/billingConfig.service';
 import { InvoicesService } from '../../src/billing/invoices/invoices.service';
 import { UpFrontInvoiceService } from '../../src/billing/invoices/upFrontInvoice.service';
+import { InvoicePaymentSheetService } from '../../src/billing/invoices/invoicePaymentSheet.service';
+import { DiscountService } from '../../src/billing/discounts/discount.service';
 import { MonthlyRunService } from '../../src/billing/monthlyRun/monthlyRun.service';
 import { PersonalCheckoutService } from '../../src/billing/personalSubscription/personalCheckout.service';
 import { PriceBooksService } from '../../src/billing/priceBooks/priceBooks.service';
@@ -58,6 +60,8 @@ describe('a machine final charge and the month-end invoice', () => {
       {
         openCheckoutAt,
       } as unknown as PersonalCheckoutService,
+      { isAvailable: false } as InvoicePaymentSheetService,
+      {} as StripeService,
     );
     deletion = new MachineDeletionService(
       fixture.database,
@@ -65,7 +69,7 @@ describe('a machine final charge and the month-end invoice', () => {
       priceBooks,
       upFront,
     );
-    run = new MonthlyRunService(db, config, priceBooks);
+    run = new MonthlyRunService(db, config, priceBooks, new DiscountService());
   });
   afterAll(() => fixture.db.close());
 

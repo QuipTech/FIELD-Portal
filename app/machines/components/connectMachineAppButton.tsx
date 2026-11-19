@@ -17,9 +17,9 @@ export const ConnectMachineAppButton = ({ isConnected, onClick }: ConnectMachine
   };
   return (
     <span className="inline-flex flex-none" onClick={(event) => event.preventDefault()}>
-      <PermissionButton permission={PERMISSIONS.manageMachine} size="sm" onClick={handleClick}>
+      <PermissionButton permission={PERMISSIONS.manageMachineControlDevices} size="sm" onClick={handleClick}>
         <Icon name={isConnected ? "check" : "cloud"} className="h-3.5 w-3.5" />
-        {isConnected ? "Connected" : "Connect app"}
+        {isConnected ? "Paired" : "Connect app"}
       </PermissionButton>
     </span>
   );

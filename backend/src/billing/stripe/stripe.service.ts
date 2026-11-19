@@ -7,12 +7,18 @@ import { ConfigService } from '@nestjs/config';
 import { createHash } from 'crypto';
 import * as Stripe from 'stripe';
 import {
+  assertPublishableKeyMatches,
   assertStripeKeyAllowed,
   readStripeSettings,
   StripeSettings,
 } from './stripeConfig';
 
 const NOT_CONFIGURED_MESSAGE = 'Billing is not configured (STRIPE_SECRET_KEY).';
+// The Stripe API version every call uses: the one this SDK release pins
+// (2026-08-26.dahlia for stripe 22.6.x). Named here so ephemeral keys for the
+// mobile Payment Sheet are created with exactly the version the client uses.
+export const STRIPE_API_VERSION = Stripe.API_VERSION;
+
 const WEBHOOK_NOT_CONFIGURED_MESSAGE =
   'Billing webhooks are not configured (STRIPE_WEBHOOK_SECRET).';
 
@@ -37,6 +43,13 @@ export interface CreateInvoiceInput {
   // The customer has a default card or direct debit: Stripe charges it
   // (spec section 9). Otherwise Stripe emails the invoice with the terms.
   chargeAutomatically: boolean;
+  // Limits how the invoice can be paid, e.g. ['card'] for invoices paid in
+  // the mobile Payment Sheet. Omitted: the account's default methods.
+  paymentMethodTypes?: Stripe.InvoiceCreateParams.PaymentSettings.PaymentMethodType[];
+  // Printed on the invoice: bank details for a 30-day account, and the PO
+  // number.
+  footer?: string | null;
+  customFields?: { name: string; value: string }[];
 }
 
 export interface CreateCheckoutInput {
@@ -76,8 +89,12 @@ export class StripeService {
       this.settings.secretKey,
       configService.get<string>('NODE_ENV'),
     );
+    assertPublishableKeyMatches(
+      this.settings.secretKey,
+      this.settings.publishableKey,
+    );
     this.logger.log(
-      `Stripe mode: ${this.settings.mode}; tax ${this.settings.isTaxEnabled ? 'on' : 'off'}`,
+      `Stripe mode: ${this.settings.mode}; tax ${this.settings.isTaxEnabled ? 'on' : 'off'}; mobile Payment Sheet ${this.settings.publishableKey ? 'on' : 'off (STRIPE_PUBLISHABLE_KEY not set)'}`,
     );
   }
 
@@ -143,6 +160,15 @@ export class StripeService {
         pending_invoice_items_behavior: 'exclude',
         auto_advance: false,
         automatic_tax: { enabled: this.settings.isTaxEnabled },
+        ...(input.paymentMethodTypes && {
+          payment_settings: {
+            payment_method_types: input.paymentMethodTypes,
+          },
+        }),
+        ...(input.footer && { footer: input.footer }),
+        ...(input.customFields?.length && {
+          custom_fields: input.customFields,
+        }),
         metadata: { fieldInvoiceId: input.fieldInvoiceId },
       },
       { idempotencyKey },
@@ -169,10 +195,52 @@ export class StripeService {
       { idempotencyKey },
     );
 
+  // The same, returning the client secret of the invoice's own payment
+  // (see retrieveInvoiceWithConfirmationSecret).
+  finalizeInvoiceWithConfirmationSecret = (
+    stripeInvoiceId: string,
+    idempotencyKey: string,
+  ) =>
+    this.require().invoices.finalizeInvoice(
+      stripeInvoiceId,
+      { auto_advance: false, expand: ['confirmation_secret'] },
+      { idempotencyKey },
+    );
+
+  // An invoice with the client secret of the PaymentIntent Stripe made for
+  // it at finalisation. API 2025-03-31 (basil) and later expose it as
+  // confirmation_secret; invoice.payment_intent no longer exists.
+  retrieveInvoiceWithConfirmationSecret = (stripeInvoiceId: string) =>
+    this.require().invoices.retrieve(stripeInvoiceId, {
+      expand: ['confirmation_secret'],
+    });
+
+  // A short-lived key that lets the mobile Payment Sheet show and save the
+  // customer's cards. A fresh one every time: never cached or reused.
+  createEphemeralKey = (customerId: string) =>
+    this.require().ephemeralKeys.create(
+      { customer: customerId },
+      { apiVersion: STRIPE_API_VERSION },
+    );
+
+  // The pk_ key for the mobile Payment Sheet; undefined when not configured.
+  get publishableKey(): string | undefined {
+    return this.settings.publishableKey;
+  }
+
   // Charges an automatically collected invoice now. A declined payment
   // throws; Stripe's invoice.payment_failed webhook records it.
   payInvoice = (stripeInvoiceId: string, idempotencyKey: string) =>
     this.require().invoices.pay(stripeInvoiceId, {}, { idempotencyKey });
+
+  // Records a payment made outside Stripe (bank transfer, cheque): the
+  // invoice becomes paid and Stripe sends invoice.paid. Nothing is charged.
+  payInvoiceOutOfBand = (stripeInvoiceId: string, idempotencyKey: string) =>
+    this.require().invoices.pay(
+      stripeInvoiceId,
+      { paid_out_of_band: true },
+      { idempotencyKey },
+    );
 
   // True when the customer saved a card or direct debit for invoices (in
   // the Customer Portal), so invoices can be charged automatically.
@@ -184,6 +252,24 @@ export class StripeService {
       customer.invoice_settings?.default_payment_method ??
       customer.default_source,
     );
+  };
+
+  // True when Stripe Tax can work out GST for the customer, so an invoice
+  // for them can be finalised (Stripe refuses one with
+  // customer_tax_location_invalid otherwise). Always true with tax off.
+  canTaxCustomer = async (customerId: string): Promise<boolean> => {
+    if (!this.settings.isTaxEnabled) return true;
+    const customer = await this.require().customers.retrieve(customerId, {
+      expand: ['tax'],
+    });
+    if ('deleted' in customer && customer.deleted) return false;
+    const status = (customer as Stripe.Customer).tax?.automatic_tax;
+    const canTax = status === 'supported' || status === 'not_collecting';
+    if (!canTax)
+      this.logger.warn(
+        `Stripe Tax can't place customer ${customerId} (automatic_tax: ${status ?? 'none'}); it needs a billing address.`,
+      );
+    return canTax;
   };
 
   // A credit note for part or all of a finalised invoice: amountCents is
@@ -265,6 +351,11 @@ export class StripeService {
       (session) => session.metadata?.fieldInvoiceId === fieldInvoiceId,
     );
 
+  // Closes an open Checkout session so it can no longer be paid. Stripe
+  // refuses (throws) if the session has completed meanwhile.
+  expireCheckoutSession = (sessionId: string) =>
+    this.require().checkout.sessions.expire(sessionId);
+
   // Stripe's current copy of an invoice, for confirming a payment whose
   // webhook never arrived.
   retrieveInvoice = (stripeInvoiceId: string) =>
@@ -302,7 +393,9 @@ export class StripeService {
   private require = (): Stripe => {
     if (!this.settings.secretKey)
       throw new ServiceUnavailableException(NOT_CONFIGURED_MESSAGE);
-    this.client ??= new Stripe(this.settings.secretKey);
+    this.client ??= new Stripe(this.settings.secretKey, {
+      apiVersion: STRIPE_API_VERSION,
+    });
     return this.client;
   };
 }

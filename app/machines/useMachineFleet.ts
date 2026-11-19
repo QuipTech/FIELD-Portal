@@ -27,6 +27,12 @@ export const useMachineFleet = (search: string, reloadToken: number) => {
     "Couldn't load machines. Please try again.",
   );
 
+  useEffect(() => {
+    if (fleet.isLoading) return;
+    const timer = setTimeout(fleet.reload, 5000);
+    return () => clearTimeout(timer);
+  }, [fleet.isLoading, fleet.reload]);
+
   // Values come from the filter panel's own options, so they're valid.
   const updateFilter = (key: keyof MachineFleetFilters, value: string) =>
     setFilters((current) => ({ ...current, [key]: value }) as MachineFleetFilters);

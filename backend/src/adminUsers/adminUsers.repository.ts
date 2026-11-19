@@ -82,3 +82,18 @@ export const setUserRole = async (
   );
   return result.rows[0].outcome;
 };
+
+export type SetUserDisabledOutcome = 'updated' | 'not_found' | 'last_owner';
+
+// SECURITY DEFINER (0136): the user may be in any organisation. Disabling
+// also ends their sessions.
+export const setUserDisabled = async (
+  client: PoolClient,
+  params: { userId: string; disabled: boolean },
+): Promise<SetUserDisabledOutcome> => {
+  const result = await client.query<{ outcome: SetUserDisabledOutcome }>(
+    `SELECT admin_set_user_disabled($1, $2) AS outcome`,
+    [params.userId, params.disabled],
+  );
+  return result.rows[0].outcome;
+};

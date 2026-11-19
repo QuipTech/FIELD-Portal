@@ -10,6 +10,8 @@ import {
   listOrganisationInvoicesRequest,
 } from "@/lib/api/organisationBillingApi";
 import { requireAccessToken } from "@/lib/api/requireAccessToken";
+import { getPaymentTermsRequest } from "@/lib/api/paymentTermsApi";
+import { PaymentTermsCard } from "@/components/billing/paymentTermsCard";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import { audMoney } from "@/lib/format/audMoney";
 import { formatBillingDay } from "@/lib/format/billingDay";
@@ -23,9 +25,10 @@ import { OrganisationPlanCard, ThisMonthCard } from "./organisationPlanCard";
 export const OrganisationBillingView = () => {
   const summary = useApiResource(getOrganisationBillingRequest, [], "Couldn't load your organisation's billing.");
   const invoices = useApiResource(listOrganisationInvoicesRequest, [], "Couldn't load invoices.");
+  const paymentTerms = useApiResource(getPaymentTermsRequest, [], "Couldn't load how your organisation pays.");
   const [portalError, setPortalError] = useState<string | null>(null);
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
-  const reload = () => { summary.reload(); invoices.reload(); };
+  const reload = () => { summary.reload(); invoices.reload(); paymentTerms.reload(); };
 
   const openPaymentMethods = async () => {
     setIsOpeningPortal(true);
@@ -67,15 +70,25 @@ export const OrganisationBillingView = () => {
           {overdue.suspensionFrom && ` If unpaid, new activations and AI sessions may be paused from ${formatBillingDay(overdue.suspensionFrom)}.`}
         </div>
       )}
+      {paymentTerms.data && (
+        <PaymentTermsCard
+          terms={paymentTerms.data}
+          onChanged={reload}
+          onAddCard={account.hasStripeCustomer ? () => void openPaymentMethods() : undefined}
+        />
+      )}
+      {paymentTerms.error && <p className="text-sm text-danger">{paymentTerms.error}</p>}
       <OrganisationPlanCard summary={summary.data} onChanged={reload} />
       <ThisMonthCard summary={summary.data} />
       <AllowanceUsageCard allowance={summary.data.allowance} />
       {invoices.data && <OrganisationInvoicesCard invoices={invoices.data} />}
       {invoices.error && <p className="text-sm text-danger">{invoices.error}</p>}
-      <p className="px-1 text-xs text-bodyGray">
-        Save a card or direct debit under Payment methods and invoices are paid automatically; otherwise they are emailed with
-        14-day terms.
-      </p>
+      {!paymentTerms.data?.usesAccountTerms && (
+        <p className="px-1 text-xs text-bodyGray">
+          Save a card or direct debit under Payment methods and invoices are paid automatically; otherwise they are emailed with
+          14-day terms.
+        </p>
+      )}
     </div>
   );
 };

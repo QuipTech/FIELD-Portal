@@ -20,7 +20,15 @@ export const invoiceItemCreateKey = (invoiceLineId: string) => invoiceLineId;
 export const invoiceFinalizeKey = (invoiceId: string) =>
   `invoice:${invoiceId}:finalize`;
 
+// Its own key: the request differs from invoiceFinalizeKey's (it expands the
+// confirmation secret), and Stripe refuses a key reused with other params.
+export const invoicePaymentSheetFinalizeKey = (invoiceId: string) =>
+  `invoice:${invoiceId}:finalize:payment-sheet`;
+
 export const invoicePayKey = (invoiceId: string) => `invoice:${invoiceId}:pay`;
+
+export const invoicePaidOutOfBandKey = (invoiceId: string) =>
+  `invoice:${invoiceId}:paid-out-of-band`;
 
 export const creditNoteCreateKey = (creditNoteId: string) =>
   `credit-note:${creditNoteId}:create`;

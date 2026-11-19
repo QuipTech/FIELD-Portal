@@ -20,6 +20,8 @@ interface UsersTableProps {
   // Offered once their access has loaded.
   canEditMachineAccess: (user: AdminUser) => boolean;
   onEditMachineAccess: (user: AdminUser) => void;
+  // Disable, or Enable for someone already disabled.
+  onToggleDisabled: (user: AdminUser) => void;
   onRemove: (user: AdminUser) => void;
 }
 
@@ -51,6 +53,7 @@ export const UsersTable = ({
   onChangeRole,
   canEditMachineAccess,
   onEditMachineAccess,
+  onToggleDisabled,
   onRemove,
 }: UsersTableProps) => {
   return (
@@ -121,6 +124,11 @@ export const UsersTable = ({
                             },
                           ]
                         : []),
+                      {
+                        label: user.status === "disabled" ? "Enable user" : "Disable user",
+                        icon: user.status === "disabled" ? "play" : "lock",
+                        onSelect: () => onToggleDisabled(user),
+                      },
                       { label: "Remove user", icon: "x", tone: "danger", onSelect: () => onRemove(user) },
                     ]}
                   />

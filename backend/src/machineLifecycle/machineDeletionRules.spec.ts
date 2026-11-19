@@ -38,6 +38,7 @@ const invoice = (
   totalExGstCents: 1000,
   hostedInvoiceUrl: null,
   isFinalCharge: false,
+  payByBankTransfer: false,
   ...overrides,
 });
 const octoberPaid = invoice('2026-10-01', 'paid');
@@ -188,6 +189,35 @@ describe('assessMachineDeletion', () => {
         facts({
           ...billed,
           invoices: [octoberPaid, finalCharge('paid')],
+          finalChargedMonths: ['2026-11-01'],
+        }),
+      ).canDelete,
+    ).toBe(true);
+  });
+
+  it('waits for approval of a final charge paid by bank transfer, then allows', () => {
+    const bankTransfer = (status: string) =>
+      invoice('2026-11-01', status, {
+        id: 'final',
+        isFinalCharge: true,
+        payByBankTransfer: true,
+      });
+    const awaiting = assessMachineDeletion(
+      facts({
+        ...billed,
+        invoices: [octoberPaid, bankTransfer('synced')],
+        finalChargedMonths: ['2026-11-01'],
+      }),
+    );
+    expect(awaiting.canDelete).toBe(false);
+    expect(awaiting.blocker).toBe('unpaid_invoices');
+    expect(awaiting.message).toMatch(/bank transfer is awaiting approval/);
+    expect(awaiting.unpaidInvoices[0].payByBankTransfer).toBe(true);
+    expect(
+      assessMachineDeletion(
+        facts({
+          ...billed,
+          invoices: [octoberPaid, bankTransfer('paid')],
           finalChargedMonths: ['2026-11-01'],
         }),
       ).canDelete,

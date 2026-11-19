@@ -10,6 +10,9 @@ export interface AuthSessionUser {
   // Permission codes those roles grant, e.g. "ai.use". Missing on sessions
   // saved before the backend sent them.
   permissions?: string[];
+  // The organisation has Machine Control turned on. Missing on sessions saved
+  // before the backend sent it, which counts as off.
+  machineControlEnabled?: boolean;
 }
 
 export interface AuthSessionTenant {
