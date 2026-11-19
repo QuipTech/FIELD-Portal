@@ -39,6 +39,7 @@ import {
   RemoteDecisionDto,
   RemoteHeartbeatDto,
   RemoteRecordingCompleteDto,
+  RequestRemoteHelpDto,
 } from './remoteSession.types';
 
 // The Portal side of remote support on one machine. Needs Machine Control
@@ -65,6 +66,28 @@ export class RemoteSessionController {
     @Body() dto: CreateRemoteSessionDto,
   ) {
     return this.sessions.create(actor, machineId, dto);
+  }
+
+  @Get('help/current')
+  @Header('Cache-Control', 'no-store')
+  @RequireFeature(FEATURE_KEYS.remoteSession)
+  pendingHelp(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('machineId', ParseUUIDPipe) machineId: string,
+  ) {
+    return this.sessions.pendingHelp(actor, machineId);
+  }
+
+  @Post(':sessionId/claim')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  @RequireFeature(FEATURE_KEYS.remoteSession)
+  claimHelp(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('machineId', ParseUUIDPipe) machineId: string,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+  ) {
+    return this.sessions.claimHelp(actor, machineId, sessionId);
   }
 
   @Get(':sessionId')
@@ -180,6 +203,17 @@ export class RemoteSessionController {
 @UseGuards(DeviceTokenGuard)
 export class DeviceRemoteSessionController {
   constructor(private readonly sessions: RemoteSessionService) {}
+
+  @Post('help')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  requestHelp(
+    @CurrentDevice() device: PairedDevice,
+    @CurrentDeviceToken() token: string,
+    @Body() dto: RequestRemoteHelpDto,
+  ) {
+    return this.sessions.requestHelp(device, token, dto);
+  }
 
   @Get('current')
   @Header('Cache-Control', 'no-store')

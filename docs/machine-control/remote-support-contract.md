@@ -1,6 +1,8 @@
 # Remote support contract (Windows FIELD Machine app)
 
-Status: backend and Portal are implemented on `dev` (migration `0139`).
+The support-initiated backend and Portal flow uses migration `0139`. The
+operator-initiated backend flow uses migration `0140` and is documented in the
+[Windows handoff](windows-remote-session-handoff.md).
 Pairing, device tokens and the `/machine-app` socket are unchanged; see
 [tablet-disconnect-contract.md](tablet-disconnect-contract.md).
 
@@ -37,6 +39,7 @@ Every remote endpoint (Portal and tablet) returns this shape:
   "machineId": "…uuid…",
   "deviceId": "…uuid…",
   "status": "requested",
+  "initiatedBy": "portal",
   "requester": { "name": "Sam Support" },
   "scope": { "view": true, "control": true, "record": true },
   "createdAt": "2026-11-19T04:10:00.000Z",
@@ -166,7 +169,8 @@ about pairing and presence only. Remote support uses `remote:*`.
 | Event | When |
 | --- | --- |
 | `remote:requested` | A Portal user pressed Connect: show Allow/Decline |
-| `remote:accepted` | The operator allowed |
+| `remote:help_requested` | The tablet operator requested help |
+| `remote:accepted` | The operator allowed or a support user claimed a tablet help request |
 | `remote:declined` | The operator declined (or the tablet ended a waiting request) |
 | `remote:ended` | Ended for any reason, including expiry, cancel, inactivity and unpairing |
 | `remote:recording` | Recording status changed (`recording`, `completed`, `failed`) |

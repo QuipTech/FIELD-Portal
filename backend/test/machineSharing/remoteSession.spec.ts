@@ -98,6 +98,73 @@ describe('remote support sessions', () => {
     }));
   };
 
+  it('lets a tablet request help once and gives only the claimant viewer access', async () => {
+    const tablet = await pairTablet(world.shared1.id);
+    const dto = { requestId: '37655fcc-71ab-4387-a830-36552b35a52f', control: false };
+    const request = await remote.requestHelp(tablet.device, tablet.deviceToken, dto);
+    expect(request).toMatchObject({
+      id: dto.requestId,
+      initiatedBy: 'tablet',
+      status: 'requested',
+      scope: { control: false },
+    });
+    await expect(remote.requestHelp(tablet.device, tablet.deviceToken, dto)).resolves.toEqual(request);
+    expect(await remoteEvents()).toEqual([
+      { event: 'remote:help_requested', status: 'requested', reason: null },
+    ]);
+    await expect(remote.pendingHelp(actors.adminA, world.shared1.id)).resolves.toEqual({
+      session: request,
+    });
+    await expect(remote.claimHelp(actors.techB, world.shared1.id, request.id))
+      .rejects.toMatchObject({ status: 404 });
+    await expect(remote.create(actors.adminA, world.shared1.id, {}))
+      .rejects.toMatchObject({ response: { code: 'remote_session_busy' } });
+    await expect(remote.decide(tablet.device, tablet.deviceToken, request.id, {
+      decision: 'allow',
+    })).rejects.toMatchObject({ response: { code: 'remote_session_claim_required' } });
+    await expect(remote.tabletConnection(tablet.device, tablet.deviceToken, request.id))
+      .rejects.toMatchObject({ response: { code: 'remote_session_not_active' } });
+    await expect(remote.claimHelp(actors.adminA, world.shared2.id, request.id))
+      .rejects.toMatchObject({ response: { code: 'remote_session_not_found' } });
+    const active = await remote.claimHelp(actors.adminA, world.shared1.id, request.id);
+    expect(active).toMatchObject({ status: 'active', scope: { control: false } });
+    await expect(remote.claimHelp(actors.adminA, world.shared1.id, request.id))
+      .resolves.toMatchObject({ id: request.id, status: 'active' });
+    await expect(remote.pendingHelp(actors.adminA, world.shared1.id)).resolves.toEqual({
+      session: null,
+    });
+    await expect(remote.viewerConnection(actors.adminA, world.shared1.id, request.id))
+      .resolves.toMatchObject({ role: 'VIEWER', controlAllowed: false });
+    await expect(remote.tabletConnection(tablet.device, tablet.deviceToken, request.id))
+      .resolves.toMatchObject({ role: 'MASTER', controlAllowed: false });
+    await remote.endFromTablet(tablet.device, tablet.deviceToken, request.id);
+    await expect(remote.requestHelp(tablet.device, tablet.deviceToken, dto))
+      .resolves.toMatchObject({ status: 'ended' });
+  });
+
+  it('refuses a claim after operator cancellation or request expiry', async () => {
+    const tablet = await pairTablet(world.shared1.id);
+    const first = await remote.requestHelp(tablet.device, tablet.deviceToken, {
+      requestId: '37655fcc-71ab-4387-a830-36552b35a52f', control: true,
+    });
+    await remote.endFromTablet(tablet.device, tablet.deviceToken, first.id);
+    await expect(remote.claimHelp(actors.adminA, world.shared1.id, first.id))
+      .rejects.toMatchObject({ response: { code: 'remote_session_closed' } });
+
+    const second = await remote.requestHelp(tablet.device, tablet.deviceToken, {
+      requestId: '63a75307-1858-4657-a89e-141cae85531b', control: true,
+    });
+    await fixture.query(
+      "UPDATE mc_remote_sessions SET expires_at = now() - interval '1 second' WHERE id = $1",
+      [second.id],
+    );
+    await expect(remote.claimHelp(actors.adminA, world.shared1.id, second.id))
+      .rejects.toMatchObject({ response: { code: 'remote_session_expired' } });
+    await expect(remote.pendingHelp(actors.adminA, world.shared1.id)).resolves.toEqual({
+      session: null,
+    });
+  });
+
   it('runs Connect → Allow → end, with history, metering and events', async () => {
     const tablet = await pairTablet(world.shared1.id);
     const requested = await remote.create(actors.adminA, world.shared1.id, {});

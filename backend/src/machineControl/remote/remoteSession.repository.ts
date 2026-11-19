@@ -239,3 +239,31 @@ export const pendingWork = async (
   );
   return rows;
 };
+
+export const requestHelp = (
+  client: Queryable,
+  deviceId: string,
+  requestId: string,
+  control: boolean,
+  viewerClientId: string,
+) =>
+  one(client, 'SELECT * FROM mc_remote_request_help($1, $2, $3, $4)', [
+    deviceId,
+    requestId,
+    control,
+    viewerClientId,
+  ]);
+
+export const claimHelp = (client: Queryable, machineId: string, sessionId: string) =>
+  one(client, 'SELECT * FROM mc_remote_claim_help($1, $2)', [machineId, sessionId]);
+
+export const findPendingHelp = async (client: Queryable, machineId: string) => {
+  const { rows } = await client.query<RemoteSessionRow>(
+    `SELECT * FROM mc_remote_sessions
+     WHERE machine_id = $1 AND initiated_by = 'tablet'
+       AND status = 'requested' AND expires_at > now()
+     ORDER BY created_at DESC LIMIT 1`,
+    [machineId],
+  );
+  return rows[0] ?? null;
+};
