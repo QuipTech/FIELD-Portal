@@ -119,7 +119,7 @@ describe("how you pay", () => {
   it("checks a promo code, then applies it", async () => {
     vi.mocked(validatePromoCodeRequest).mockResolvedValue({
       code: "SPRING25", description: "Spring", summary: "25% off machine charges for 3 months",
-      startsMonth: "2026-11-01", endsMonth: "2027-01-01",
+      discountType: "percent", discountValue: 25, startsMonth: "2026-11-01", endsMonth: "2027-01-01",
     });
     vi.mocked(redeemPromoCodeRequest).mockResolvedValue({} as never);
     render(<PaymentTermsCard terms={terms()} onChanged={onChanged} />);
@@ -146,7 +146,7 @@ describe("how you pay", () => {
         terms={terms({
           promo: {
             id: "r", promoCodeId: "p", code: "WELCOME", description: "", summary: "A$50.00 off machine charges every month",
-            billingAccountId: "acct-1", accountName: "Acme", redeemedAt: "", startsMonth: "2026-11-01", endsMonth: null,
+            discountType: "fixed_cents", discountValue: 5000, billingAccountId: "acct-1", accountName: "Acme", redeemedAt: "", startsMonth: "2026-11-01", endsMonth: null,
           },
         })}
         onChanged={onChanged}

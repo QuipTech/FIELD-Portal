@@ -104,7 +104,7 @@ export const FreePeriodDialog = ({ organisation, onDone, onClose }: DialogProps)
   const [percent, setPercent] = useState(String(current?.freePercent ?? 100));
   const [reason, setReason] = useState("");
   const [clearing, setClearing] = useState(false);
-  const percentNumber = Number(percent.replace(/[%\s]/g, ""));
+  const percentNumber = Number(percent);
   const isValid =
     reason.trim().length > 0 &&
     (clearing || (/^\d{4}-\d{2}-\d{2}$/.test(freeUntil) && Number.isInteger(percentNumber) && percentNumber >= 1 && percentNumber <= 100));
@@ -150,7 +150,7 @@ export const FreePeriodDialog = ({ organisation, onDone, onClose }: DialogProps)
             </label>
             <label className="flex flex-col gap-1 text-sm text-ink">
               Percent off machine charges
-              <input value={percent} onChange={(event) => setPercent(event.target.value)} inputMode="numeric" className={inputClass} />
+              <input value={percent} onChange={(event) => setPercent(event.target.value.replace(/\D/g, "").slice(0, 3))} inputMode="numeric" className={inputClass} />
             </label>
           </>
         )}

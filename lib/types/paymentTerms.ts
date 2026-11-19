@@ -46,6 +46,9 @@ export interface PromoRedemption {
   description: string;
   // e.g. "20% off machine charges for 3 months"
   summary: string;
+  discountType: DiscountType;
+  // Percent (1–100) or AUD cents off each month.
+  discountValue: number;
   billingAccountId: string;
   accountName: string;
   redeemedAt: string;
@@ -74,9 +77,22 @@ export interface PromoPreview {
   code: string;
   description: string;
   summary: string;
+  discountType: DiscountType;
+  discountValue: number;
   startsMonth: string;
   endsMonth: string | null;
 }
+
+// What a promo takes off one month's machine charges: never more than the
+// charge itself.
+export const promoDiscountCents = (
+  promo: Pick<PromoPreview, "discountType" | "discountValue">,
+  chargeCents: number,
+): number =>
+  Math.min(
+    chargeCents,
+    promo.discountType === "percent" ? Math.round((chargeCents * promo.discountValue) / 100) : promo.discountValue,
+  );
 
 export const PROMO_ERROR_CODES = [
   "invalid",

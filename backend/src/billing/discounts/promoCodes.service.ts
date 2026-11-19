@@ -62,6 +62,9 @@ export interface PromoRedemption {
   code: string;
   description: string;
   summary: string;
+  // So the portal can show what the code takes off a quote.
+  discountType: PromoCodeRow['discount_type'];
+  discountValue: number;
   billingAccountId: string;
   accountName: string;
   redeemedAt: string;
@@ -101,6 +104,8 @@ const toRedemption = (row: RedemptionRow): PromoRedemption => ({
     discountValue: row.discount_value,
     durationMonths: row.duration_months,
   }),
+  discountType: row.discount_type,
+  discountValue: row.discount_value,
   billingAccountId: row.billing_account_id,
   accountName: row.account_name,
   redeemedAt: row.redeemed_at.toISOString(),
@@ -255,6 +260,8 @@ export class PromoCodesService {
       code: live.code,
       description: live.description,
       summary: toPromoCode(live).summary,
+      discountType: live.discount_type,
+      discountValue: live.discount_value,
       ...redemptionMonths(today, live.duration_months),
     };
   };

@@ -5,6 +5,9 @@ import { useApiResource } from "@/lib/hooks/useApiResource";
 import { getActivationQuoteRequest } from "@/lib/api/machineLifecycleApi";
 import { audMoney } from "@/lib/format/audMoney";
 import type { ActivationQuote } from "@/lib/types/machineLifecycle";
+import { promoDiscountCents } from "@/lib/types/paymentTerms";
+import type { ActivationPromoState } from "@/lib/hooks/useActivationPromo";
+import { ActivationPromoField } from "./activationPromoField";
 
 const formatDay = (day: string) =>
   new Date(`${day}T00:00:00`).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
@@ -13,7 +16,14 @@ const plural = (count: number, word: string) => `${count} ${word}${count === 1 ?
 
 const describeBand = ({ from, to }: { from: number; to: number | null }) => (to === null ? `${from}+` : `${from}–${to}`);
 
-const PerMachineSummary = ({ quote }: { quote: Extract<ActivationQuote, { pricing: "per_machine" }> }) => {
+interface PerMachineSummaryProps {
+  quote: Extract<ActivationQuote, { pricing: "per_machine" }>;
+  promo?: ActivationPromoState;
+}
+
+const PerMachineSummary = ({ quote, promo }: PerMachineSummaryProps) => {
+  const applied = promo?.applied ?? null;
+  const discountCents = applied ? promoDiscountCents(applied, quote.monthlyAfterCents) : 0;
   const addsNothing = quote.monthlyAfterCents === quote.monthlyBeforeCents;
   const rateDrops = quote.rateBeforeCents !== null && quote.rateAfterCents < quote.rateBeforeCents;
   return (
@@ -33,6 +43,18 @@ const PerMachineSummary = ({ quote }: { quote: Extract<ActivationQuote, { pricin
           {audMoney(quote.monthlyAfterCents)} ex GST
         </span>
       </div>
+      {applied && discountCents > 0 && (
+        <>
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-bodyGray">Promo {applied.code}</span>
+            <span className="font-medium text-primary">−{audMoney(discountCents)}</span>
+          </div>
+          <div className="flex items-baseline justify-between gap-3 border-t border-borderGray pt-2">
+            <span className="text-bodyGray">After promo</span>
+            <span className="font-medium text-ink">{audMoney(quote.monthlyAfterCents - discountCents)} ex GST</span>
+          </div>
+        </>
+      )}
       {rateDrops && (
         <p className="text-xs text-primary">
           Your fleet moves to the {audMoney(quote.rateAfterCents)} band, so every machine is charged the lower rate.
@@ -50,17 +72,25 @@ const PerMachineSummary = ({ quote }: { quote: Extract<ActivationQuote, { pricin
       )}
       <p className="text-xs text-bodyGray">
         No payment is taken now. Machines are billed monthly in arrears: this month&apos;s highest number of active machines
-        is invoiced on {formatDay(quote.invoicedOn)}, with GST added.
+        is invoiced on {formatDay(quote.invoicedOn)}, with GST added
+        {applied ? " and the promo taken off (after any free period)" : ""}.
       </p>
       <p className="text-xs text-mutedGray">
         Fleet rates: {quote.bands.map((band) => `${describeBand(band)} machines ${audMoney(band.unitCents)}`).join(" · ")}
       </p>
+      {promo && (
+        <div className="border-t border-borderGray pt-2">
+          <ActivationPromoField promo={promo} />
+        </div>
+      )}
     </div>
   );
 };
 
-// The cost of activating, shown in the activation dialog before the admin confirms.
-export const ActivationPriceSummary = ({ count = 1 }: { count?: number }) => {
+// The cost of activating, shown in the activation dialog before the admin
+// confirms, with any promo code taken off. A contract has no per-machine
+// charge, so there's nothing for a promo to discount.
+export const ActivationPriceSummary = ({ count = 1, promo }: { count?: number; promo?: ActivationPromoState }) => {
   const quote = useApiResource((accessToken) => getActivationQuoteRequest(accessToken, count), [count], "Couldn't load pricing.");
   if (quote.isLoading && !quote.data)
     return (
@@ -75,5 +105,5 @@ export const ActivationPriceSummary = ({ count = 1 }: { count?: number }) => {
         This machine is covered by your organisation&apos;s contract. No separate per-machine charge applies.
       </p>
     );
-  return <PerMachineSummary quote={quote.data} />;
+  return <PerMachineSummary quote={quote.data} promo={promo} />;
 };
