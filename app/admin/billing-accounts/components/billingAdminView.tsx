@@ -44,7 +44,7 @@ export const BillingAdminView = () => {
   return (
     <>
       <h1 className="text-[22px] font-medium text-ink">Billing</h1>
-      <div role="tablist" aria-label="Billing" className="flex gap-1 overflow-x-auto border-b border-borderGray">
+      <div role="tablist" aria-label="Billing" className="flex flex-none gap-1 overflow-x-auto border-b border-borderGray">
         {TABS.map((item) => (
           <button
             key={item.id}
