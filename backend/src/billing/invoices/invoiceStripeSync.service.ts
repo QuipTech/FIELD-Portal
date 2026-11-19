@@ -1,9 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { ConflictException, Injectable, Logger } from '@nestjs/common';
 import * as Stripe from 'stripe';
 import { ServiceDatabaseService } from '../../database/serviceDatabase.service';
 import { BillingAccountsService } from '../billingAccounts/billingAccounts.service';
 import { findAccountTerms } from '../accountTerms/accountTerms.repository';
-import { usesAccountTerms } from '../accountTerms/accountTermsTypes';
+import {
+  usesAccountTerms,
+  ZOHO_BILLED_MESSAGE,
+} from '../accountTerms/accountTermsTypes';
 import { BillingConfigService } from '../billingConfig/billingConfig.service';
 import { StripeService } from '../stripe/stripe.service';
 import { toStripeGatewayError } from '../stripe/stripeErrors';
@@ -48,6 +51,7 @@ export class InvoiceStripeSyncService {
     invoice: InvoiceRow,
     options: PushInvoiceOptions = {},
   ): Promise<void> => {
+    await this.assertNotZohoBilled(invoice);
     try {
       const account = await this.billingAccountsService.ensureStripeCustomer(
         await this.billingAccountsService.requireAccount(
@@ -81,6 +85,19 @@ export class InvoiceStripeSyncService {
     } catch (error) {
       throw toStripeGatewayError(error);
     }
+  };
+
+  // A 30-day account is invoiced in Zoho: a new invoice for it must never
+  // reach Stripe (not even a Stripe customer). One already on Stripe from
+  // before the account moved keeps syncing.
+  private assertNotZohoBilled = async (invoice: InvoiceRow): Promise<void> => {
+    if (invoice.stripe_invoice_id) return;
+    const terms = await findAccountTerms(
+      this.serviceDatabase,
+      invoice.billing_account_id,
+    );
+    if (terms && usesAccountTerms(terms))
+      throw new ConflictException(ZOHO_BILLED_MESSAGE);
   };
 
   // Asks Stripe whether an invoice has been paid, for a customer back from
@@ -131,9 +148,9 @@ export class InvoiceStripeSyncService {
       this.billingConfig.loadConfig(),
       findAccountTerms(this.serviceDatabase, invoice.billing_account_id),
     ]);
-    // An approved 30-day account, or an invoice the customer chose to pay
-    // by bank transfer, is sent with the bank details and never charged to
-    // a card.
+    // An invoice the customer chose to pay by bank transfer is sent with the
+    // bank details and never charged to a card. (An approved 30-day account
+    // never gets here: assertNotZohoBilled.)
     const presentation = buildInvoicePresentation({
       invoiceId: invoice.id,
       accountName: terms?.name ?? invoice.billing_account_name,

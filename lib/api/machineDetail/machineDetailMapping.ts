@@ -64,6 +64,7 @@ export const toHistoryEntry = (entry: LiveHistoryEntry): HistoryEntry => {
       downloadUrl: document.downloadUrl,
     })),
     syncState: "synced",
+    remoteSession: entry.remoteSession ?? null,
   };
 };
 

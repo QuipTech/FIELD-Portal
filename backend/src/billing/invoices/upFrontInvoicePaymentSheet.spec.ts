@@ -4,7 +4,9 @@ import { BillingAccountsService } from '../billingAccounts/billingAccounts.servi
 import { PersonalCheckoutService } from '../personalSubscription/personalCheckout.service';
 import { PriceBooksService } from '../priceBooks/priceBooks.service';
 import { StripeService } from '../stripe/stripe.service';
+import { StatementsService } from '../statements/statements.service';
 import { findInvoice } from './invoices.repository';
+import { findAccountTerms } from '../accountTerms/accountTerms.repository';
 import { InvoicePaymentSheetService } from './invoicePaymentSheet.service';
 import { InvoicesService } from './invoices.service';
 import {
@@ -13,6 +15,9 @@ import {
 } from './upFrontInvoice.service';
 
 jest.mock('./invoices.repository', () => ({ findInvoice: jest.fn() }));
+jest.mock('../accountTerms/accountTerms.repository', () => ({
+  findAccountTerms: jest.fn().mockResolvedValue(undefined),
+}));
 
 const SHEET = {
   publishableKey: 'pk_test_field',
@@ -52,8 +57,9 @@ const setup = () => {
     {} as PersonalCheckoutService,
     paymentSheets as unknown as InvoicePaymentSheetService,
     stripe as unknown as StripeService,
+    {} as StatementsService,
   );
-  return { service, paymentSheets, stripe };
+  return { service, paymentSheets, stripe, accounts };
 };
 
 beforeEach(() => jest.clearAllMocks());
@@ -112,5 +118,32 @@ describe('paying an up-front invoice in the Payment Sheet', () => {
     await expect(
       service.openPaymentSheet('invoice-final'),
     ).rejects.toBeInstanceOf(BadGatewayException);
+  });
+});
+
+describe('a 30-day account (invoiced in Zoho)', () => {
+  it('never opens Checkout, the Payment Sheet or a bank transfer invoice on Stripe', async () => {
+    const { service, paymentSheets, stripe, accounts } = setup();
+    jest.mocked(findAccountTerms).mockResolvedValue({
+      payment_type: 'account',
+      account_status: 'approved',
+    } as Awaited<ReturnType<typeof findAccountTerms>>);
+    await expect(service.openPaymentSheet('invoice-final')).rejects.toThrow(
+      /invoices it from Zoho/,
+    );
+    await expect(
+      service.openCheckout('invoice-final', {
+        returnPage: '/machines/m',
+        keyScope: 'k',
+        description: 'd',
+      }),
+    ).rejects.toThrow(/invoices it from Zoho/);
+    await expect(service.sendForBankTransfer('invoice-final')).rejects.toThrow(
+      /invoices it from Zoho/,
+    );
+    expect(accounts.ensureStripeCustomer).not.toHaveBeenCalled();
+    expect(stripe.canTaxCustomer).not.toHaveBeenCalled();
+    expect(paymentSheets.forInvoice).not.toHaveBeenCalled();
+    jest.mocked(findAccountTerms).mockResolvedValue(undefined);
   });
 });

@@ -111,7 +111,7 @@ describe("how you pay", () => {
       />,
     );
     expect(screen.getByText("Free until 31 December 2026")).toBeTruthy();
-    expect(screen.getByText(/emailed to accounts@acme\.test with 30 days to pay by bank transfer/)).toBeTruthy();
+    expect(screen.getByText(/to accounts@acme\.test from Zoho each month, with 30 days to pay by bank transfer/)).toBeTruthy();
     expect(screen.getByText(/Your invoices need a purchase order number/)).toBeTruthy();
     expect(screen.getByText("PO for October 2026")).toBeTruthy();
   });

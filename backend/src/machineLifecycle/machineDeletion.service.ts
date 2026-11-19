@@ -29,6 +29,8 @@ import { CalculatedLine } from '../billing/monthlyRun/monthlyRunTypes';
 import { sumAmountCents } from '../billing/invoices/invoiceAmounts';
 import { formatPaymentReference } from '../billing/invoices/accountInvoiceTerms';
 import { findInvoice } from '../billing/invoices/invoices.repository';
+import { findAccountTerms } from '../billing/accountTerms/accountTerms.repository';
+import { usesAccountTerms } from '../billing/accountTerms/accountTermsTypes';
 import { FinalChargePaymentMethod } from './dto/lifecycleActionDtos';
 import { PriceBooksService } from '../billing/priceBooks/priceBooks.service';
 import { PLAN_CODES } from '../billing/subscriptions/planCodes';
@@ -46,6 +48,7 @@ import {
   BillingIntervalUse,
   FinalChargeDue,
   FinalChargeQuote,
+  MachineBilling,
   MachineDeletionCheck,
   quoteFinalCharge,
 } from './machineDeletionRules';
@@ -159,14 +162,18 @@ export class MachineDeletionService {
     options: FinalChargePaymentOptions = {},
   ): Promise<FinalChargePayment> => {
     const isBankTransfer = options.method === 'bank_transfer';
-    if (isBankTransfer && !(await this.isBankTransferAvailable())) {
-      throw new ConflictException(BANK_TRANSFER_UNAVAILABLE_MESSAGE);
-    }
     const { check, machine, intervals, today, label } = await this.readCheck(
       actor,
       machineId,
       now,
     );
+    // A 30-day account is billed on its Zoho statement: nothing is paid
+    // here, and nothing goes to Stripe.
+    if (check.billing === 'account')
+      return { ...check, paymentUrl: null, paymentSheet: null };
+    if (isBankTransfer && !(await this.isBankTransferAvailable())) {
+      throw new ConflictException(BANK_TRANSFER_UNAVAILABLE_MESSAGE);
+    }
     if (check.blocker === 'unpaid_invoices') {
       if (isBankTransfer) return this.sendBankTransfer(actor, machineId, now);
       return this.openPayment(
@@ -338,9 +345,10 @@ export class MachineDeletionService {
     check: MachineDeletionCheck,
   ): Promise<MachineDeletionCheck> => {
     const config = await this.billingConfig.loadConfig();
-    const bankTransferAvailable = Boolean(
-      config.BANK_BSB && config.BANK_ACCOUNT_NUMBER,
-    );
+    // A 30-day account never pays here, so it's never offered.
+    const bankTransferAvailable =
+      check.billing === 'card' &&
+      Boolean(config.BANK_BSB && config.BANK_ACCOUNT_NUMBER);
     const awaiting = check.unpaidInvoices.find(
       (invoice) => invoice.payByBankTransfer,
     );
@@ -497,7 +505,9 @@ export class MachineDeletionService {
       timezone,
     );
     const range = billedMonthRange(intervals, today);
-    const check = assessMachineDeletion({
+    const billing = await this.findBilling(machine.billing_account_id);
+    const assessed = assessMachineDeletion({
+      billing,
       state: toLifecycleState(machine.lifecycle_state),
       today,
       openCaseCount: await deletionRepository.countOpenCases(
@@ -529,7 +539,20 @@ export class MachineDeletionService {
           )
         : false,
     });
+    const check: MachineDeletionCheck = { ...assessed, billing };
     return { check, intervals, today };
+  };
+
+  // 'account' for an approved 30-day account, which is invoiced in Zoho.
+  private findBilling = async (
+    billingAccountId: string | null,
+  ): Promise<MachineBilling> => {
+    if (!billingAccountId) return 'card';
+    const terms = await findAccountTerms(
+      this.serviceDatabase,
+      billingAccountId,
+    );
+    return terms && usesAccountTerms(terms) ? 'account' : 'card';
   };
 
   // Each month's rate is the band for the account's peak that month, so far if

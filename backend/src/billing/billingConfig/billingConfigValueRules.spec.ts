@@ -29,6 +29,7 @@ const SEEDED_VALUES: Record<string, unknown> = {
   BANK_ACCOUNT_NUMBER: '',
   PAYMENT_REFERENCE_FORMAT: 'FIELD-{invoiceRef}',
   INVOICE_REMINDER_OFFSET_DAYS: [-7, 0, 7, 14],
+  STATEMENT_REMINDERS_EMAIL_CLIENT: false,
 };
 
 const seededRows = () =>

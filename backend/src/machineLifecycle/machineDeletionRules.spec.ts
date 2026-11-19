@@ -232,6 +232,35 @@ describe('assessMachineDeletion', () => {
     expect(check.finalInvoiceFrom).toBe('2026-12-01');
   });
 
+  it('lets a 30-day account delete without paying: its statement bills the days', () => {
+    const check = assessMachineDeletion(
+      facts({
+        ...billed,
+        billing: 'account',
+        invoices: [invoice('2026-10-01', 'synced')],
+      }),
+    );
+    expect(check).toMatchObject({
+      canDelete: true,
+      blocker: null,
+      billing: 'account',
+      finalCharge: null,
+      unpaidInvoices: [],
+    });
+    expect(check.message).toMatch(/monthly statement/);
+  });
+
+  it('still asks a 30-day account to deactivate and close cases first', () => {
+    expect(
+      assessMachineDeletion(facts({ state: 'active', billing: 'account' }))
+        .message,
+    ).toMatch(/monthly statement/);
+    expect(
+      assessMachineDeletion(facts({ openCaseCount: 2, billing: 'account' }))
+        .blocker,
+    ).toBe('open_cases');
+  });
+
   it('charges nothing on a plan without a machine charge', () => {
     expect(
       assessMachineDeletion(

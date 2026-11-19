@@ -21,6 +21,7 @@ vi.mock("@/lib/api/organisationBillingApi", () => ({
   getOrganisationInvoicePdfRequest: vi.fn(),
 }));
 vi.mock("@/lib/api/requireAccessToken", () => ({ requireAccessToken: () => "test-token" }));
+vi.mock("@/lib/api/statementsApi", () => ({ listOrganisationStatementsRequest: vi.fn().mockResolvedValue([]) }));
 vi.mock("@/lib/api/paymentTermsApi", () => ({
   getPaymentTermsRequest: vi.fn(),
   applyForAccountRequest: vi.fn(),

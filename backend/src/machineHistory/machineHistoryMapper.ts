@@ -11,6 +11,7 @@ import {
   HistoryEntry,
   MachineDetail,
   MachineSummary,
+  RemoteSessionSummary,
 } from './types/machineHistoryResponse';
 
 export const toPersonName = (
@@ -90,4 +91,27 @@ export const toHistoryEntry = async (
       toMachineDocumentFile(storageService, document),
     ),
   ),
+  remoteSession: row.remote_session
+    ? toRemoteSessionSummary(row.remote_session)
+    : null,
 });
+
+const toRemoteSessionSummary = (
+  session: NonNullable<HistoryEntryRow['remote_session']>,
+): RemoteSessionSummary => {
+  const started = session.started_at ? Date.parse(session.started_at) : null;
+  const ended = session.ended_at ? Date.parse(session.ended_at) : null;
+  return {
+    id: session.id,
+    requesterName: session.requester_name,
+    startedAt: started === null ? null : new Date(started).toISOString(),
+    endedAt: ended === null ? null : new Date(ended).toISOString(),
+    durationSeconds:
+      started !== null && ended !== null
+        ? Math.max(0, Math.floor((ended - started) / 1000))
+        : null,
+    endReason: session.end_reason,
+    recordingStatus: session.recording_status,
+    transcriptStatus: session.transcript_status,
+  };
+};

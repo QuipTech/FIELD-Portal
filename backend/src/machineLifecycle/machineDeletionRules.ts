@@ -75,7 +75,15 @@ export interface DeletionFacts {
   // The run has processed the day after the last closed month, so a month with
   // no invoice had nothing to bill (Enterprise, internal, within a commitment).
   runPassedLastClosedMonth: boolean;
+  // 'account': a 30-day account, invoiced monthly in Zoho. Its machines'
+  // days go on the month's statement, so nothing is paid before deleting.
+  billing?: MachineBilling;
 }
+
+export type MachineBilling = 'account' | 'card';
+
+export const ACCOUNT_BILLING_MESSAGE =
+  'The days this machine was used are billed on your next monthly statement from QuipTech accounts.';
 
 export interface FinalChargeQuote {
   periodStart: string;
@@ -117,6 +125,8 @@ export interface MachineDeletionCheck {
   // bank transfer can be offered, and where to pay one already chosen.
   bankTransferAvailable: boolean;
   bankTransfer: BankTransferDetails | null;
+  // How the organisation pays: 'account' never has a final charge to pay.
+  billing: MachineBilling;
 }
 
 const blocked = (
@@ -133,6 +143,7 @@ const blocked = (
   finalCharge: null,
   bankTransferAvailable: false,
   bankTransfer: null,
+  billing: 'card',
   ...details,
 });
 
@@ -146,6 +157,7 @@ const ALLOWED: MachineDeletionCheck = {
   finalCharge: null,
   bankTransferAvailable: false,
   bankTransfer: null,
+  billing: 'card',
 };
 
 const previousMonthStart = (day: string): string =>
@@ -209,10 +221,14 @@ const wasBilledInMonth = (
 export const assessMachineDeletion = (
   facts: DeletionFacts,
 ): MachineDeletionCheck => {
+  const isAccount = facts.billing === 'account';
   if (facts.state === 'active') {
     return blocked(
       'needs_deactivation',
-      'Deactivate this machine first. You then pay for the days it was used and can delete it.',
+      isAccount
+        ? 'Deactivate this machine first. The days it was used go on your monthly statement, and you can then delete it.'
+        : 'Deactivate this machine first. You then pay for the days it was used and can delete it.',
+      { billing: facts.billing ?? 'card' },
     );
   }
   if (facts.state === 'sold') {
@@ -233,6 +249,10 @@ export const assessMachineDeletion = (
       'Close the open support cases on this machine first.',
     );
   }
+  // A 30-day account settles through its Zoho statements: the machine
+  // stays in the month's peak and is billed there.
+  if (isAccount)
+    return { ...ALLOWED, billing: 'account', message: ACCOUNT_BILLING_MESSAGE };
   const range = billedMonthRange(facts.intervals, facts.today);
   if (!range) return ALLOWED;
 

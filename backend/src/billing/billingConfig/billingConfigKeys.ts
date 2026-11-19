@@ -43,6 +43,7 @@ export const BILLING_CONFIG_KEYS = {
   BANK_ACCOUNT_NUMBER: 'text',
   PAYMENT_REFERENCE_FORMAT: 'text',
   INVOICE_REMINDER_OFFSET_DAYS: 'dayOffsets',
+  STATEMENT_REMINDERS_EMAIL_CLIENT: 'boolean',
 } as const satisfies Record<string, BillingConfigValueKind>;
 
 export type BillingConfigKey = keyof typeof BILLING_CONFIG_KEYS;

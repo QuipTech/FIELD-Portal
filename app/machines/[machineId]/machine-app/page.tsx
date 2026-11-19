@@ -5,9 +5,9 @@ import { useState } from "react";
 import { PermissionButton } from "@/components/auth/permissionButton";
 import { Icon } from "@/components/icons/icon";
 import { ConnectMachineAppDialog } from "@/components/machines/machineApp/connectMachineAppDialog";
+import { RemoteSessionButton } from "@/components/machines/machineApp/remoteSessionButton";
 import { buttonBaseClasses, buttonSizeClasses, buttonVariantClasses } from "@/components/ui/buttonStyles";
 import { Card } from "@/components/ui/card";
-import { ComingSoonButton } from "@/components/ui/comingSoonButton";
 import { ConfirmDialog } from "@/components/ui/confirmDialog";
 import { EmptyState } from "@/components/ui/emptyState";
 import { LoadErrorState } from "@/components/ui/loadErrorState";
@@ -96,13 +96,15 @@ const MachineAppPage = () => {
           </div>
           <div className="mt-2 flex flex-col items-start gap-2 border-t border-borderGray pt-4">
             <span className="text-[15px] font-medium text-ink">Remote access</span>
-            <p className="text-sm text-bodyGray">See and control this machine&apos;s tablet from here.</p>
-            <ComingSoonButton
-              label="Connect as remote access"
-              className={`${buttonBaseClasses} ${buttonVariantClasses.primary} ${buttonSizeClasses.md} !flex-none`}
-            >
-              Connect as remote access
-            </ComingSoonButton>
+            <p className="text-sm text-bodyGray">
+              See and control this machine&apos;s tablet in a new window. The operator allows each session on the tablet, and
+              every session is recorded to this machine&apos;s History.
+            </p>
+            <RemoteSessionButton
+              machineId={machineId}
+              machineLabel={label}
+              tabletOnline={!connection.error && Boolean(connection.data?.session?.tabletOnline)}
+            />
           </div>
         </Card>
       )}

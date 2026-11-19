@@ -70,6 +70,20 @@ export interface HistoryEntry {
   downtimeHours: number | null;
   photos: MachinePhoto[];
   documents: MachineDocumentFile[];
+  // Set on a 'remote_session' entry. Playback and the transcript come from
+  // /machines/:machineId/remote-sessions/:id/recording and /transcript.
+  remoteSession: RemoteSessionSummary | null;
+}
+
+export interface RemoteSessionSummary {
+  id: string;
+  requesterName: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  durationSeconds: number | null;
+  endReason: string | null;
+  recordingStatus: string;
+  transcriptStatus: string;
 }
 
 export interface MachineDocumentFile {

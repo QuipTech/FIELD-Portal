@@ -170,27 +170,30 @@ describe('InvoiceStripeSyncService', () => {
       ...overrides,
     });
 
-    it('sends the invoice with its terms and never charges a card', async () => {
+    it('never reaches Stripe for a 30-day account: it is invoiced in Zoho', async () => {
       state.accountTerms = approvedAccount();
-      stripe.hasDefaultPaymentMethod.mockResolvedValue(true);
-      await service.pushInvoice(state.invoices[0]);
-      expect(stripe.createInvoice).toHaveBeenCalledWith(
-        expect.objectContaining({
-          chargeAutomatically: false,
-          daysUntilDue: 30,
-        }),
-        expect.any(String),
+      billingAccounts.ensureStripeCustomer.mockClear();
+      await expect(service.pushInvoice(state.invoices[0])).rejects.toThrow(
+        /invoices it from Zoho/,
       );
-      expect(stripe.hasDefaultPaymentMethod).not.toHaveBeenCalled();
-      expect(stripe.payInvoice).not.toHaveBeenCalled();
-      expect(state.invoices[0]).toMatchObject({ status: 'synced' });
+      expect(stripe.createInvoice).not.toHaveBeenCalled();
+      expect(stripe.createInvoiceItem).not.toHaveBeenCalled();
+      expect(billingAccounts.ensureStripeCustomer).not.toHaveBeenCalled();
+      expect(state.invoices[0].status).not.toBe('synced');
+    });
+
+    it('keeps syncing an invoice already on Stripe from before the move', async () => {
+      state.accountTerms = approvedAccount();
+      state.invoices[0].stripe_invoice_id = 'in_existing';
+      await service.pushInvoice(state.invoices[0]);
+      expect(stripe.createInvoice).not.toHaveBeenCalled();
     });
 
     it('prints bank details and the payment reference in the footer', async () => {
-      state.accountTerms = approvedAccount();
+      state.invoices[0].pay_by_bank_transfer = true;
       await service.pushInvoice(state.invoices[0]);
       const input = stripe.createInvoice.mock.calls[0][0];
-      expect(input.footer).toContain('within 30 days');
+      expect(input.footer).toContain('within 21 days');
       expect(input.footer).toContain('BSB: 064-000');
       expect(input.footer).toContain('Account number: 12345678');
       expect(input.footer).toContain('Payment reference: FIELD-11111111');
@@ -198,8 +201,12 @@ describe('InvoiceStripeSyncService', () => {
 
     it("prints the invoice's PO number, falling back to the standing one", async () => {
       state.accountTerms = approvedAccount({
+        payment_type: 'card',
+        account_status: 'none',
+        po_required: true,
         default_po_number: 'PO-STANDING',
       });
+      state.invoices[0].pay_by_bank_transfer = true;
       state.invoices[0].po_number = 'PO-778';
       await service.pushInvoice(state.invoices[0]);
       expect(stripe.createInvoice.mock.calls[0][0].customFields).toEqual([

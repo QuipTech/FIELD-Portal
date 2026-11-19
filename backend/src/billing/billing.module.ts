@@ -58,6 +58,10 @@ import { DiscountService } from './discounts/discount.service';
 import { PromoCodesService } from './discounts/promoCodes.service';
 import { OverdueListService } from './collections/overdueList.service';
 import { MarkInvoicePaidService } from './invoices/markInvoicePaid.service';
+import { StatementsService } from './statements/statements.service';
+import { AdminStatementsController } from './statements/adminStatements.controller';
+import { OrganisationStatementsController } from './statements/organisationStatements.controller';
+import { ZohoBooksService } from './statements/zoho/zohoBooks.service';
 
 @Module({
   imports: [StripeModule, EmailModule],
@@ -74,6 +78,8 @@ import { MarkInvoicePaidService } from './invoices/markInvoicePaid.service';
     AdminBillingOperationsController,
     OrganisationPaymentTermsController,
     AdminPaymentTermsController,
+    AdminStatementsController,
+    OrganisationStatementsController,
   ],
   providers: [
     PersonalSubscriptionService,
@@ -117,6 +123,8 @@ import { MarkInvoicePaidService } from './invoices/markInvoicePaid.service';
     PromoCodesService,
     OverdueListService,
     MarkInvoicePaidService,
+    StatementsService,
+    ZohoBooksService,
   ],
   exports: [
     BillingConfigService,
@@ -132,6 +140,7 @@ import { MarkInvoicePaidService } from './invoices/markInvoicePaid.service';
     UpFrontInvoiceService,
     DiscountService,
     PromoCodesService,
+    StatementsService,
   ],
 })
 export class BillingModule {}

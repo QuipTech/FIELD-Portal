@@ -31,7 +31,8 @@ const formatMonth = (day: string) => utcDate(day).toLocaleDateString("en-GB", { 
 const formatDay = (day: string) => utcDate(day).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 
 // Deleting a machine: deactivate it, pay what's billed and the days used since
-// the last invoice, then delete. The API decides and enforces that; this shows
+// the last invoice, then delete. A 30-day account pays nothing here: the days
+// go on its monthly statement, invoiced from Zoho. The API decides and enforces that; this shows
 // the next step.
 export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }: DeleteMachineSectionProps) => {
   const router = useRouter();
@@ -101,7 +102,11 @@ export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }
           {check.error && <span className="text-sm text-danger">{check.error}</span>}
           {result?.message && <span className="text-sm text-bodyGray">{result.message}</span>}
           {result?.finalInvoiceFrom && <span className="text-xs text-mutedGray">The final invoice is issued from {formatDay(result.finalInvoiceFrom)}.</span>}
-          {result?.canDelete && <span className="text-sm text-bodyGray">Billing is settled. This machine can be deleted.</span>}
+          {result?.canDelete && (
+            <span className="text-sm text-bodyGray">
+              {result.billing === "account" ? "Nothing to pay now. This machine can be deleted." : "Billing is settled. This machine can be deleted."}
+            </span>
+          )}
         </div>
         <Button size="sm" variant="danger" className="ml-auto" disabled={!result?.canDelete} onClick={() => setIsConfirming(true)}>
           Delete machine

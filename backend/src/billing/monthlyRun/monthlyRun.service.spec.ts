@@ -8,6 +8,7 @@ import { ASSET_PRO_V1 } from '../pricing/priceBookV1Fixture';
 import * as countsRepository from './dailyBillableCounts.repository';
 import { MonthlyRunService } from './monthlyRun.service';
 import * as runInvoicesRepository from './runInvoices.repository';
+import { StatementsService } from '../statements/statements.service';
 
 jest.mock('./dailyBillableCounts.repository');
 jest.mock('./runInvoices.repository');
@@ -22,7 +23,17 @@ const runInvoices = jest.mocked(runInvoicesRepository);
 const terms = jest.mocked(termsRepository);
 const promos = jest.mocked(promoRepository);
 
-const ACCOUNT = { id: 'acct-1', timezone: 'Australia/Brisbane' };
+const ACCOUNT: countsRepository.RunAccountRow = {
+  id: 'acct-1',
+  timezone: 'Australia/Brisbane',
+  payment_type: 'card',
+  account_status: 'none',
+};
+const ZOHO_ACCOUNT: countsRepository.RunAccountRow = {
+  ...ACCOUNT,
+  payment_type: 'account',
+  account_status: 'approved',
+};
 // 1 May 2026, 10am Brisbane: April has closed.
 const NOW = new Date('2026-05-01T00:00:00Z');
 
@@ -82,6 +93,9 @@ const setup = (requireUserSubscription = false) => {
         : ASSET_PRO_V1,
     ),
   };
+  const statements = {
+    addCharges: jest.fn().mockResolvedValue('statement-april'),
+  };
   const service = new MonthlyRunService(
     database as unknown as ServiceDatabaseService,
     {
@@ -92,8 +106,9 @@ const setup = (requireUserSubscription = false) => {
     } as unknown as BillingConfigService,
     books as unknown as PriceBooksService,
     new DiscountService(),
+    statements as unknown as StatementsService,
   );
-  return { service };
+  return { service, statements, client };
 };
 
 const insertedInvoice = () => runInvoices.insertRunInvoice.mock.calls[0][1];
@@ -101,6 +116,49 @@ const insertedInvoice = () => runInvoices.insertRunInvoice.mock.calls[0][1];
 beforeEach(() => jest.clearAllMocks());
 
 describe('monthly run', () => {
+  describe('a 30-day account (invoiced in Zoho)', () => {
+    it('writes the month to its statement with the same lines, never an invoice', async () => {
+      const { service, statements } = setup();
+      promos.listRedemptionsForAccount.mockResolvedValue([]);
+      terms.findAccountTerms.mockResolvedValue({
+        free_until: '2026-04-30',
+        free_percent: 50,
+      } as termsRepository.AccountTermsRow);
+      expect(await service.runAccount(ZOHO_ACCOUNT, NOW)).toBe(
+        'statement-april',
+      );
+      expect(runInvoices.insertRunInvoice).not.toHaveBeenCalled();
+      expect(runInvoices.markNoCharge).not.toHaveBeenCalled();
+      const [, actor, params] = statements.addCharges.mock.calls[0];
+      expect(actor).toBeNull();
+      expect(params).toMatchObject({
+        billingAccountId: 'acct-1',
+        periodStart: '2026-04-01',
+        markRun: true,
+      });
+      expect(
+        params.lines.map((line: { lineType: string; amountCents: number }) => [
+          line.lineType,
+          line.amountCents,
+        ]),
+      ).toEqual([
+        ['ASSET_PRO', 70000],
+        ['FREE_PERIOD_DISCOUNT', -35000],
+      ]);
+    });
+
+    it('skips a month its statement already has from the run', async () => {
+      const { service, statements, client } = setup();
+      client.query.mockImplementation(async (sql: string) =>
+        sql.includes('run_at IS NOT NULL')
+          ? { rows: [{ found: true }] }
+          : { rows: [] },
+      );
+      expect(await service.runAccount(ZOHO_ACCOUNT, NOW)).toBeNull();
+      expect(statements.addCharges).not.toHaveBeenCalled();
+    });
+  });
+
   it('bills active machines only when there is no user paywall', async () => {
     const { service } = setup(false);
     await service.runAccount(ACCOUNT, NOW);
