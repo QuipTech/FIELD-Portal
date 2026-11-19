@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { validatePromoCodeRequest } from "@/lib/api/paymentTermsApi";
+import { validateActivationPromoRequest } from "@/lib/api/machineLifecycleApi";
 import { requireAccessToken } from "@/lib/api/requireAccessToken";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import { formatBillingMonth } from "@/lib/format/billingDay";
@@ -23,11 +23,11 @@ export const ActivationPromoField = ({ promo }: { promo: ActivationPromoState })
   const [error, setError] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState(false);
 
-  if (!promo.canUse || promo.isLoading) return null;
+  if (promo.isLoading) return null;
 
   if (promo.current)
     return (
-      <p className="text-xs text-bodyGray">
+      <p className="border-t border-borderGray pt-2 text-xs text-bodyGray">
         Promo code <span className="font-medium text-ink">{promo.current.code}</span> is on your account (
         {promo.current.summary}, {describeMonths(promo.current)}), so it&apos;s taken off this charge.
       </p>
@@ -35,7 +35,7 @@ export const ActivationPromoField = ({ promo }: { promo: ActivationPromoState })
 
   if (promo.pending)
     return (
-      <div className="flex flex-wrap items-center gap-2 text-xs text-bodyGray">
+      <div className="flex flex-wrap items-center gap-2 border-t border-borderGray pt-2 text-xs text-bodyGray">
         <span>
           <span className="font-medium text-ink">{promo.pending.code}</span>: {promo.pending.summary},{" "}
           {describeMonths(promo.pending)}. It&apos;s applied when you activate.
@@ -50,7 +50,7 @@ export const ActivationPromoField = ({ promo }: { promo: ActivationPromoState })
     setIsChecking(true);
     setError(null);
     try {
-      promo.setPending(await validatePromoCodeRequest(requireAccessToken(), code.trim()));
+      promo.setPending(await validateActivationPromoRequest(requireAccessToken(), code.trim()));
       setCode("");
     } catch (cause) {
       setError(toApiErrorMessage(cause, "Couldn't check that code. Please try again."));
@@ -60,7 +60,7 @@ export const ActivationPromoField = ({ promo }: { promo: ActivationPromoState })
   };
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.5 border-t border-borderGray pt-2">
       <label htmlFor="activation-promo-code" className="text-xs font-medium text-ink">
         Have a promo code?
       </label>

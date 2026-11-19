@@ -88,6 +88,8 @@ export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }
     setIsChoosingBankTransfer(false);
   };
   const canPayByBankTransfer = Boolean(result?.bankTransferAvailable);
+  // A promo or free period covers it all: settling records it, no payment.
+  const isFullyDiscounted = finalCharge !== null && finalCharge.amountDueCents === 0;
   const bankTransfer = result?.bankTransfer ?? null;
   const canConfirm = typedLabel.trim() === machineLabel && reason.trim().length >= MIN_REASON_LENGTH;
 
@@ -108,22 +110,27 @@ export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }
       {finalCharge && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg bg-fillGray p-3 text-sm">
           <div className="flex min-w-0 flex-col gap-0.5">
-            <span className="font-medium text-ink">Amount due: {audMoney(finalCharge.amountCents)} + GST</span>
+            <span className="font-medium text-ink">Amount due: {audMoney(finalCharge.amountDueCents)} + GST</span>
             {finalCharge.months.map((month) => (
               <span key={month.periodStart} className="text-bodyGray">
                 {formatMonth(month.periodStart)}: {month.daysUsed} of {month.daysInMonth} days, up to {formatDay(month.lastUsedOn)}, at {audMoney(month.monthlyRateCents)} a month: {audMoney(month.amountCents)}
               </span>
             ))}
+            {finalCharge.discounts.map((discount) => (
+              <span key={discount.description} className="text-primary">
+                {discount.description}: −{audMoney(-discount.amountCents)}
+              </span>
+            ))}
             <span className="text-xs text-mutedGray">This machine then comes off the monthly invoice for these months, and can&apos;t be reactivated this month. You delete it once this is paid.</span>
           </div>
           <div className="ml-auto flex flex-wrap gap-2">
-            {canPayByBankTransfer && (
+            {canPayByBankTransfer && !isFullyDiscounted && (
               <Button size="sm" disabled={isRaisingCharge} onClick={() => setIsChoosingBankTransfer(true)}>
                 Pay by bank transfer
               </Button>
             )}
             <Button size="sm" variant="primary" disabled={isRaisingCharge} onClick={raiseFinalCharge}>
-              {isRaisingCharge ? "Creating invoice…" : "Pay online"}
+              {isRaisingCharge ? "Creating invoice…" : isFullyDiscounted ? "Settle (nothing to pay)" : "Pay online"}
             </Button>
           </div>
         </div>
@@ -151,7 +158,8 @@ export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }
           </dl>
           <span className="text-xs text-mutedGray">
             Use the reference so we can match your payment. The invoice, with GST, has been emailed to your billing contact.
-            Once we confirm the payment, you can delete this machine.
+            Once you&apos;ve paid, let our accounts team know (contact your administrator or QuipTech support). As soon as we
+            confirm the payment, you can delete this machine.
           </span>
         </div>
       )}
@@ -204,7 +212,7 @@ export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }
           toErrorMessage={(error) => toApiErrorMessage(error, "Couldn't set up the bank transfer. Please try again.")}
         >
           <p>
-            We&apos;ll email the invoice{finalCharge ? ` for ${audMoney(finalCharge.amountCents)} + GST` : ""} to your billing
+            We&apos;ll email the invoice{finalCharge ? ` for ${audMoney(finalCharge.amountDueCents)} + GST` : ""} to your billing
             contact, with our bank details and a payment reference. Once we&apos;ve confirmed the payment, you can delete{" "}
             {machineLabel}. To pay by card instead, use Pay online.
           </p>

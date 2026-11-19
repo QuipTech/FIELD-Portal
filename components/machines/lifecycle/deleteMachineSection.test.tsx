@@ -104,6 +104,8 @@ describe("deleting a machine", () => {
             { periodStart: "2026-10-01", lastUsedOn: "2026-10-31", daysUsed: 7, daysInMonth: 31, monthlyRateCents: 3500, amountCents: 790 },
             { periodStart: "2026-11-01", lastUsedOn: "2026-11-07", daysUsed: 7, daysInMonth: 30, monthlyRateCents: 3500, amountCents: 817 },
           ],
+          discounts: [],
+          amountDueCents: 1607,
         },
       });
       vi.mocked(payMachineFinalChargeRequest).mockResolvedValue({ ...unpaid, paymentUrl: checkoutUrl });
@@ -120,6 +122,24 @@ describe("deleting a machine", () => {
     });
   });
 
+  it("takes the promo off the final charge", async () => {
+    vi.mocked(getMachineDeletionCheckRequest).mockResolvedValue({
+      ...allowed,
+      canDelete: false,
+      blocker: "final_charge_due",
+      message: "Pay for the days this machine was used, then you can delete it.",
+      finalCharge: {
+        amountCents: 1607,
+        months: [{ periodStart: "2026-11-01", lastUsedOn: "2026-11-07", daysUsed: 7, daysInMonth: 30, monthlyRateCents: 3500, amountCents: 1607 }],
+        discounts: [{ description: "Promo HVJH6: 9% off", amountCents: -145 }],
+        amountDueCents: 1462,
+      },
+    });
+    renderSection();
+    await screen.findByText(/Amount due: .*14\.62 \+ GST/);
+    expect(screen.getByText(/Promo HVJH6: 9% off: −.*1\.45/)).toBeTruthy();
+  });
+
   describe("paying by bank transfer", () => {
     const due = {
       ...allowed,
@@ -130,6 +150,8 @@ describe("deleting a machine", () => {
       finalCharge: {
         amountCents: 1607,
         months: [{ periodStart: "2026-11-01", lastUsedOn: "2026-11-07", daysUsed: 7, daysInMonth: 30, monthlyRateCents: 3500, amountCents: 1607 }],
+        discounts: [],
+        amountDueCents: 1607,
       },
     };
     const awaiting = {

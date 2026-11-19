@@ -78,16 +78,12 @@ const PerMachineSummary = ({ quote, promo }: PerMachineSummaryProps) => {
       <p className="text-xs text-mutedGray">
         Fleet rates: {quote.bands.map((band) => `${describeBand(band)} machines ${audMoney(band.unitCents)}`).join(" · ")}
       </p>
-      {promo && (
-        <div className="border-t border-borderGray pt-2">
-          <ActivationPromoField promo={promo} />
-        </div>
-      )}
+      {promo && <ActivationPromoField promo={promo} />}
     </div>
   );
 };
 
-// The cost of activating, shown in the activation dialog before the admin
+// The cost of activating, shown in the activation dialog before the user
 // confirms, with any promo code taken off. A contract has no per-machine
 // charge, so there's nothing for a promo to discount.
 export const ActivationPriceSummary = ({ count = 1, promo }: { count?: number; promo?: ActivationPromoState }) => {

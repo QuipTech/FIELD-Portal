@@ -86,10 +86,13 @@ export interface FinalChargeQuote {
   amountCents: number;
 }
 
-// Everything to pay in one go, oldest month first.
+// Everything to pay in one go, oldest month first. amountCents is before
+// discounts; any free period or promo comes off it (never below A$0).
 export interface FinalChargeDue {
   amountCents: number;
   months: FinalChargeQuote[];
+  discounts: { description: string; amountCents: number }[];
+  amountDueCents: number;
 }
 
 export interface MachineDeletionCheck {
