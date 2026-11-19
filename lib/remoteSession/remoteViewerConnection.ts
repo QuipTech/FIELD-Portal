@@ -4,6 +4,8 @@ import { decodeSignalingMessage, encodeSignalingAction } from "./kvsSignaling";
 
 export type ViewerConnectionState = "connecting" | "connected" | "disconnected" | "failed" | "closed";
 
+const OFFER_RETRY_MS = 3000;
+
 interface ViewerHandlers {
   onStream: (stream: MediaStream) => void;
   onState: (state: ViewerConnectionState) => void;
@@ -20,7 +22,11 @@ export class RemoteViewerConnection {
   private control: RTCDataChannel | null = null;
   private audioSender: RTCRtpSender | null = null;
   private pendingCandidates: RTCIceCandidateInit[] = [];
-  private outbox: string[] = [];
+  private localOffer: string | null = null;
+  private localCandidates: string[] = [];
+  private offerTimer: ReturnType<typeof setInterval> | null = null;
+  private applyingAnswer = false;
+  private failed = false;
   private closed = false;
   private readonly stream = new MediaStream();
 
@@ -49,29 +55,29 @@ export class RemoteViewerConnection {
       this.handlers.onStream(this.stream);
     };
     peer.onicecandidate = ({ candidate }) => {
-      if (candidate) this.signal(encodeSignalingAction("ICE_CANDIDATE", candidate.toJSON()));
+      if (!candidate || this.closed) return;
+      const frame = encodeSignalingAction("ICE_CANDIDATE", candidate.toJSON());
+      if (!peer.remoteDescription) this.localCandidates.push(frame);
+      if (this.localOffer) this.signal(frame);
     };
     peer.onconnectionstatechange = () => {
       if (this.closed) return;
       const state = peer.connectionState;
       if (state === "connected") this.handlers.onState("connected");
       else if (state === "disconnected") this.handlers.onState("disconnected");
-      else if (state === "failed") this.handlers.onState("failed");
+      else if (state === "failed") this.fail();
     };
 
     this.handlers.onState("connecting");
     const socket = new WebSocket(this.connection.signalingUrl);
     this.socket = socket;
-    socket.onopen = async () => {
-      this.outbox.splice(0).forEach((frame) => socket.send(frame));
-      const offer = await peer.createOffer();
-      await peer.setLocalDescription(offer);
-      socket.send(encodeSignalingAction("SDP_OFFER", peer.localDescription?.toJSON() ?? offer));
+    socket.onopen = () => void this.offer(peer).catch(this.fail);
+    socket.onmessage = (event) => void this.receive(String(event.data)).catch(this.fail);
+    const onSignalingLost = () => {
+      if (peer.connectionState !== "connected") this.fail();
     };
-    socket.onmessage = (event) => void this.receive(String(event.data));
-    socket.onerror = () => {
-      if (!this.closed && peer.connectionState !== "connected") this.handlers.onState("failed");
-    };
+    socket.onerror = onSignalingLost;
+    socket.onclose = onSignalingLost;
   };
 
   send = (message: ControlMessage): boolean => {
@@ -91,6 +97,7 @@ export class RemoteViewerConnection {
 
   close = () => {
     this.closed = true;
+    this.stopOfferRetry();
     this.handlers.onControlReady(false);
     this.control?.close();
     this.peer?.close();
@@ -99,20 +106,57 @@ export class RemoteViewerConnection {
     this.handlers.onState("closed");
   };
 
-  private signal(frame: string) {
+  private async offer(peer: RTCPeerConnection) {
+    const offer = await peer.createOffer();
     if (this.closed) return;
-    if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(frame);
-    else this.outbox.push(frame);
+    await peer.setLocalDescription(offer);
+    if (this.closed || this.failed) return;
+    this.localOffer = encodeSignalingAction("SDP_OFFER", peer.localDescription?.toJSON() ?? offer);
+    // The Windows MASTER may open its socket only after the screen picker.
+    this.offerTimer = setInterval(this.sendOffer, OFFER_RETRY_MS);
+    this.sendOffer();
+  }
+
+  private sendOffer = () => {
+    if (!this.localOffer || this.peer?.remoteDescription) return;
+    try {
+      this.signal(this.localOffer);
+      for (const candidate of this.localCandidates) this.signal(candidate);
+    } catch {
+      this.fail();
+    }
+  };
+
+  private stopOfferRetry() {
+    if (this.offerTimer !== null) clearInterval(this.offerTimer);
+    this.offerTimer = null;
+    this.localCandidates = [];
+  }
+
+  private fail = () => {
+    if (this.closed || this.failed) return;
+    this.failed = true;
+    this.stopOfferRetry();
+    this.handlers.onState("failed");
+  };
+
+  private signal(frame: string) {
+    if (!this.closed && !this.failed && this.socket?.readyState === WebSocket.OPEN) this.socket.send(frame);
   }
 
   private async receive(data: string) {
     const decoded = decodeSignalingMessage(data);
     const peer = this.peer;
-    if (!decoded || !peer || this.closed) return;
+    if (!decoded || !peer || this.closed || this.failed) return;
     const { message, payload } = decoded;
     if (message.messageType === "SDP_ANSWER") {
+      if (this.applyingAnswer || peer.remoteDescription) return;
+      this.applyingAnswer = true;
       await peer.setRemoteDescription(payload as RTCSessionDescriptionInit);
-      for (const candidate of this.pendingCandidates.splice(0)) await peer.addIceCandidate(candidate);
+      this.stopOfferRetry();
+      for (const candidate of this.pendingCandidates.splice(0)) {
+        await peer.addIceCandidate(candidate).catch(() => undefined);
+      }
     } else if (message.messageType === "ICE_CANDIDATE") {
       const candidate = payload as RTCIceCandidateInit;
       if (peer.remoteDescription) await peer.addIceCandidate(candidate).catch(() => undefined);

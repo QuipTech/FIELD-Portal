@@ -328,6 +328,9 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60 text-sm text-white/80">
                 <LoadingSpinner size="md" />
                 {remote.connectionState === "disconnected" ? "Reconnecting…" : "Connecting to the tablet…"}
+                {remote.connectionState !== "disconnected" && (
+                  <span className="text-xs text-white/60">On the tablet, choose the screen to share.</span>
+                )}
               </div>
             )}
           </div>
