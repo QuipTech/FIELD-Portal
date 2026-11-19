@@ -176,6 +176,43 @@ export class UpFrontInvoiceService {
     }
   };
 
+  // Paying an invoice (a machine's final charge) by bank transfer instead:
+  // open Checkout sessions are closed so it can't be paid twice, and it's
+  // flagged and sent through Stripe with the bank details, never charged to
+  // a card. A platform administrator marks it paid once the money arrives.
+  // 'paid' when Checkout had already taken the payment (now recorded).
+  sendForBankTransfer = async (invoiceId: string): Promise<'paid' | 'sent'> => {
+    try {
+      const invoice = await this.requireInvoiceRow(invoiceId);
+      if (invoice.status === 'paid') return 'paid';
+      const account = await this.billingAccounts.ensureStripeCustomer(
+        await this.billingAccounts.requireAccount(invoice.billing_account_id),
+      );
+      if (!invoice.hosted_invoice_url) {
+        const checkout = await this.checkout.closeCheckout(
+          invoice,
+          account.stripe_customer_id as string,
+        );
+        if (checkout === 'paid') return 'paid';
+      }
+      // A Stripe invoice from an earlier, failed push was never finalised:
+      // drop it so the new one carries the bank details.
+      await this.serviceDatabase.query(
+        `UPDATE billing.invoices SET pay_by_bank_transfer = true,
+           stripe_invoice_id = CASE WHEN hosted_invoice_url IS NULL THEN NULL ELSE stripe_invoice_id END,
+           updated_at = now()
+         WHERE id = $1`,
+        [invoice.id],
+      );
+      if (!invoice.hosted_invoice_url) {
+        await this.invoices.finaliseInvoice(invoice.id, account.billing_email);
+      }
+      return 'sent';
+    } catch (error) {
+      throw toStripeGatewayError(error);
+    }
+  };
+
   // Paying an invoice on the spot (a machine's final charge) in the mobile
   // Payment Sheet instead of Checkout: the invoice becomes a card-only Stripe
   // Invoice and the sheet pays its own PaymentIntent. Open Checkout sessions

@@ -31,6 +31,8 @@ export interface InvoiceRow {
   marked_paid_reference: string | null;
   // Why it was never sent to Stripe (e.g. discounted to A$0).
   no_charge_reason: string | null;
+  // The customer chose to pay by bank transfer (a machine's final charge).
+  pay_by_bank_transfer: boolean;
   created_at: Date;
   updated_at: Date;
 }

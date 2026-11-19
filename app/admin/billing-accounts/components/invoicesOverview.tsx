@@ -85,6 +85,11 @@ const InvoiceRow = ({ invoice, actions }: { invoice: AdminInvoice; actions: Acti
       <TableCell className="flex flex-wrap items-center gap-1">
         <span title={category.hint}><Tag tone={category.tone}>{category.label}</Tag></span>
         {invoice.heldAt && <Tag tone="amber">Held</Tag>}
+        {invoice.payByBankTransfer && invoice.status !== "paid" && (
+          <span title="The customer is paying by bank transfer. Use Mark as paid once the money arrives.">
+            <Tag tone="amber">Bank transfer</Tag>
+          </span>
+        )}
       </TableCell>
       <TableCell className="text-sm">
         {invoice.hostedInvoiceUrl ? (

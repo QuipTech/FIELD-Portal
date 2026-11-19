@@ -51,6 +51,8 @@ const toAdminInvoice = (row: AdminInvoiceRow) => ({
   paymentType: row.payment_type,
   markedPaidOn: row.marked_paid_on,
   noChargeReason: row.no_charge_reason,
+  // The customer chose bank transfer: mark it paid once the money arrives.
+  payByBankTransfer: row.pay_by_bank_transfer,
   // Paid outside Stripe (bank transfer): only invoices Stripe emails rather
   // than charging a saved card, while they're unpaid.
   canMarkPaid:

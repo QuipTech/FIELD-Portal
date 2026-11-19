@@ -22,6 +22,10 @@ import {
   MACHINE_FINAL_INVOICE_KIND,
 } from '../billing/monthlyRun/runInvoices.repository';
 import { findBandRateCents } from '../billing/pricing/fleetPrice';
+import { BillingConfigService } from '../billing/billingConfig/billingConfig.service';
+import { formatPaymentReference } from '../billing/invoices/accountInvoiceTerms';
+import { findInvoice } from '../billing/invoices/invoices.repository';
+import { FinalChargePaymentMethod } from './dto/lifecycleActionDtos';
 import { PriceBooksService } from '../billing/priceBooks/priceBooks.service';
 import { PLAN_CODES } from '../billing/subscriptions/planCodes';
 import { listLiveSubscriptions } from '../billing/subscriptions/subscriptions.repository';
@@ -33,6 +37,7 @@ import { findPeakSoFar } from './machineActivations.repository';
 import * as deletionRepository from './machineDeletion.repository';
 import {
   assessMachineDeletion,
+  BankTransferDetails,
   billedMonthRange,
   BillingIntervalUse,
   FinalChargeDue,
@@ -51,6 +56,8 @@ const NO_PRICE_MESSAGE =
   "This machine's plan has no price to charge. Contact support.";
 const NOTHING_TO_PAY_MESSAGE =
   "This machine doesn't have a final charge to pay.";
+const BANK_TRANSFER_UNAVAILABLE_MESSAGE =
+  "Paying by bank transfer isn't set up yet. Pay online instead, or contact support.";
 
 export type FinalChargePayment = MachineDeletionCheck & {
   paymentUrl: string | null;
@@ -62,6 +69,9 @@ export type FinalChargePayment = MachineDeletionCheck & {
 export interface FinalChargePaymentOptions {
   // From the mobile app: pay in the Payment Sheet rather than Checkout.
   inApp?: boolean;
+  // 'bank_transfer': send the invoice to pay by transfer, approved by a
+  // platform administrator, instead of paying online.
+  method?: FinalChargePaymentMethod;
 }
 
 const formatRate = (cents: number) => `A$${(cents / 100).toFixed(2)}`;
@@ -84,12 +94,22 @@ export class MachineDeletionService {
     private readonly serviceDatabase: ServiceDatabaseService,
     private readonly priceBooks: PriceBooksService,
     private readonly upFrontInvoices: UpFrontInvoiceService,
+    private readonly billingConfig: BillingConfigService,
   ) {}
 
+  // The deletion check, plus whether bank transfer can be offered and where
+  // to send one already chosen.
   checkDeletion = async (
     actor: AuthenticatedUser,
     machineId: string,
     now = new Date(),
+  ): Promise<MachineDeletionCheck> =>
+    this.withBankTransfer(await this.checkSettlement(actor, machineId, now));
+
+  private checkSettlement = async (
+    actor: AuthenticatedUser,
+    machineId: string,
+    now: Date,
   ): Promise<MachineDeletionCheck> => {
     const { check, machine, intervals, today } = await this.readCheck(
       actor,
@@ -111,7 +131,7 @@ export class MachineDeletionService {
             viaCheckout,
             machine.billing_account_id,
           )));
-      return isAnyPaid ? this.checkDeletion(actor, machineId, now) : check;
+      return isAnyPaid ? this.checkSettlement(actor, machineId, now) : check;
     }
     if (check.blocker !== 'final_charge_due') return check;
     return {
@@ -133,12 +153,17 @@ export class MachineDeletionService {
     now = new Date(),
     options: FinalChargePaymentOptions = {},
   ): Promise<FinalChargePayment> => {
+    const isBankTransfer = options.method === 'bank_transfer';
+    if (isBankTransfer && !(await this.isBankTransferAvailable())) {
+      throw new ConflictException(BANK_TRANSFER_UNAVAILABLE_MESSAGE);
+    }
     const { check, machine, intervals, today, label } = await this.readCheck(
       actor,
       machineId,
       now,
     );
     if (check.blocker === 'unpaid_invoices') {
+      if (isBankTransfer) return this.sendBankTransfer(actor, machineId, now);
       return this.openPayment(
         actor,
         machineId,
@@ -230,7 +255,64 @@ export class MachineDeletionService {
       }
       return invoice;
     });
+    if (isBankTransfer) return this.sendBankTransfer(actor, machineId, now);
     return this.openPayment(actor, machineId, label, returnPage, now, options);
+  };
+
+  // Sends the machine's unpaid final charge to pay by bank transfer. The
+  // machine can be deleted once a platform administrator marks it paid.
+  private sendBankTransfer = async (
+    actor: AuthenticatedUser,
+    machineId: string,
+    now: Date,
+  ): Promise<FinalChargePayment> => {
+    const check = await this.checkSettlement(actor, machineId, now);
+    const finalCharge = check.unpaidInvoices.find(
+      (invoice) => invoice.isFinalCharge,
+    );
+    if (finalCharge && !finalCharge.payByBankTransfer) {
+      await this.upFrontInvoices.sendForBankTransfer(finalCharge.id);
+      this.logger.log(
+        `Final charge ${finalCharge.id} for machine ${machineId}: sent to pay by bank transfer.`,
+      );
+    }
+    return {
+      ...(await this.checkDeletion(actor, machineId, now)),
+      paymentUrl: null,
+      paymentSheet: null,
+    };
+  };
+
+  private isBankTransferAvailable = async (): Promise<boolean> => {
+    const config = await this.billingConfig.loadConfig();
+    return Boolean(config.BANK_BSB && config.BANK_ACCOUNT_NUMBER);
+  };
+
+  private withBankTransfer = async (
+    check: MachineDeletionCheck,
+  ): Promise<MachineDeletionCheck> => {
+    const config = await this.billingConfig.loadConfig();
+    const bankTransferAvailable = Boolean(
+      config.BANK_BSB && config.BANK_ACCOUNT_NUMBER,
+    );
+    const awaiting = check.unpaidInvoices.find(
+      (invoice) => invoice.payByBankTransfer,
+    );
+    let bankTransfer: BankTransferDetails | null = null;
+    if (awaiting) {
+      const invoice = await findInvoice(this.serviceDatabase, awaiting.id);
+      bankTransfer = {
+        invoiceId: awaiting.id,
+        accountName: config.BANK_ACCOUNT_NAME,
+        bsb: config.BANK_BSB,
+        accountNumber: config.BANK_ACCOUNT_NUMBER,
+        reference: formatPaymentReference(config.PAYMENT_REFERENCE_FORMAT, {
+          invoiceId: awaiting.id,
+          accountName: invoice?.billing_account_name ?? '',
+        }),
+      };
+    }
+    return { ...check, bankTransferAvailable, bankTransfer };
   };
 
   // The payment page for the machine's unpaid final charge: its Stripe

@@ -111,6 +111,8 @@ export class MachineLifecycleController {
 
   // Raises the days-used charge and returns the Stripe Checkout URL to pay
   // it; Checkout returns to the machine's page. Then delete. Safe to repeat.
+  // paymentMethod 'bank_transfer' sends the invoice with the bank details
+  // instead (no paymentUrl); it's settled once an admin marks it paid.
   // Any client but the portal (X-Field-Client: web) is the mobile app and
   // also gets paymentSheet. The header only picks how to pay: payment is
   // still confirmed by Stripe, never by the client.
@@ -128,7 +130,10 @@ export class MachineLifecycleController {
       machineId,
       `${toReturnOrigin(dto.returnOrigin)}/machines/${machineId}`,
       undefined,
-      { inApp: parseRequestSource(client) !== 'web' },
+      {
+        inApp: parseRequestSource(client) !== 'web',
+        method: dto.paymentMethod,
+      },
     );
   }
 

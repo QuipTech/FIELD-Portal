@@ -76,9 +76,10 @@ export const listSettlementInvoices = async (
     total_ex_gst_cents: string;
     hosted_invoice_url: string | null;
     kind: string;
+    pay_by_bank_transfer: boolean;
   }>(
     `SELECT i.id, i.period_start::text, i.status, i.total_ex_gst_cents,
-            i.hosted_invoice_url, i.kind
+            i.hosted_invoice_url, i.kind, i.pay_by_bank_transfer
      FROM billing.invoices i
      WHERE i.billing_account_id = current_billing_account_id()
        AND i.status <> 'void'
@@ -95,6 +96,7 @@ export const listSettlementInvoices = async (
     totalExGstCents: Number(row.total_ex_gst_cents),
     hostedInvoiceUrl: row.hosted_invoice_url,
     isFinalCharge: row.kind === MACHINE_FINAL_INVOICE_KIND,
+    payByBankTransfer: row.pay_by_bank_transfer,
   }));
 };
 

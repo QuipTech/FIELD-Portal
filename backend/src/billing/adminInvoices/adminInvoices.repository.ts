@@ -32,6 +32,7 @@ export interface AdminInvoiceRow {
   payment_type: string;
   marked_paid_on: string | null;
   no_charge_reason: string | null;
+  pay_by_bank_transfer: boolean;
   created_at: Date;
   updated_at: Date;
 }
@@ -74,7 +75,7 @@ export const listAdminInvoices = async (
          i.amount_refunded_cents, i.stripe_invoice_id, i.hosted_invoice_url,
          i.kind AS invoice_kind, i.review_until, i.held_at, i.amount_credited_cents,
          i.due_on::text, i.collection_method, i.po_number, a.payment_type,
-         i.marked_paid_on::text, i.no_charge_reason, i.created_at, i.updated_at
+         i.marked_paid_on::text, i.no_charge_reason, i.pay_by_bank_transfer, i.created_at, i.updated_at
        ${FROM} ${WHERE}
        ORDER BY i.created_at DESC, i.id LIMIT $3 OFFSET $4`,
       [...params, filters.limit, filters.offset],

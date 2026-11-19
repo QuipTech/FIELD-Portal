@@ -33,6 +33,8 @@ export interface AdminInvoice {
   markedPaidOn: string | null;
   // e.g. "fully_discounted": a A$0 month that was never sent.
   noChargeReason: string | null;
+  // The customer chose to pay by bank transfer; Mark as paid approves it.
+  payByBankTransfer: boolean;
   // Unpaid and emailed (not charged to a card): can be marked paid.
   canMarkPaid: boolean;
   createdAt: string;

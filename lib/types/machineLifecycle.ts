@@ -79,7 +79,25 @@ export interface MachineDeletionCheck {
   message: string | null;
   // First day the final invoice can exist, when waiting for it.
   finalInvoiceFrom: string | null;
-  unpaidInvoices: { id: string; periodStart: string; status: string; hostedInvoiceUrl: string | null; isFinalCharge: boolean }[];
+  unpaidInvoices: {
+    id: string;
+    periodStart: string;
+    status: string;
+    hostedInvoiceUrl: string | null;
+    isFinalCharge: boolean;
+    // Being paid by bank transfer: settled once an administrator approves it.
+    payByBankTransfer: boolean;
+  }[];
+  // Bank details are set up, so paying by bank transfer can be offered.
+  bankTransferAvailable: boolean;
+  // Where to send the bank transfer already chosen.
+  bankTransfer: {
+    invoiceId: string;
+    accountName: string;
+    bsb: string;
+    accountNumber: string;
+    reference: string;
+  } | null;
   // What paying now costs, when the blocker is final_charge_due: one invoice
   // for this month and last month, if that isn't invoiced yet.
   finalCharge: {
