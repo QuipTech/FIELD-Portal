@@ -39,7 +39,7 @@ export const PromoCodeDialog = ({ promo, onSaved, onClose }: PromoCodeDialogProp
   const [maxRedemptions, setMaxRedemptions] = useState(promo?.maxRedemptions ? String(promo.maxRedemptions) : "");
   const [newCustomersOnly, setNewCustomersOnly] = useState(promo?.newCustomersOnly ?? false);
 
-  const amountNumber = Number(amount.replace(/[$,\s]/g, ""));
+  const amountNumber = Number(amount.replace(/[$,%\s]/g, ""));
   const discountValue =
     discountType === "percent" ? (Number.isInteger(amountNumber) ? amountNumber : NaN) : Math.round(amountNumber * 100);
   const months = toWholeNumber(durationMonths);

@@ -104,7 +104,7 @@ export const FreePeriodDialog = ({ organisation, onDone, onClose }: DialogProps)
   const [percent, setPercent] = useState(String(current?.freePercent ?? 100));
   const [reason, setReason] = useState("");
   const [clearing, setClearing] = useState(false);
-  const percentNumber = Number(percent);
+  const percentNumber = Number(percent.replace(/[%\s]/g, ""));
   const isValid =
     reason.trim().length > 0 &&
     (clearing || (/^\d{4}-\d{2}-\d{2}$/.test(freeUntil) && Number.isInteger(percentNumber) && percentNumber >= 1 && percentNumber <= 100));
