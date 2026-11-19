@@ -158,7 +158,8 @@ export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }
           </dl>
           <span className="text-xs text-mutedGray">
             Use the reference so we can match your payment. The invoice, with GST, has been emailed to your billing contact.
-            Once we confirm the payment, you can delete this machine.
+            Once you&apos;ve paid, let our accounts team know (contact your administrator or QuipTech support). As soon as we
+            confirm the payment, you can delete this machine.
           </span>
         </div>
       )}
