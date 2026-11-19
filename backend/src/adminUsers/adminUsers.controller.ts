@@ -23,6 +23,8 @@ import { AdminUserInvitationsService } from './adminUserInvitations.service';
 import { InviteUserDto } from './dto/inviteUserDto';
 import { AdminUserRolesService } from './adminUserRoles.service';
 import { AdminUserRemovalService } from './adminUserRemoval.service';
+import { AdminUserStatusService } from './adminUserStatus.service';
+import { SetUserStatusDto } from './dto/setUserStatusDto';
 import { ChangeUserRoleDto } from './dto/changeUserRoleDto';
 import { ListAdminUsersQueryDto } from './dto/listAdminUsersQueryDto';
 import { UserMachineAccessService } from '../machineSharing/userAccess/userMachineAccess.service';
@@ -39,6 +41,7 @@ export class AdminUsersController {
     private readonly invitations: AdminUserInvitationsService,
     private readonly userRoles: AdminUserRolesService,
     private readonly removal: AdminUserRemovalService,
+    private readonly userStatus: AdminUserStatusService,
     private readonly machineAccess: UserMachineAccessService,
   ) {}
 
@@ -110,6 +113,19 @@ export class AdminUsersController {
       },
       dto.machineAccessMode,
     );
+  }
+
+  // 'disabled' keeps the account but blocks sign-in (they're told an
+  // administrator disabled it) and ends their sessions; 'active' restores
+  // it. Not yourself, never the last Owner.
+  @Patch(':userId/status')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  setStatus(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('userId', ParseUUIDPipe) userId: string,
+    @Body() dto: SetUserStatusDto,
+  ) {
+    return this.userStatus.setStatus(actor, userId, dto);
   }
 
   // Deletes the user's account and sign-in completely, so the email can

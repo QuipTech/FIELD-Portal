@@ -4,7 +4,7 @@ import * as authRepository from '../auth/auth.repository';
 import { CognitoIdentity } from '../auth/types/cognitoIdentity';
 import * as usersRepository from './users.repository';
 import { createTenantAndFirstUserFromCognito } from './cognitoSignup';
-import { UsersService } from './users.service';
+import { ACCOUNT_DISABLED_MESSAGE, UsersService } from './users.service';
 
 jest.mock('../auth/auth.repository');
 jest.mock('./users.repository');
@@ -81,6 +81,18 @@ describe('UsersService.findOrCreateFromCognito', () => {
 
     expect(resolution).toMatchObject({ status: 'resolved' });
     expect(createTenantAndFirstUserFromCognito).not.toHaveBeenCalled();
+  });
+
+  it('tells a user an admin disabled that their account is disabled', async () => {
+    jest.mocked(usersRepository.findUserByCognitoSub).mockResolvedValue({
+      ...createdUser,
+      status: 'disabled',
+      tenant_status: 'active',
+    });
+
+    await expect(
+      buildService().findOrCreateFromCognito(googleIdentity),
+    ).rejects.toThrow(new ForbiddenException(ACCOUNT_DISABLED_MESSAGE));
   });
 
   it('refreshes the saved photo on sign-in and returns the new one', async () => {

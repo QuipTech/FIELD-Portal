@@ -47,6 +47,20 @@ export const changeUserRoleRequest = (accessToken: string, userId: string, roleI
     body: JSON.stringify({ roleId }),
   });
 
+// "disabled" keeps their account but blocks sign-in (they're told an
+// administrator disabled it); "active" lets them back in. Refused for your
+// own account and for the last Owner.
+export const setUserStatusRequest = (
+  accessToken: string,
+  userId: string,
+  status: "active" | "disabled",
+): Promise<null> =>
+  apiRequest<null>(`/admin/users/${userId}/status`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ status }),
+  });
+
 // Deletes their account and sign-in completely, so the email can sign up
 // again. Refused for your own account and for the last Owner.
 export const removeUserRequest = (accessToken: string, userId: string): Promise<null> =>

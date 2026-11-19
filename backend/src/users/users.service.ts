@@ -19,6 +19,9 @@ import {
 const SUSPENDED_TENANT_STATUS = 'suspended';
 const ACCOUNT_UNAVAILABLE_MESSAGE =
   'This account is disabled or its organisation is suspended.';
+// Admin portal → Users → Disable user. The portal shows it as is.
+export const ACCOUNT_DISABLED_MESSAGE =
+  'An administrator disabled your FIELD account. Contact your administrator to get access again.';
 const UNVERIFIED_EMAIL_MESSAGE =
   'Verify your email address before signing in with this account.';
 
@@ -36,8 +39,12 @@ interface SignInCandidate {
 // An invited user (admin portal → Invite user) may sign in; their first
 // sign-in makes them active (recordCognitoSignIn / linkCognitoIdentity).
 const SIGN_IN_STATUSES = ['active', 'invited'];
+const DISABLED_USER_STATUS = 'disabled';
 
 const assertCanSignIn = (candidate: SignInCandidate): void => {
+  if (candidate.status === DISABLED_USER_STATUS) {
+    throw new ForbiddenException(ACCOUNT_DISABLED_MESSAGE);
+  }
   if (
     !SIGN_IN_STATUSES.includes(candidate.status) ||
     candidate.tenant_status === SUSPENDED_TENANT_STATUS
