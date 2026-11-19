@@ -36,10 +36,15 @@ export class RemoteViewerConnection {
     this.audioSender = peer.addTransceiver("audio", { direction: "sendrecv" }).sender;
     const control = peer.createDataChannel("control", { ordered: true });
     this.control = control;
-    control.onopen = () => this.handlers.onControlReady(true);
-    control.onclose = () => this.handlers.onControlReady(false);
+    control.onopen = () => {
+      if (!this.closed) this.handlers.onControlReady(this.connection.controlAllowed);
+    };
+    control.onclose = () => {
+      if (!this.closed) this.handlers.onControlReady(false);
+    };
 
     peer.ontrack = (event) => {
+      if (this.closed) return;
       if (!this.stream.getTracks().includes(event.track)) this.stream.addTrack(event.track);
       this.handlers.onStream(this.stream);
     };
@@ -47,6 +52,7 @@ export class RemoteViewerConnection {
       if (candidate) this.signal(encodeSignalingAction("ICE_CANDIDATE", candidate.toJSON()));
     };
     peer.onconnectionstatechange = () => {
+      if (this.closed) return;
       const state = peer.connectionState;
       if (state === "connected") this.handlers.onState("connected");
       else if (state === "disconnected") this.handlers.onState("disconnected");
@@ -69,9 +75,13 @@ export class RemoteViewerConnection {
   };
 
   send = (message: ControlMessage): boolean => {
-    if (this.control?.readyState !== "open") return false;
-    this.control.send(JSON.stringify(message));
-    return true;
+    if (!this.connection.controlAllowed || this.peer?.connectionState !== "connected" || this.control?.readyState !== "open") return false;
+    try {
+      this.control.send(JSON.stringify(message));
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   // The viewer's microphone to the tablet; null mutes it.
@@ -81,6 +91,7 @@ export class RemoteViewerConnection {
 
   close = () => {
     this.closed = true;
+    this.handlers.onControlReady(false);
     this.control?.close();
     this.peer?.close();
     this.socket?.close();
@@ -89,6 +100,7 @@ export class RemoteViewerConnection {
   };
 
   private signal(frame: string) {
+    if (this.closed) return;
     if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(frame);
     else this.outbox.push(frame);
   }

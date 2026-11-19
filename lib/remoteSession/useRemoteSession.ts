@@ -34,12 +34,14 @@ export const useRemoteSession = (machineId: string) => {
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [micOn, setMicOn] = useState(false);
+  const [micPending, setMicPending] = useState(false);
 
   const started = useRef(false);
   const sessionRef = useRef<RemoteSession | null>(null);
   const connection = useRef<RemoteViewerConnection | null>(null);
   const recorder = useRef<SessionRecorder | null>(null);
   const mic = useRef<MediaStream | null>(null);
+  const changingMic = useRef(false);
   const interacted = useRef(false);
   const reconnects = useRef(0);
   const finishing = useRef<Promise<void> | null>(null);
@@ -57,6 +59,9 @@ export const useRemoteSession = (machineId: string) => {
         const stopRecording = recorder.current?.stop() ?? Promise.resolve(false);
         connection.current?.close();
         mic.current?.getTracks().forEach((track) => track.stop());
+        mic.current = null;
+        setMicOn(false);
+        setStream(null);
         setIsRecording(false);
         if (current && endOnServer) {
           await endRemoteSessionRequest(machineId, current.id)
@@ -103,15 +108,17 @@ export const useRemoteSession = (machineId: string) => {
 
   const connect = useCallback(async () => {
     const current = sessionRef.current;
-    if (!current) return;
-    setPhase((value) => (value === "live" ? value : "connecting"));
+    if (current?.status !== "active" || finishing.current) return;
+    setPhase("connecting");
     try {
       const access = await getRemoteConnectionRequest(machineId, current.id);
+      if (finishing.current || sessionRef.current?.status !== "active") return;
       connection.current?.close();
       const viewer = new RemoteViewerConnection(access, {
         onStream: (media) => {
           setStream(media);
           startRecording(media);
+          recorder.current?.addAudio(media);
         },
         onState: (state) => {
           setConnectionState(state);
@@ -142,7 +149,7 @@ export const useRemoteSession = (machineId: string) => {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    createRemoteSessionRequest(machineId)
+    createRemoteSessionRequest(machineId, true)
       .then((created) => {
         remember(created);
         setPhase("waiting");
@@ -216,26 +223,42 @@ export const useRemoteSession = (machineId: string) => {
   }, [machineId]);
 
   const sendControl = useCallback((message: ControlMessage) => {
-    if (!sessionRef.current?.scope.control) return;
+    if (finishing.current || sessionRef.current?.status !== "active" || !sessionRef.current.scope.control) return;
     if (connection.current?.send(message)) interacted.current = true;
   }, []);
 
   const toggleMic = useCallback(async () => {
-    if (mic.current) {
-      mic.current.getTracks().forEach((track) => track.stop());
-      mic.current = null;
-      await connection.current?.setMicrophone(null);
-      setMicOn(false);
-      return;
-    }
+    if (changingMic.current || finishing.current || sessionRef.current?.status !== "active") return;
+    changingMic.current = true;
+    setMicPending(true);
     try {
-      const media = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      if (mic.current) {
+        mic.current.getTracks().forEach((track) => track.stop());
+        mic.current = null;
+        setMicOn(false);
+        await connection.current?.setMicrophone(null);
+        return;
+      }
+      const media = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true },
+      });
+      if (finishing.current || sessionRef.current?.status !== "active") {
+        media.getTracks().forEach((track) => track.stop());
+        return;
+      }
       mic.current = media;
       await connection.current?.setMicrophone(media.getAudioTracks()[0] ?? null);
+      if (mic.current !== media) return;
       recorder.current?.addAudio(media);
       setMicOn(true);
     } catch {
-      setError("Couldn't use your microphone. Check the browser's permission for this site.");
+      mic.current?.getTracks().forEach((track) => track.stop());
+      mic.current = null;
+      setMicOn(false);
+      if (!finishing.current) setError("Couldn't use your microphone. Check the browser's permission for this site.");
+    } finally {
+      changingMic.current = false;
+      setMicPending(false);
     }
   }, []);
 
@@ -255,6 +278,8 @@ export const useRemoteSession = (machineId: string) => {
     isRecording,
     recordingError,
     micOn,
+    micPending,
+    resumeRecordingAudio: () => recorder.current?.resumeAudio(),
     sendControl,
     toggleMic,
     end,

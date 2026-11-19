@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Icon } from "@/components/icons/icon";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loadingSpinner";
-import { shouldSendKey, toKeyMessage, toScreenPoint } from "@/lib/remoteSession/controlInput";
+import { shouldSendKey, toKeyMessage, toScreenPoint, type ControlMessage } from "@/lib/remoteSession/controlInput";
 import { useRemoteSession } from "@/lib/remoteSession/useRemoteSession";
 import { formatRemoteDuration, remoteEndReasonLabel, type RemoteSession } from "@/lib/types/remoteSession";
 
@@ -69,17 +69,62 @@ const EndedSummary = ({ session }: { session: RemoteSession | null }) => {
 export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionViewerProps) => {
   const remote = useRemoteSession(machineId);
   const { phase, session, stream, sendControl } = remote;
+  const viewer = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   const surface = useRef<HTMLDivElement>(null);
-  const pointerDown = useRef(false);
+  const pressedPointer = useRef<{ id: number; button: number; x: number; y: number } | null>(null);
+  const pressedKeys = useRef(new Map<string, Extract<ControlMessage, { type: "key" }>>());
   const lastHover = useRef(0);
   const [isEnding, setIsEnding] = useState(false);
-  const canControl = Boolean(session?.scope.control) && remote.controlReady;
+  const [playbackBlocked, setPlaybackBlocked] = useState(false);
+  const [clipboardError, setClipboardError] = useState("");
+  const live = phase === "live" || phase === "connecting";
+  const canControl = phase === "live" && !playbackBlocked && Boolean(session?.scope.control) &&
+    remote.connectionState === "connected" && remote.controlReady;
   const elapsed = useElapsed(session?.startedAt ?? null, phase === "live" || phase === "connecting");
 
   useEffect(() => {
-    if (video.current && stream && video.current.srcObject !== stream) video.current.srcObject = stream;
-  }, [stream]);
+    const element = video.current;
+    if (!element) return;
+    let current = true;
+    element.srcObject = stream;
+    setPlaybackBlocked(false);
+    if (stream) {
+      void element.play().catch(() => {
+        if (current) setPlaybackBlocked(true);
+      });
+    }
+    return () => { current = false; };
+  }, [live, stream]);
+
+  const playMedia = async () => {
+    void remote.resumeRecordingAudio();
+    try {
+      await video.current?.play();
+      setPlaybackBlocked(false);
+    } catch {
+      setPlaybackBlocked(true);
+    }
+  };
+
+  const releaseInput = useCallback(() => {
+    const pointer = pressedPointer.current;
+    if (pointer) {
+      const { x, y, button } = pointer;
+      sendControl({ v: 1, type: "pointer", action: "cancel", x, y, button });
+      pressedPointer.current = null;
+    }
+    pressedKeys.current.forEach((key) => {
+      sendControl({ ...key, action: "up", alt: false, ctrl: false, shift: false, meta: false });
+    });
+    pressedKeys.current.clear();
+  }, [sendControl]);
+
+  useEffect(() => {
+    if (!canControl) releaseInput();
+    window.addEventListener("blur", releaseInput);
+    return () => window.removeEventListener("blur", releaseInput);
+  }, [canControl, releaseInput]);
 
   useEffect(() => {
     document.title = `Remote session · ${machineLabel || "Machine"}`;
@@ -98,42 +143,63 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
     return () => element.removeEventListener("wheel", onWheel);
   });
 
-  const pointFor = (clientX: number, clientY: number) => {
+  const pointFor = (clientX: number, clientY: number, clampToScreen = false) => {
     const element = video.current;
     if (!element) return null;
     const rect = element.getBoundingClientRect();
-    return toScreenPoint(clientX, clientY, rect, element.videoWidth, element.videoHeight);
+    return toScreenPoint(clientX, clientY, rect, element.videoWidth, element.videoHeight, clampToScreen);
   };
 
   const onPointer = (action: "down" | "move" | "up" | "cancel") => (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!canControl) return;
-    if (action === "move" && !pointerDown.current) {
+    const held = pressedPointer.current;
+    if (held && held.id !== event.pointerId) return;
+    if (!held && (action === "up" || action === "cancel")) return;
+    if (action === "move" && !held) {
       const now = performance.now();
       if (now - lastHover.current < HOVER_INTERVAL_MS) return;
       lastHover.current = now;
     }
-    const point = pointFor(event.clientX, event.clientY);
+    const point = action === "cancel" ? held : pointFor(event.clientX, event.clientY, Boolean(held));
+    if (!point) {
+      if (held && (action === "up" || action === "cancel")) releaseInput();
+      return;
+    }
+    const button = held?.button ?? Math.max(0, event.button);
     if (action === "down") {
+      if (held || button > 2) return;
       surface.current?.focus();
       event.currentTarget.setPointerCapture(event.pointerId);
-      pointerDown.current = true;
+      pressedPointer.current = { ...point, id: event.pointerId, button };
+      void remote.resumeRecordingAudio();
+    } else if (held && action === "move") {
+      pressedPointer.current = { ...held, ...point };
+    } else if (action === "up" || action === "cancel") {
+      pressedPointer.current = null;
     }
-    if (action === "up" || action === "cancel") pointerDown.current = false;
-    if (!point) return;
     event.preventDefault();
-    sendControl({ v: 1, type: "pointer", action, ...point, button: event.button < 0 ? 0 : event.button });
+    sendControl({ v: 1, type: "pointer", action, x: point.x, y: point.y, button });
+  };
+
+  const paste = async () => {
+    setClipboardError("");
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) sendControl({ v: 1, type: "text", text });
+    } catch {
+      setClipboardError("Allow clipboard access in your browser to paste to the tablet.");
+    }
   };
 
   const end = async () => {
+    releaseInput();
     setIsEnding(true);
     await remote.end();
     setIsEnding(false);
   };
 
-  const live = phase === "live" || phase === "connecting";
-
   return (
-    <div className="flex h-screen flex-col bg-[#0f1115] text-white">
+    <div ref={viewer} className="flex h-screen flex-col bg-[#0f1115] text-white">
       <header className="flex flex-wrap items-center gap-3 border-b border-white/10 px-4 py-2.5">
         <Icon name="broadcast" className="h-5 w-5 text-white/70" />
         <div className="flex min-w-0 flex-col">
@@ -142,7 +208,11 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
             {phase === "requesting" && "Asking the tablet…"}
             {phase === "waiting" && "Waiting for the operator to allow"}
             {phase === "connecting" && "Connecting to the tablet…"}
-            {phase === "live" && (canControl ? "Live · you can tap, type and scroll" : "Live · view only")}
+            {phase === "live" && (
+              remote.connectionState === "disconnected" ? "Reconnecting…" :
+                canControl ? "Live · you can tap, type and scroll" :
+                  session?.scope.control ? "Live · tablet control unavailable" : "Live · view only"
+            )}
             {phase === "ended" && "Ended"}
             {phase === "error" && "Couldn't start"}
           </span>
@@ -160,7 +230,11 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
               size="sm"
               variant="ghost"
               className="!text-white hover:!bg-white/10"
-              onClick={() => void remote.toggleMic()}
+              onClick={() => {
+                void playMedia();
+                void remote.toggleMic();
+              }}
+              disabled={phase !== "live" || remote.micPending}
               aria-pressed={remote.micOn}
               title={remote.micOn ? "Turn microphone off" : "Turn microphone on"}
             >
@@ -173,10 +247,15 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
               size="sm"
               variant="ghost"
               className="!text-white hover:!bg-white/10"
-              onClick={() => void surface.current?.requestFullscreen?.()}
+              onClick={() => void viewer.current?.requestFullscreen?.()}
               title="Full screen"
             >
               <Icon name="ext" />
+            </Button>
+          )}
+          {canControl && (
+            <Button size="sm" variant="ghost" className="!text-white hover:!bg-white/10" onClick={() => void paste()}>
+              Paste to tablet
             </Button>
           )}
           {(phase === "waiting" || live) && (
@@ -199,6 +278,8 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
         </div>
       )}
 
+      {clipboardError && <div role="alert" className="px-4 py-2 text-sm text-amber-200">{clipboardError}</div>}
+
       <main className="relative flex min-h-0 flex-1 items-center justify-center">
         {live && (
           <div
@@ -212,14 +293,21 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
             onPointerMove={onPointer("move")}
             onPointerUp={onPointer("up")}
             onPointerCancel={onPointer("cancel")}
+            onLostPointerCapture={(event) => {
+              if (pressedPointer.current?.id === event.pointerId) releaseInput();
+            }}
+            onClick={() => void remote.resumeRecordingAudio()}
+            onBlur={releaseInput}
             onContextMenu={(event) => canControl && event.preventDefault()}
             onKeyDown={(event) => {
               if (!canControl || !shouldSendKey(event.nativeEvent)) return;
               event.preventDefault();
-              sendControl(toKeyMessage("down", event.nativeEvent));
+              const message = toKeyMessage("down", event.nativeEvent);
+              pressedKeys.current.set(message.code, message);
+              sendControl(message);
             }}
             onKeyUp={(event) => {
-              if (!canControl || !shouldSendKey(event.nativeEvent)) return;
+              if (!canControl || !pressedKeys.current.delete(event.code)) return;
               event.preventDefault();
               sendControl(toKeyMessage("up", event.nativeEvent));
             }}
@@ -231,6 +319,11 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
             }}
           >
             <video ref={video} autoPlay playsInline className="h-full w-full object-contain" />
+            {phase === "live" && playbackBlocked && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                <Button variant="primary" onClick={() => void playMedia()}>Play tablet audio and video</Button>
+              </div>
+            )}
             {phase === "connecting" && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60 text-sm text-white/80">
                 <LoadingSpinner size="md" />
@@ -246,7 +339,7 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
             <h2 className="text-lg font-medium">Waiting for the operator</h2>
             <p className="text-sm text-white/70">
               The tablet on {machineLabel || "this machine"} is asking its operator to allow remote support. The session
-              is recorded.
+              is recorded. You can talk with the operator and control the tablet if they allow it.
             </p>
             {session && <ExpiryCountdown expiresAt={session.expiresAt} />}
           </div>

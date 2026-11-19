@@ -12,7 +12,7 @@ rejected token is `401` with `code: "DEVICE_TOKEN_REVOKED"`, as today.
 
 ## How a session runs
 
-1. A Portal user with `mc.remote` clicks **Connect as remote access** on the
+1. A Portal user with `mc.remote` clicks **Connect to Remote Session** on the
    machine's **Machine app** tab. The Portal opens a small window and calls
    `POST /machines/{machineId}/remote-sessions`. The tablet must be online
    (socket connected) or the Portal gets `409 remote_tablet_offline`.
@@ -23,9 +23,14 @@ rejected token is `401` with `code: "DEVICE_TOKEN_REVOKED"`, as today.
 4. On Allow, the tablet calls `POST /mc/device/remote-sessions/{id}/connection`,
    opens the returned presigned WebSocket, and acts as the **WebRTC MASTER**:
    it answers the viewer's offer and streams its screen.
-5. While the session is `active`, the tablet shows a **Recording** indicator
+5. The Portal viewer can speak using **Mic on** and hear the tablet if it
+   provides an audio track. If the browser blocks playback, select **Play
+   tablet audio and video**. When the operator grants control, the Portal
+   viewer can click, drag, scroll and type on the tablet screen or use
+   **Paste to tablet**. Full screen keeps mic and End session available.
+6. While the session is `active`, the tablet shows a **Recording** indicator
    and heartbeats every 15 seconds.
-6. Either side ends it. The backend also ends it after 10 minutes without
+7. Either side ends it. The backend also ends it after 10 minutes without
    interaction, 60 seconds without a heartbeat from either side, 4 hours, or
    when the pairing is lost. The tablet hears `remote:ended`.
 
