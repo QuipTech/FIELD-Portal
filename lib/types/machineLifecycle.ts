@@ -110,6 +110,9 @@ export interface MachineDeletionCheck {
       monthlyRateCents: number;
       amountCents: number;
     }[];
+    // Free period and promo lines (negative), then what's left to pay.
+    discounts: { description: string; amountCents: number }[];
+    amountDueCents: number;
   } | null;
 }
 

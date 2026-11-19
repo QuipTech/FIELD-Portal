@@ -20,9 +20,13 @@ import { PaymentSheet } from '../billing/invoices/invoicePaymentSheet.service';
 import {
   hasRunInvoice,
   MACHINE_FINAL_INVOICE_KIND,
+  markNoCharge,
 } from '../billing/monthlyRun/runInvoices.repository';
 import { findBandRateCents } from '../billing/pricing/fleetPrice';
 import { BillingConfigService } from '../billing/billingConfig/billingConfig.service';
+import { DiscountService } from '../billing/discounts/discount.service';
+import { CalculatedLine } from '../billing/monthlyRun/monthlyRunTypes';
+import { sumAmountCents } from '../billing/invoices/invoiceAmounts';
 import { formatPaymentReference } from '../billing/invoices/accountInvoiceTerms';
 import { findInvoice } from '../billing/invoices/invoices.repository';
 import { FinalChargePaymentMethod } from './dto/lifecycleActionDtos';
@@ -95,6 +99,7 @@ export class MachineDeletionService {
     private readonly priceBooks: PriceBooksService,
     private readonly upFrontInvoices: UpFrontInvoiceService,
     private readonly billingConfig: BillingConfigService,
+    private readonly discounts: DiscountService,
   ) {}
 
   // The deletion check, plus whether bank transfer can be offered and where
@@ -209,6 +214,13 @@ export class MachineDeletionService {
         if (!isCharged) toCharge.push(month);
       }
       if (toCharge.length === 0) return null;
+      const lines = await this.finalChargeLines(client, {
+        billingAccountId,
+        machineId,
+        label,
+        book,
+        months: toCharge,
+      });
       const invoice = await this.upFrontInvoices.draft(client, actor, {
         billingAccountId,
         kind: MACHINE_FINAL_INVOICE_KIND,
@@ -217,34 +229,13 @@ export class MachineDeletionService {
           toCharge[toCharge.length - 1].periodStart,
         ),
         reason: 'final charge for a machine being deleted',
-        lines: toCharge.map((month) => ({
-          lineType: 'ASSET_PRO_FINAL_DAYS',
-          description: `Final charge for ${label}: ${month.daysUsed} of ${month.daysInMonth} days in ${formatMonth(month.periodStart)} at ${formatRate(month.monthlyRateCents)} a month`,
-          // invoice_lines needs amount = quantity × unit: a daily rate
-          // wouldn't round to the same total, so this is one final charge.
-          quantity: 1,
-          unitCents: month.amountCents,
-          amountCents: month.amountCents,
-          calcSnapshot: {
-            formula: 'ASSET_PRO_FINAL_DAYS',
-            subscriptionId: null,
-            periodStart: month.periodStart,
-            periodEnd: firstDayOfNextMonth(month.periodStart),
-            peak: 0,
-            peakDay: null,
-            priceBookId: book.id,
-            priceBookVersion: book.version,
-            bands: book.bands,
-            seatCents: null,
-            committedQty: null,
-            monthsCharged: null,
-            machineId,
-            monthlyRateCents: month.monthlyRateCents,
-            daysUsed: month.daysUsed,
-            daysInMonth: month.daysInMonth,
-          },
-        })),
+        lines,
       });
+      // A promo or free period covering all of it: nothing to pay, so it's
+      // recorded as paid and never sent to Stripe.
+      if (sumAmountCents(lines.map((line) => line.amountCents)) <= 0) {
+        await markNoCharge(client, invoice, 'fully_discounted');
+      }
       for (const month of toCharge) {
         await deletionRepository.insertFinalCharge(client, {
           machineId,
@@ -281,6 +272,61 @@ export class MachineDeletionService {
       paymentUrl: null,
       paymentSheet: null,
     };
+  };
+
+  // The final charge's lines: one per month, then that month's free period
+  // and promo discounts, as the monthly run would have applied them.
+  private finalChargeLines = async (
+    database: Pick<ServiceDatabaseService, 'query'>,
+    params: {
+      billingAccountId: string;
+      machineId: string;
+      label: string;
+      book: Awaited<ReturnType<MachineDeletionService['pinnedBook']>>;
+      months: FinalChargeQuote[];
+    },
+  ): Promise<CalculatedLine[]> => {
+    const { machineId, label, book } = params;
+    const lines: CalculatedLine[] = [];
+    for (const month of params.months) {
+      const charge: CalculatedLine = {
+        lineType: 'ASSET_PRO_FINAL_DAYS',
+        description: `Final charge for ${label}: ${month.daysUsed} of ${month.daysInMonth} days in ${formatMonth(month.periodStart)} at ${formatRate(month.monthlyRateCents)} a month`,
+        // invoice_lines needs amount = quantity × unit: a daily rate
+        // wouldn't round to the same total, so this is one final charge.
+        quantity: 1,
+        unitCents: month.amountCents,
+        amountCents: month.amountCents,
+        calcSnapshot: {
+          formula: 'ASSET_PRO_FINAL_DAYS',
+          subscriptionId: null,
+          periodStart: month.periodStart,
+          periodEnd: firstDayOfNextMonth(month.periodStart),
+          peak: 0,
+          peakDay: null,
+          priceBookId: book.id,
+          priceBookVersion: book.version,
+          bands: book.bands,
+          seatCents: null,
+          committedQty: null,
+          monthsCharged: null,
+          machineId,
+          monthlyRateCents: month.monthlyRateCents,
+          daysUsed: month.daysUsed,
+          daysInMonth: month.daysInMonth,
+        },
+      };
+      lines.push(
+        charge,
+        ...(await this.discounts.discountLinesForMonth(
+          database,
+          params.billingAccountId,
+          month.periodStart,
+          [charge],
+        )),
+      );
+    }
+    return lines;
   };
 
   private isBankTransferAvailable = async (): Promise<boolean> => {
@@ -517,9 +563,33 @@ export class MachineDeletionService {
       }
       return results;
     });
+    const amountCents = quotes.reduce(
+      (sum, month) => sum + month.amountCents,
+      0,
+    );
+    const discounts = (
+      await this.finalChargeLines(this.serviceDatabase, {
+        billingAccountId,
+        machineId: machine.id,
+        label: '',
+        book,
+        months: quotes,
+      })
+    )
+      .filter((line) => line.amountCents < 0)
+      .map((line) => ({
+        description: line.description,
+        amountCents: line.amountCents,
+      }));
     return {
-      amountCents: quotes.reduce((sum, month) => sum + month.amountCents, 0),
+      amountCents,
       months: quotes,
+      discounts,
+      amountDueCents: Math.max(
+        0,
+        amountCents +
+          discounts.reduce((sum, line) => sum + line.amountCents, 0),
+      ),
     };
   };
 

@@ -14,7 +14,13 @@ export const PROMO_LINE_TYPE = 'PROMO_DISCOUNT';
 export const DISCOUNT_LINE_TYPES = [FREE_PERIOD_LINE_TYPE, PROMO_LINE_TYPE];
 
 // Machine charges: what a free period and a promo discount.
-export const MACHINE_LINE_TYPES = ['ASSET_PRO', 'ASSET_PRO_OVER_COMMIT'];
+// Machine charges, which free periods and promos discount: the monthly
+// fleet charge and a deleted machine's final days.
+export const MACHINE_LINE_TYPES = [
+  'ASSET_PRO',
+  'ASSET_PRO_OVER_COMMIT',
+  'ASSET_PRO_FINAL_DAYS',
+];
 
 export type DiscountType = 'percent' | 'fixed_cents';
 

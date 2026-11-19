@@ -6,9 +6,7 @@ import { applyBulkLifecycleActionRequest, getActivationQuoteRequest } from "@/li
 vi.mock("@/lib/api/machineLifecycleApi", () => ({
   applyBulkLifecycleActionRequest: vi.fn(),
   getActivationQuoteRequest: vi.fn(),
-}));
-vi.mock("@/lib/auth/usePermissions", () => ({
-  usePermissions: () => ({ isLoaded: true, can: () => false, machineControlEnabled: false }),
+  getActivationPromoRequest: vi.fn().mockResolvedValue(null),
 }));
 vi.mock("@/lib/api/requireAccessToken", () => ({ requireAccessToken: () => "test-token" }));
 afterEach(cleanup);

@@ -106,6 +106,21 @@ describe('calculateDiscountLines', () => {
     });
   });
 
+  it("applies the promo to a deleted machine's final days too", () => {
+    const discounts = calculateDiscountLines({
+      periodStart: APRIL,
+      lines: [assetPro(1607, 'ASSET_PRO_FINAL_DAYS')],
+      freePeriod: null,
+      promo: promo(),
+    });
+    expect(discounts).toEqual([
+      expect.objectContaining({
+        lineType: 'PROMO_DISCOUNT',
+        amountCents: -321,
+      }),
+    ]);
+  });
+
   it('applies a fixed promo, capped at the machine charges', () => {
     const fixed = promo({ discountType: 'fixed_cents', discountValue: 10000 });
     expect(

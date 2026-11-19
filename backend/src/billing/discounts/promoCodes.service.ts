@@ -337,6 +337,19 @@ export class PromoCodesService {
     return current ? toRedemption(current) : null;
   };
 
+  // The caller's organisation's promo for this month, if any (the
+  // activation dialog, which machine.lifecycle users open).
+  findCurrentForOrganisation = async (
+    actor: AuthenticatedUser,
+    now = new Date(),
+  ): Promise<PromoRedemption | null> => {
+    const account = await this.requireOrganisationAccount(actor);
+    return this.findCurrentRedemption(
+      account.id,
+      toBillingDay(now, account.timezone),
+    );
+  };
+
   // ── Shared ───────────────────────────────────────────────────────────
 
   private get = async (promoCodeId: string): Promise<PromoCode> => {

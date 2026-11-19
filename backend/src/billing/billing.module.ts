@@ -130,6 +130,8 @@ import { MarkInvoicePaidService } from './invoices/markInvoicePaid.service';
     AnnualQuoteService,
     ReviewTasksService,
     UpFrontInvoiceService,
+    DiscountService,
+    PromoCodesService,
   ],
 })
 export class BillingModule {}
