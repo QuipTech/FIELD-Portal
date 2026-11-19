@@ -17,6 +17,14 @@ interface PromoCodeDialogProps {
 const inputClass = "h-10 rounded-lg border border-borderGrayStrong bg-surface px-3 text-[15px] text-ink outline-none";
 const CODE_PATTERN = /^[A-Za-z0-9_-]{3,40}$/;
 
+// Typing is limited to what each box can hold: whole numbers, or A$ with
+// up to two decimals. Anything else (like "%") is simply not entered.
+const digitsOnly = (text: string) => text.replace(/\D/g, "");
+const dollarsOnly = (text: string) => {
+  const [whole, ...rest] = text.replace(/[^\d.]/g, "").split(".");
+  return rest.length ? `${whole}.${rest.join("").slice(0, 2)}` : whole;
+};
+
 const toWholeNumber = (text: string): number | null => {
   if (!text.trim()) return null;
   const value = Number(text);
@@ -39,7 +47,7 @@ export const PromoCodeDialog = ({ promo, onSaved, onClose }: PromoCodeDialogProp
   const [maxRedemptions, setMaxRedemptions] = useState(promo?.maxRedemptions ? String(promo.maxRedemptions) : "");
   const [newCustomersOnly, setNewCustomersOnly] = useState(promo?.newCustomersOnly ?? false);
 
-  const amountNumber = Number(amount.replace(/[$,\s]/g, ""));
+  const amountNumber = Number(amount);
   const discountValue =
     discountType === "percent" ? (Number.isInteger(amountNumber) ? amountNumber : NaN) : Math.round(amountNumber * 100);
   const months = toWholeNumber(durationMonths);
@@ -112,7 +120,12 @@ export const PromoCodeDialog = ({ promo, onSaved, onClose }: PromoCodeDialogProp
             <select
               value={discountType}
               disabled={locked}
-              onChange={(event) => setDiscountType(event.target.value as DiscountType)}
+              onChange={(event) => {
+                const nextType = event.target.value as DiscountType;
+                setDiscountType(nextType);
+                // A percentage is a whole number.
+                if (nextType === "percent") setAmount((current) => current.split(".")[0]);
+              }}
               className={inputClass}
             >
               <option value="percent">Percent off</option>
@@ -121,7 +134,16 @@ export const PromoCodeDialog = ({ promo, onSaved, onClose }: PromoCodeDialogProp
           </label>
           <label className="flex flex-1 flex-col gap-1 text-sm text-ink">
             {discountType === "percent" ? "Percent" : "Amount (A$)"}
-            <input value={amount} disabled={locked} onChange={(event) => setAmount(event.target.value)} inputMode="decimal" className={inputClass} />
+            <input
+              value={amount}
+              disabled={locked}
+              onChange={(event) =>
+                setAmount(discountType === "percent" ? digitsOnly(event.target.value).slice(0, 3) : dollarsOnly(event.target.value))
+              }
+              inputMode={discountType === "percent" ? "numeric" : "decimal"}
+              placeholder={discountType === "percent" ? "1–100" : "0.00"}
+              className={inputClass}
+            />
           </label>
         </div>
         <label className="flex flex-col gap-1 text-sm text-ink">
@@ -129,7 +151,7 @@ export const PromoCodeDialog = ({ promo, onSaved, onClose }: PromoCodeDialogProp
           <input
             value={durationMonths}
             disabled={locked}
-            onChange={(event) => setDurationMonths(event.target.value)}
+            onChange={(event) => setDurationMonths(digitsOnly(event.target.value).slice(0, 3))}
             inputMode="numeric"
             placeholder="Forever"
             className={inputClass}
@@ -149,7 +171,7 @@ export const PromoCodeDialog = ({ promo, onSaved, onClose }: PromoCodeDialogProp
           Maximum uses
           <input
             value={maxRedemptions}
-            onChange={(event) => setMaxRedemptions(event.target.value)}
+            onChange={(event) => setMaxRedemptions(digitsOnly(event.target.value).slice(0, 7))}
             inputMode="numeric"
             placeholder="Unlimited"
             className={inputClass}

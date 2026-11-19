@@ -207,6 +207,20 @@ describe('InvoiceStripeSyncService', () => {
       ]);
     });
 
+    it("sends a card customer's bank transfer invoice with the bank details, never charging the card", async () => {
+      state.invoices[0].pay_by_bank_transfer = true;
+      stripe.hasDefaultPaymentMethod.mockResolvedValue(true);
+      await service.pushInvoice(state.invoices[0]);
+      const input = stripe.createInvoice.mock.calls[0][0];
+      expect(input).toMatchObject({
+        chargeAutomatically: false,
+        daysUntilDue: 21,
+      });
+      expect(input.footer).toContain('BSB: 064-000');
+      expect(input.footer).toContain('Payment reference: FIELD-11111111');
+      expect(stripe.payInvoice).not.toHaveBeenCalled();
+    });
+
     it('keeps the card flow while an application is pending', async () => {
       state.accountTerms = approvedAccount({
         payment_type: 'card',

@@ -17,7 +17,7 @@ const INVOICE_SELECT = `SELECT i.id, i.billing_account_id, a.name AS billing_acc
     i.hosted_invoice_url, i.period_start::text, i.period_end::text, i.review_until,
     i.held_at, i.hold_reason, i.kind, i.po_number, i.collection_method,
     i.due_on::text, i.marked_paid_on::text, i.marked_paid_method,
-    i.marked_paid_reference, i.no_charge_reason, i.created_at, i.updated_at
+    i.marked_paid_reference, i.no_charge_reason, i.pay_by_bank_transfer, i.created_at, i.updated_at
   FROM billing.invoices i
   JOIN billing.billing_accounts a ON a.id = i.billing_account_id`;
 

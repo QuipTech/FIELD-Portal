@@ -46,6 +46,7 @@ export const buildInvoiceRow = (
   marked_paid_method: null,
   marked_paid_reference: null,
   no_charge_reason: null,
+  pay_by_bank_transfer: false,
   created_at: new Date('2026-10-19T00:00:00Z'),
   updated_at: new Date('2026-10-19T00:00:00Z'),
   ...overrides,

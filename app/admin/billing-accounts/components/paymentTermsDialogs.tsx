@@ -150,7 +150,7 @@ export const FreePeriodDialog = ({ organisation, onDone, onClose }: DialogProps)
             </label>
             <label className="flex flex-col gap-1 text-sm text-ink">
               Percent off machine charges
-              <input value={percent} onChange={(event) => setPercent(event.target.value)} inputMode="numeric" className={inputClass} />
+              <input value={percent} onChange={(event) => setPercent(event.target.value.replace(/\D/g, "").slice(0, 3))} inputMode="numeric" className={inputClass} />
             </label>
           </>
         )}

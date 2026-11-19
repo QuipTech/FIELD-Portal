@@ -131,12 +131,15 @@ export class InvoiceStripeSyncService {
       this.billingConfig.loadConfig(),
       findAccountTerms(this.serviceDatabase, invoice.billing_account_id),
     ]);
-    // An approved 30-day account is sent the invoice with its own terms
-    // and bank details, and its card is never charged.
+    // An approved 30-day account, or an invoice the customer chose to pay
+    // by bank transfer, is sent with the bank details and never charged to
+    // a card.
     const presentation = buildInvoicePresentation({
       invoiceId: invoice.id,
       accountName: terms?.name ?? invoice.billing_account_name,
-      usesAccountTerms: terms ? usesAccountTerms(terms) : false,
+      usesAccountTerms:
+        invoice.pay_by_bank_transfer ||
+        (terms ? usesAccountTerms(terms) : false),
       termsDays: terms?.terms_days ?? config.PAYMENT_TERMS_DAYS,
       poRequired: terms?.po_required ?? false,
       invoicePoNumber: invoice.po_number ?? null,

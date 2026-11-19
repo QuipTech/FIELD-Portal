@@ -61,6 +61,7 @@ describe('admin invoices', () => {
           payment_type: 'card',
           marked_paid_on: null,
           no_charge_reason: null,
+          pay_by_bank_transfer: false,
           created_at: new Date(0),
           updated_at: new Date(0),
         },

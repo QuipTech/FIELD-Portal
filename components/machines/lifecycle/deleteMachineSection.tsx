@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { Tag } from "@/components/ui/tag";
 import { ConfirmDialog } from "@/components/ui/confirmDialog";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import { deleteMachineRequest, getMachineDeletionCheckRequest, payMachineFinalChargeRequest } from "@/lib/api/machineLifecycleApi";
@@ -44,6 +45,7 @@ export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }
   const [reason, setReason] = useState("");
   const [isRaisingCharge, setIsRaisingCharge] = useState(false);
   const [chargeError, setChargeError] = useState<string | null>(null);
+  const [isChoosingBankTransfer, setIsChoosingBankTransfer] = useState(false);
   const result = check.data;
   const finalCharge = result?.finalCharge ?? null;
   const isAwaitingPayment = result?.blocker === "unpaid_invoices";
@@ -78,6 +80,15 @@ export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }
       if (!isRedirecting) setIsRaisingCharge(false);
     }
   };
+  // Emails the invoice with the bank details; the machine can be deleted
+  // once an administrator confirms the money arrived.
+  const payByBankTransfer = async () => {
+    const next = await payMachineFinalChargeRequest(requireAccessToken(), machineId, window.location.origin, "bank_transfer");
+    check.setData(next);
+    setIsChoosingBankTransfer(false);
+  };
+  const canPayByBankTransfer = Boolean(result?.bankTransferAvailable);
+  const bankTransfer = result?.bankTransfer ?? null;
   const canConfirm = typedLabel.trim() === machineLabel && reason.trim().length >= MIN_REASON_LENGTH;
 
   return (
@@ -105,9 +116,43 @@ export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }
             ))}
             <span className="text-xs text-mutedGray">This machine then comes off the monthly invoice for these months, and can&apos;t be reactivated this month. You delete it once this is paid.</span>
           </div>
-          <Button size="sm" variant="primary" className="ml-auto" disabled={isRaisingCharge} onClick={raiseFinalCharge}>
-            {isRaisingCharge ? "Creating invoice…" : "Pay dues"}
-          </Button>
+          <div className="ml-auto flex flex-wrap gap-2">
+            {canPayByBankTransfer && (
+              <Button size="sm" disabled={isRaisingCharge} onClick={() => setIsChoosingBankTransfer(true)}>
+                Pay by bank transfer
+              </Button>
+            )}
+            <Button size="sm" variant="primary" disabled={isRaisingCharge} onClick={raiseFinalCharge}>
+              {isRaisingCharge ? "Creating invoice…" : "Pay online"}
+            </Button>
+          </div>
+        </div>
+      )}
+      {bankTransfer && (
+        <div className="flex flex-col gap-1 rounded-lg bg-fillGray p-3 text-sm">
+          <span className="font-medium text-ink">Pay by bank transfer</span>
+          <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-0.5 text-bodyGray">
+            {bankTransfer.accountName && (
+              <>
+                <dt>Account name</dt>
+                <dd className="text-ink">{bankTransfer.accountName}</dd>
+              </>
+            )}
+            <dt>BSB</dt>
+            <dd className="text-ink">{bankTransfer.bsb}</dd>
+            <dt>Account number</dt>
+            <dd className="text-ink">{bankTransfer.accountNumber}</dd>
+            {bankTransfer.reference && (
+              <>
+                <dt>Reference</dt>
+                <dd className="font-medium text-ink">{bankTransfer.reference}</dd>
+              </>
+            )}
+          </dl>
+          <span className="text-xs text-mutedGray">
+            Use the reference so we can match your payment. The invoice, with GST, has been emailed to your billing contact.
+            Once we confirm the payment, you can delete this machine.
+          </span>
         </div>
       )}
       {chargeError && <span className="text-sm text-danger">{chargeError}</span>}
@@ -116,14 +161,30 @@ export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }
           {result.unpaidInvoices.map((invoice) => (
             <li key={invoice.id} className="flex flex-wrap items-center gap-2 text-bodyGray">
               <span>{invoice.isFinalCharge ? `Final charge from ${formatMonth(invoice.periodStart)}` : `${formatMonth(invoice.periodStart)} invoice`}</span>
-              {invoice.hostedInvoiceUrl ? (
+              {invoice.payByBankTransfer ? (
+                <>
+                  <Tag tone="amber">Bank transfer awaiting approval</Tag>
+                  {invoice.hostedInvoiceUrl && (
+                    <a href={invoice.hostedInvoiceUrl} target="_blank" rel="noreferrer" className="font-medium text-primary">
+                      View invoice
+                    </a>
+                  )}
+                </>
+              ) : invoice.hostedInvoiceUrl ? (
                 <a href={invoice.hostedInvoiceUrl} target="_blank" rel="noreferrer" className="font-medium text-primary">
                   Pay invoice
                 </a>
               ) : invoice.isFinalCharge ? (
-                <Button size="sm" variant="primary" disabled={isRaisingCharge} onClick={raiseFinalCharge}>
-                  {isRaisingCharge ? "Creating invoice…" : "Pay invoice"}
-                </Button>
+                <>
+                  <Button size="sm" variant="primary" disabled={isRaisingCharge} onClick={raiseFinalCharge}>
+                    {isRaisingCharge ? "Creating invoice…" : "Pay online"}
+                  </Button>
+                  {canPayByBankTransfer && (
+                    <Button size="sm" disabled={isRaisingCharge} onClick={() => setIsChoosingBankTransfer(true)}>
+                      Pay by bank transfer
+                    </Button>
+                  )}
+                </>
               ) : (
                 <Link href="/settings/billing" className="font-medium text-primary">
                   View in Billing
@@ -132,6 +193,22 @@ export const DeleteMachineSection = ({ machineId, machineLabel, lifecycleState }
             </li>
           ))}
         </ul>
+      )}
+      {isChoosingBankTransfer && (
+        <ConfirmDialog
+          title="Pay by bank transfer?"
+          confirmLabel="Email invoice"
+          confirmVariant="primary"
+          onConfirm={payByBankTransfer}
+          onClose={() => setIsChoosingBankTransfer(false)}
+          toErrorMessage={(error) => toApiErrorMessage(error, "Couldn't set up the bank transfer. Please try again.")}
+        >
+          <p>
+            We&apos;ll email the invoice{finalCharge ? ` for ${audMoney(finalCharge.amountCents)} + GST` : ""} to your billing
+            contact, with our bank details and a payment reference. Once we&apos;ve confirmed the payment, you can delete{" "}
+            {machineLabel}. To pay by card instead, use Pay online.
+          </p>
+        </ConfirmDialog>
       )}
       {isConfirming && (
         <ConfirmDialog

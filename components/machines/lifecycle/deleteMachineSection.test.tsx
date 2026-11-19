@@ -14,7 +14,7 @@ vi.mock("@/lib/api/machineLifecycleApi", () => ({
 vi.mock("@/lib/api/requireAccessToken", () => ({ requireAccessToken: () => "test-token" }));
 afterEach(cleanup);
 
-const allowed = { canDelete: true, blocker: null, message: null, finalInvoiceFrom: null, unpaidInvoices: [], finalCharge: null };
+const allowed = { canDelete: true, blocker: null, message: null, finalInvoiceFrom: null, unpaidInvoices: [], finalCharge: null, bankTransferAvailable: false, bankTransfer: null };
 const renderSection = () => render(<DeleteMachineSection machineId="m1" machineLabel="ABC-01" lifecycleState="registered" />);
 const deleteButton = (name = "Delete machine") => screen.getAllByRole("button", { name }).at(-1) as HTMLButtonElement;
 
@@ -39,7 +39,7 @@ describe("deleting a machine", () => {
   });
 
   describe("paying the final charge", () => {
-    const stuck = { id: "f1", periodStart: "2026-10-01", status: "draft", hostedInvoiceUrl: null, isFinalCharge: true };
+    const stuck = { id: "f1", periodStart: "2026-10-01", status: "draft", hostedInvoiceUrl: null, isFinalCharge: true, payByBankTransfer: false };
     const unpaid = { ...allowed, canDelete: false, blocker: "unpaid_invoices" as const, message: "Pay the invoices below.", unpaidInvoices: [stuck] };
     const checkoutUrl = "https://checkout.stripe.com/c/pay/final";
     const assign = vi.fn();
@@ -55,7 +55,7 @@ describe("deleting a machine", () => {
       vi.mocked(payMachineFinalChargeRequest).mockResolvedValue({ ...unpaid, paymentUrl: checkoutUrl });
       renderSection();
 
-      fireEvent.click(await screen.findByRole("button", { name: "Pay invoice" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Pay online" }));
       await waitFor(() => expect(assign).toHaveBeenCalledWith(checkoutUrl));
       expect(payMachineFinalChargeRequest).toHaveBeenCalledWith("test-token", "m1", "http://localhost:3000");
     });
@@ -65,7 +65,7 @@ describe("deleting a machine", () => {
       vi.mocked(payMachineFinalChargeRequest).mockResolvedValue({ ...unpaid, paymentUrl: "https://evil.example/pay" });
       renderSection();
 
-      fireEvent.click(await screen.findByRole("button", { name: "Pay invoice" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Pay online" }));
       await screen.findByText(/payment link could not be verified/);
       expect(assign).not.toHaveBeenCalled();
     });
@@ -75,7 +75,7 @@ describe("deleting a machine", () => {
       vi.mocked(payMachineFinalChargeRequest).mockRejectedValue(new ApiError("Billing is not configured (STRIPE_SECRET_KEY).", 503));
       renderSection();
 
-      fireEvent.click(await screen.findByRole("button", { name: "Pay invoice" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Pay online" }));
       await screen.findByText("Billing is not configured (STRIPE_SECRET_KEY).");
       expect(assign).not.toHaveBeenCalled();
       expect(deleteButton().disabled).toBe(true);
@@ -86,13 +86,13 @@ describe("deleting a machine", () => {
       vi.mocked(payMachineFinalChargeRequest).mockResolvedValue({ ...allowed, paymentUrl: null });
       renderSection();
 
-      fireEvent.click(await screen.findByRole("button", { name: "Pay invoice" }));
+      fireEvent.click(await screen.findByRole("button", { name: "Pay online" }));
       await screen.findByText(/Billing is settled/);
       expect(assign).not.toHaveBeenCalled();
       expect(deleteButton().disabled).toBe(false);
     });
 
-    it("shows the total due, then goes to Checkout from Pay dues", async () => {
+    it("shows the total due, then goes to Checkout from Pay online", async () => {
       vi.mocked(getMachineDeletionCheckRequest).mockResolvedValue({
         ...allowed,
         canDelete: false,
@@ -114,8 +114,62 @@ describe("deleting a machine", () => {
       expect(screen.getByText(/November 2026: 7 of 30 days, up to 7 November 2026/)).toBeTruthy();
       expect(deleteButton().disabled).toBe(true);
 
-      fireEvent.click(screen.getByRole("button", { name: "Pay dues" }));
+      expect(screen.queryByRole("button", { name: "Pay by bank transfer" })).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Pay online" }));
       await waitFor(() => expect(assign).toHaveBeenCalledWith(checkoutUrl));
+    });
+  });
+
+  describe("paying by bank transfer", () => {
+    const due = {
+      ...allowed,
+      canDelete: false,
+      blocker: "final_charge_due" as const,
+      message: "Pay for the days this machine was used, then you can delete it.",
+      bankTransferAvailable: true,
+      finalCharge: {
+        amountCents: 1607,
+        months: [{ periodStart: "2026-11-01", lastUsedOn: "2026-11-07", daysUsed: 7, daysInMonth: 30, monthlyRateCents: 3500, amountCents: 1607 }],
+      },
+    };
+    const awaiting = {
+      ...allowed,
+      canDelete: false,
+      blocker: "unpaid_invoices" as const,
+      message: "Your bank transfer is awaiting approval. You can delete this machine once your payment has been confirmed.",
+      bankTransferAvailable: true,
+      unpaidInvoices: [
+        { id: "f1", periodStart: "2026-11-01", status: "synced", hostedInvoiceUrl: "https://invoice.stripe.com/i/f", isFinalCharge: true, payByBankTransfer: true },
+      ],
+      bankTransfer: { invoiceId: "f1", accountName: "QuipTech Pty Ltd", bsb: "064-000", accountNumber: "12345678", reference: "FIELD-F1AB" },
+    };
+
+    it("emails the invoice with bank details, then waits for approval before deleting", async () => {
+      vi.mocked(getMachineDeletionCheckRequest).mockResolvedValue(due);
+      vi.mocked(payMachineFinalChargeRequest).mockResolvedValue({ ...awaiting, paymentUrl: null });
+      renderSection();
+
+      fireEvent.click(await screen.findByRole("button", { name: "Pay by bank transfer" }));
+      expect(screen.getByText(/email the invoice for .*16\.07 \+ GST/)).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Email invoice" }));
+
+      await screen.findByText(/bank transfer is awaiting approval/);
+      expect(payMachineFinalChargeRequest).toHaveBeenCalledWith("test-token", "m1", expect.any(String), "bank_transfer");
+      expect(screen.getByText("064-000")).toBeTruthy();
+      expect(screen.getByText("12345678")).toBeTruthy();
+      expect(screen.getByText("FIELD-F1AB")).toBeTruthy();
+      expect(screen.getByText("Bank transfer awaiting approval")).toBeTruthy();
+      expect(deleteButton().disabled).toBe(true);
+    });
+
+    it("allows deleting once the payment is approved", async () => {
+      vi.mocked(getMachineDeletionCheckRequest).mockResolvedValueOnce(awaiting).mockResolvedValue(allowed);
+      renderSection();
+      await screen.findByText(/bank transfer is awaiting approval/);
+      expect(deleteButton().disabled).toBe(true);
+      fireEvent.focus(window);
+      await screen.findByText(/Billing is settled/);
+      expect(deleteButton().disabled).toBe(false);
     });
   });
 
@@ -126,8 +180,8 @@ describe("deleting a machine", () => {
       blocker: "unpaid_invoices",
       message: "Pay the invoices below to delete this machine.",
       unpaidInvoices: [
-        { id: "i1", periodStart: "2026-10-01", status: "synced", hostedInvoiceUrl: "https://invoice.stripe.com/i/1", isFinalCharge: false },
-        { id: "i2", periodStart: "2026-11-01", status: "draft", hostedInvoiceUrl: null, isFinalCharge: false },
+        { id: "i1", periodStart: "2026-10-01", status: "synced", hostedInvoiceUrl: "https://invoice.stripe.com/i/1", isFinalCharge: false, payByBankTransfer: false },
+        { id: "i2", periodStart: "2026-11-01", status: "draft", hostedInvoiceUrl: null, isFinalCharge: false, payByBankTransfer: false },
       ],
     });
     renderSection();
@@ -138,7 +192,7 @@ describe("deleting a machine", () => {
   });
 
   it("looks again on coming back from paying in another tab", async () => {
-    const unpaid = { ...allowed, canDelete: false, blocker: "unpaid_invoices" as const, message: "Pay the invoices below.", unpaidInvoices: [{ id: "f1", periodStart: "2026-10-01", status: "synced", hostedInvoiceUrl: "https://invoice.stripe.com/i/f", isFinalCharge: true }] };
+    const unpaid = { ...allowed, canDelete: false, blocker: "unpaid_invoices" as const, message: "Pay the invoices below.", unpaidInvoices: [{ id: "f1", periodStart: "2026-10-01", status: "synced", hostedInvoiceUrl: "https://invoice.stripe.com/i/f", isFinalCharge: true, payByBankTransfer: false }] };
     vi.mocked(getMachineDeletionCheckRequest).mockResolvedValueOnce(unpaid).mockResolvedValue(allowed);
     renderSection();
     await screen.findByRole("link", { name: "Pay invoice" });

@@ -6,6 +6,7 @@ import { requireAccessToken } from "@/lib/api/requireAccessToken";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import type { LifecycleChangeResult, LifecycleState } from "@/lib/types/machineLifecycle";
 import { ActivationPriceSummary } from "./activationPriceSummary";
+import { useActivationPromo } from "@/lib/hooks/useActivationPromo";
 
 interface ActivateMachineDialogProps {
   machineId: string;
@@ -33,9 +34,12 @@ export const ActivateMachineDialog = ({
 }: ActivateMachineDialogProps) => {
   const action = activationActionFor(lifecycleState);
   const verb = action === "reactivate" ? "Reactivate" : "Activate";
+  const promo = useActivationPromo();
 
   const activate = async () => {
     if (!action) return;
+    // First, so a code that can no longer be used stops the activation.
+    await promo.redeemPending();
     onActivated(await applyLifecycleActionRequest(requireAccessToken(), machineId, action));
   };
 
@@ -53,7 +57,7 @@ export const ActivateMachineDialog = ({
           The machine counts toward this month&apos;s billing from today. Its full history, components, photos, AI and
           support then open for everyone in your organisation, in the portal and the mobile app.
         </p>
-        <ActivationPriceSummary />
+        <ActivationPriceSummary promo={promo} />
       </div>
     </ConfirmDialog>
   );

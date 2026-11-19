@@ -20,6 +20,13 @@ const MAX_REASON_LENGTH = 500;
 const MAX_BULK_MACHINES = 200;
 const MIN_DELETE_REASON_LENGTH = 3;
 
+export const FINAL_CHARGE_PAYMENT_METHODS = [
+  'online',
+  'bank_transfer',
+] as const;
+export type FinalChargePaymentMethod =
+  (typeof FINAL_CHARGE_PAYMENT_METHODS)[number];
+
 export class ApplyLifecycleActionDto {
   @IsIn(DIRECT_LIFECYCLE_ACTIONS)
   action: LifecycleAction;
@@ -46,6 +53,12 @@ export class PayFinalChargeDto {
   @IsString()
   @MaxLength(200)
   returnOrigin?: string;
+
+  // 'bank_transfer' sends the invoice with the bank details to pay by
+  // transfer instead of opening Stripe online payment (the default).
+  @IsOptional()
+  @IsIn(FINAL_CHARGE_PAYMENT_METHODS)
+  paymentMethod?: FinalChargePaymentMethod;
 }
 
 export class DeleteMachineDto {
