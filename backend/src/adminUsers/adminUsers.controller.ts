@@ -112,9 +112,8 @@ export class AdminUsersController {
     );
   }
 
-  // Deletes the user's account completely and disables their sign-in; they
-  // are told an administrator removed them. Not yourself, never the last
-  // Owner.
+  // Deletes the user's account and sign-in completely, so the email can
+  // sign up again. Not yourself, never the last Owner.
   @Delete(':userId')
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(

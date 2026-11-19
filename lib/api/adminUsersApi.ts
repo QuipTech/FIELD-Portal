@@ -47,9 +47,8 @@ export const changeUserRoleRequest = (accessToken: string, userId: string, roleI
     body: JSON.stringify({ roleId }),
   });
 
-// Deletes their account completely and disables their sign-in; signing in
-// again tells them an administrator removed them. Refused for your own
-// account and for the last Owner.
+// Deletes their account and sign-in completely, so the email can sign up
+// again. Refused for your own account and for the last Owner.
 export const removeUserRequest = (accessToken: string, userId: string): Promise<null> =>
   apiRequest<null>(`/admin/users/${userId}`, {
     method: "DELETE",

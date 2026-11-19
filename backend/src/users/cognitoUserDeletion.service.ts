@@ -19,17 +19,8 @@ export class CognitoUserDeletionService {
     await Promise.all(usernames.map(this.userDirectory.deleteUser));
   };
 
-  // An admin removing someone: their sign-ins are disabled rather than
-  // deleted, so signing in again says why instead of "wrong password".
-  disableCognitoUsersForAccount = async (
-    account: AccountIdentityRow,
-  ): Promise<void> => {
-    const usernames = await this.findAccountUsernames(account);
-    await Promise.all(usernames.map(this.userDirectory.disableUser));
-  };
-
-  // Re-inviting a removed person: their disabled sign-ins go, so Cognito
-  // can create the invited one.
+  // Re-inviting someone removed before removal deleted sign-ins: their
+  // disabled sign-ins go, so Cognito can create the invited one.
   deleteCognitoUsersForEmail = async (email: string): Promise<void> => {
     const usernames = await this.findUsernames('email', email);
     await Promise.all(usernames.map(this.userDirectory.deleteUser));

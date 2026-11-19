@@ -171,9 +171,9 @@ export class AdminUserInvitationsService {
     return role;
   };
 
-  // Someone an admin removed keeps a disabled Cognito sign-in (so they're
-  // told why they can't sign in). Inviting them again deletes it first, so
-  // Cognito can create the new one.
+  // Someone an admin removed before removal deleted sign-ins (0135) may
+  // still have a disabled Cognito sign-in. Inviting them again deletes it
+  // first, so Cognito can create the new one.
   private releaseRemovedSignIn = async (email: string): Promise<void> => {
     if (!(await isRemovedAccount(this.databaseService, email))) return;
     await this.cognitoUsers.deleteCognitoUsersForEmail(email);
