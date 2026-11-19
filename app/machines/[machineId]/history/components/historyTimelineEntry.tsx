@@ -9,6 +9,8 @@ import { formatDayMonth } from "@/lib/format/elapsedTimeLabel";
 import { historyEntryTypeMeta, type HistoryEntry, type HistoryPhoto, type HistorySyncState } from "@/lib/types/historyEntry";
 import { HistoryPhotoLightbox } from "./historyPhotoLightbox";
 import { HistoryEntryDocuments } from "./historyEntryDocuments";
+import { RemoteSessionHistoryDetails } from "@/components/remoteSession/remoteSessionHistoryDetails";
+import { useMachineDetail } from "../../machineDetailContext";
 
 interface HistoryTimelineEntryProps {
   entry: HistoryEntry;
@@ -34,6 +36,7 @@ const syncStateLabels: Record<HistorySyncState, string> = {
 export const HistoryTimelineEntry = ({ entry, onDeletePhoto }: HistoryTimelineEntryProps) => {
   const [photoIndex, setPhotoIndex] = useState<number | null>(null);
   const [photoToDelete, setPhotoToDelete] = useState<HistoryPhoto | null>(null);
+  const { machineId } = useMachineDetail();
   const meta = historyEntryTypeMeta[entry.type];
   const isSynced = entry.syncState === "synced";
 
@@ -79,6 +82,7 @@ export const HistoryTimelineEntry = ({ entry, onDeletePhoto }: HistoryTimelineEn
         </div>
       )}
       <HistoryEntryDocuments documents={entry.documents} />
+      {entry.remoteSession && <RemoteSessionHistoryDetails machineId={machineId} session={entry.remoteSession} />}
       {photoIndex !== null && (
         <HistoryPhotoLightbox
           photos={entry.photos}

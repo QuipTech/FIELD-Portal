@@ -1,11 +1,16 @@
 import type { IconName } from "@/components/icons/icon";
 import type { Tone } from "@/components/ui/tone";
+import type { RemoteSessionSummary } from "./remoteSession";
 
 // Entry types stored by the backend (technical_history_entries.entry_type).
-export type HistoryEntryType = "repair" | "inspection" | "fault" | "service" | "note";
+// "remote_session" is written by the system when a remote session ends.
+export type HistoryEntryType = "repair" | "inspection" | "fault" | "service" | "note" | "remote_session";
 
 // What a technician picks when adding an entry ("note" is API-only).
 export const NEW_ENTRY_TYPES: HistoryEntryType[] = ["repair", "inspection", "fault", "service"];
+
+// What the history can be filtered by.
+export const FILTER_ENTRY_TYPES: HistoryEntryType[] = [...NEW_ENTRY_TYPES, "remote_session"];
 
 export interface HistoryPhoto {
   id: string;
@@ -42,6 +47,8 @@ export interface HistoryEntry {
   photos: HistoryPhoto[];
   documents: HistoryDocument[];
   syncState: HistorySyncState;
+  // Set on a "remote_session" entry.
+  remoteSession?: RemoteSessionSummary | null;
 }
 
 export type HistoryDateRange = "30d" | "90d" | "365d" | "all";
@@ -96,4 +103,5 @@ export const historyEntryTypeMeta: Record<HistoryEntryType, HistoryEntryTypeMeta
   fault: { label: "Fault", icon: "alert", tone: "amber" },
   service: { label: "Service", icon: "tool", tone: "default" },
   note: { label: "Note", icon: "file", tone: "default" },
+  remote_session: { label: "Remote session", icon: "broadcast", tone: "primary" },
 };

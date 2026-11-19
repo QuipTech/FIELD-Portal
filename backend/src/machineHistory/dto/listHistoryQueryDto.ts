@@ -13,13 +13,20 @@ import { HISTORY_ENTRY_TYPES } from './createHistoryEntryDto';
 
 export const MAX_HISTORY_PAGE_SIZE = 100;
 
+// Filterable types: everything a person can add, plus entries the system
+// writes (a remote session that ran, migration 0139).
+export const HISTORY_FILTER_TYPES = [
+  ...HISTORY_ENTRY_TYPES,
+  'remote_session',
+] as const;
+
 // The history filters, shared by the list and its export. Every filter is
 // optional.
 export class HistoryFilterQueryDto {
   @IsOptional()
   @Transform(trimToUndefined)
-  @IsIn(HISTORY_ENTRY_TYPES)
-  type?: (typeof HISTORY_ENTRY_TYPES)[number];
+  @IsIn(HISTORY_FILTER_TYPES)
+  type?: (typeof HISTORY_FILTER_TYPES)[number];
 
   @IsOptional()
   @Transform(trimToUndefined)

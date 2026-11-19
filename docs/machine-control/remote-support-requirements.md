@@ -1,6 +1,6 @@
 # Remote support requirements from Red Edge
 
-TeamViewer is blocked on the cab tablets. This document records the requested remote-support workflow for later implementation.
+TeamViewer is blocked on the cab tablets. This document records the requested remote-support workflow. The support-initiated session, recording, transcript and History entry are implemented; the API, events and Windows work are in the [remote support contract](remote-support-contract.md). The operator-initiated **Request help** flow is not built yet.
 
 ## Installation and pairing
 

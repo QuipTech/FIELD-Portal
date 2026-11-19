@@ -65,6 +65,16 @@ export interface HistoryEntryRow {
   photos: PhotoRow[];
   // Live documents added with the entry, oldest first, also from json_agg.
   documents: MachineDocumentRow[];
+  // A 'remote_session' entry's session (migration 0139).
+  remote_session?: {
+    id: string;
+    requester_name: string;
+    started_at: string | null;
+    ended_at: string | null;
+    end_reason: string | null;
+    recording_status: string;
+    transcript_status: string;
+  } | null;
 }
 
 export interface GalleryPhotoRow extends PhotoRow {

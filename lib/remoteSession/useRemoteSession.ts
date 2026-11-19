@@ -1,0 +1,263 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { toApiErrorMessage } from "../api/apiErrorMessage";
+import {
+  completeRecordingRequest,
+  createRemoteSessionRequest,
+  endRemoteSessionOnUnload,
+  endRemoteSessionRequest,
+  getRemoteConnectionRequest,
+  getRemoteSessionRequest,
+  remoteHeartbeatRequest,
+  uploadRecordingPartRequest,
+} from "../api/remoteSessionApi";
+import { isOpenRemoteSession, type RemoteSession } from "../types/remoteSession";
+import type { ControlMessage } from "./controlInput";
+import { RemoteViewerConnection, type ViewerConnectionState } from "./remoteViewerConnection";
+import { SessionRecorder } from "./sessionRecorder";
+
+export type RemotePhase = "requesting" | "waiting" | "connecting" | "live" | "ended" | "error";
+
+const WAITING_POLL_MS = 1500;
+const MAX_RECONNECTS = 3;
+
+// One remote session from this window: Connect, wait for the operator's
+// answer, then view, control and record until either side ends it.
+export const useRemoteSession = (machineId: string) => {
+  const [phase, setPhase] = useState<RemotePhase>("requesting");
+  const [session, setSession] = useState<RemoteSession | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [connectionState, setConnectionState] = useState<ViewerConnectionState>("connecting");
+  const [controlReady, setControlReady] = useState(false);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [micOn, setMicOn] = useState(false);
+
+  const started = useRef(false);
+  const sessionRef = useRef<RemoteSession | null>(null);
+  const connection = useRef<RemoteViewerConnection | null>(null);
+  const recorder = useRef<SessionRecorder | null>(null);
+  const mic = useRef<MediaStream | null>(null);
+  const interacted = useRef(false);
+  const reconnects = useRef(0);
+  const finishing = useRef<Promise<void> | null>(null);
+
+  const remember = useCallback((next: RemoteSession) => {
+    sessionRef.current = next;
+    setSession(next);
+  }, []);
+
+  // Stops the media, keeps the recording, and shows the end screen.
+  const finish = useCallback(
+    (endOnServer: boolean) => {
+      finishing.current ??= (async () => {
+        const current = sessionRef.current;
+        const stopRecording = recorder.current?.stop() ?? Promise.resolve(false);
+        connection.current?.close();
+        mic.current?.getTracks().forEach((track) => track.stop());
+        setIsRecording(false);
+        if (current && endOnServer) {
+          await endRemoteSessionRequest(machineId, current.id)
+            .then(remember)
+            .catch(() => undefined);
+        }
+        const uploaded = await stopRecording;
+        if (current && recorder.current) {
+          await completeRecordingRequest(machineId, current.id, !uploaded)
+            .then(remember)
+            .catch(() => undefined);
+        }
+        if (current) {
+          await getRemoteSessionRequest(machineId, current.id)
+            .then(remember)
+            .catch(() => undefined);
+        }
+        setPhase("ended");
+      })();
+      return finishing.current;
+    },
+    [machineId, remember],
+  );
+
+  const startRecording = useCallback(
+    (media: MediaStream) => {
+      const current = sessionRef.current;
+      if (!current?.scope.record || recorder.current || media.getVideoTracks().length === 0) return;
+      if (!SessionRecorder.isSupported()) {
+        setRecordingError("This browser can't record the session. Use a current Chrome or Edge.");
+        return;
+      }
+      const sessionRecorder = new SessionRecorder(
+        (partNumber, part) => uploadRecordingPartRequest(machineId, current.id, partNumber, part),
+        (message) => setRecordingError(message),
+      );
+      recorder.current = sessionRecorder;
+      sessionRecorder.start(media);
+      if (mic.current) sessionRecorder.addAudio(mic.current);
+      setIsRecording(sessionRecorder.isRecording);
+    },
+    [machineId],
+  );
+
+  const connect = useCallback(async () => {
+    const current = sessionRef.current;
+    if (!current) return;
+    setPhase((value) => (value === "live" ? value : "connecting"));
+    try {
+      const access = await getRemoteConnectionRequest(machineId, current.id);
+      connection.current?.close();
+      const viewer = new RemoteViewerConnection(access, {
+        onStream: (media) => {
+          setStream(media);
+          startRecording(media);
+        },
+        onState: (state) => {
+          setConnectionState(state);
+          if (state === "connected") {
+            reconnects.current = 0;
+            setPhase("live");
+          }
+          if (state === "failed" && !finishing.current) {
+            if (reconnects.current < MAX_RECONNECTS) {
+              reconnects.current += 1;
+              void connect();
+            } else {
+              setError("Lost the connection to the tablet.");
+            }
+          }
+        },
+        onControlReady: setControlReady,
+      });
+      connection.current = viewer;
+      viewer.start();
+      if (mic.current) await viewer.setMicrophone(mic.current.getAudioTracks()[0] ?? null);
+    } catch (connectError) {
+      setError(toApiErrorMessage(connectError, "Couldn't connect to the tablet."));
+    }
+  }, [machineId, startRecording]);
+
+  // Connect once (StrictMode runs effects twice in development).
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    createRemoteSessionRequest(machineId)
+      .then((created) => {
+        remember(created);
+        setPhase("waiting");
+      })
+      .catch((createError) => {
+        setError(toApiErrorMessage(createError, "Couldn't start a remote session."));
+        setPhase("error");
+      });
+  }, [machineId, remember]);
+
+  // Waiting for Allow or Decline.
+  useEffect(() => {
+    if (phase !== "waiting" || !session) return;
+    let current = true;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = async () => {
+      try {
+        const next = await getRemoteSessionRequest(machineId, session.id);
+        if (!current) return;
+        remember(next);
+        if (next.status === "active") {
+          void connect();
+          return;
+        }
+        if (!isOpenRemoteSession(next.status)) {
+          setPhase("ended");
+          return;
+        }
+      } catch {
+        // Try again on the next tick.
+      }
+      if (current) timer = setTimeout(poll, WAITING_POLL_MS);
+    };
+    timer = setTimeout(poll, WAITING_POLL_MS);
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+  }, [phase, session, machineId, remember, connect]);
+
+  // Heartbeats while the session runs; they also notice the tablet ending it.
+  const sessionId = session?.id;
+  const heartbeatSeconds = session?.heartbeatSeconds ?? 15;
+  const running = phase === "connecting" || phase === "live";
+  useEffect(() => {
+    if (!running || !sessionId) return;
+    const timer = setInterval(async () => {
+      const wasInteracted = interacted.current;
+      interacted.current = false;
+      try {
+        const next = await remoteHeartbeatRequest(machineId, sessionId, wasInteracted);
+        remember(next);
+        if (!isOpenRemoteSession(next.status)) void finish(false);
+      } catch {
+        interacted.current ||= wasInteracted;
+      }
+    }, heartbeatSeconds * 1000);
+    return () => clearInterval(timer);
+  }, [running, sessionId, heartbeatSeconds, machineId, remember, finish]);
+
+  // Closing the window ends the session.
+  useEffect(() => {
+    const onHide = () => {
+      const current = sessionRef.current;
+      if (current && isOpenRemoteSession(current.status) && !finishing.current) {
+        endRemoteSessionOnUnload(machineId, current.id);
+      }
+    };
+    window.addEventListener("pagehide", onHide);
+    return () => window.removeEventListener("pagehide", onHide);
+  }, [machineId]);
+
+  const sendControl = useCallback((message: ControlMessage) => {
+    if (!sessionRef.current?.scope.control) return;
+    if (connection.current?.send(message)) interacted.current = true;
+  }, []);
+
+  const toggleMic = useCallback(async () => {
+    if (mic.current) {
+      mic.current.getTracks().forEach((track) => track.stop());
+      mic.current = null;
+      await connection.current?.setMicrophone(null);
+      setMicOn(false);
+      return;
+    }
+    try {
+      const media = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      mic.current = media;
+      await connection.current?.setMicrophone(media.getAudioTracks()[0] ?? null);
+      recorder.current?.addAudio(media);
+      setMicOn(true);
+    } catch {
+      setError("Couldn't use your microphone. Check the browser's permission for this site.");
+    }
+  }, []);
+
+  const end = useCallback(() => {
+    const current = sessionRef.current;
+    if (!current) return Promise.resolve();
+    return finish(isOpenRemoteSession(current.status));
+  }, [finish]);
+
+  return {
+    phase,
+    session,
+    error,
+    stream,
+    connectionState,
+    controlReady,
+    isRecording,
+    recordingError,
+    micOn,
+    sendControl,
+    toggleMic,
+    end,
+    clearError: () => setError(null),
+  };
+};

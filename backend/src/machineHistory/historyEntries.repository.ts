@@ -50,9 +50,16 @@ export const listHistoryEntries = async (
               FROM machine_documents d
               WHERE d.history_entry_id = e.id AND d.tenant_id = $2
                 AND d.deleted_at IS NULL
-            ), '[]'::json) AS documents
+            ), '[]'::json) AS documents,
+            CASE WHEN rs.id IS NOT NULL THEN json_build_object(
+              'id', rs.id, 'requester_name', rs.requester_name,
+              'started_at', rs.started_at, 'ended_at', rs.ended_at,
+              'end_reason', rs.end_reason,
+              'recording_status', rs.recording_status,
+              'transcript_status', rs.transcript_status) END AS remote_session
      FROM technical_history_entries e
      LEFT JOIN users u ON u.id = e.created_by
+     LEFT JOIN mc_remote_sessions rs ON rs.id = e.remote_session_id
      LEFT JOIN installed_components c ON c.id = e.installed_component_id
      LEFT JOIN installed_systems s ON s.id = c.installed_system_id
      WHERE e.machine_id = $1 AND e.tenant_id = $2 AND e.deleted_at IS NULL

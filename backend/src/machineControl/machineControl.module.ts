@@ -22,6 +22,14 @@ import {
   DeviceDesignDeliveryController,
 } from './designs/designDelivery.controller';
 import { DesignLibraryService } from './designs/designLibrary.service';
+import {
+  DeviceRemoteSessionController,
+  RemoteSessionController,
+} from './remote/remoteSession.controller';
+import { KvsSignalingService } from './remote/kvsSignaling.service';
+import { RemoteRecordingService } from './remote/remoteRecording.service';
+import { RemoteSessionService } from './remote/remoteSession.service';
+import { RemoteSessionWorkerService } from './remote/remoteSessionWorker.service';
 import { DeviceDesignDeliveryService } from './designs/deviceDesignDelivery.service';
 
 @Module({
@@ -35,6 +43,8 @@ import { DeviceDesignDeliveryService } from './designs/deviceDesignDelivery.serv
     DeviceDesignDeliveryController,
     McDevicesController,
     AdminMachineControlController,
+    RemoteSessionController,
+    DeviceRemoteSessionController,
   ],
   providers: [
     MachineAppPairingService,
@@ -49,6 +59,10 @@ import { DeviceDesignDeliveryService } from './designs/deviceDesignDelivery.serv
     RequireMachineControlGuard,
     McDevicesService,
     AdminMachineControlService,
+    KvsSignalingService,
+    RemoteRecordingService,
+    RemoteSessionService,
+    RemoteSessionWorkerService,
   ],
 })
 export class MachineControlModule {}

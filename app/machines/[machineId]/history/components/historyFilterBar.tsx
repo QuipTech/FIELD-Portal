@@ -1,5 +1,5 @@
 import { FilterChipSelect } from "@/components/ui/filterChipSelect";
-import { NEW_ENTRY_TYPES, historyEntryTypeMeta, type HistoryDateRange, type HistoryFilters } from "@/lib/types/historyEntry";
+import { FILTER_ENTRY_TYPES, historyEntryTypeMeta, type HistoryDateRange, type HistoryFilters } from "@/lib/types/historyEntry";
 import { DEFAULT_HISTORY_FILTERS } from "../historyPaging";
 
 interface HistoryFilterBarProps {
@@ -10,7 +10,7 @@ interface HistoryFilterBarProps {
 
 const typeOptions = [
   { value: "", label: "All types" },
-  ...NEW_ENTRY_TYPES.map((type) => ({ value: type, label: historyEntryTypeMeta[type].label })),
+  ...FILTER_ENTRY_TYPES.map((type) => ({ value: type, label: historyEntryTypeMeta[type].label })),
 ];
 
 const rangeOptions: { value: HistoryDateRange; label: string }[] = [
