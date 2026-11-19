@@ -11,6 +11,11 @@ describe("toScreenPoint", () => {
     expect(toScreenPoint(100 + 900, 50 + 500, box, 1280, 800)).toEqual({ x: 1, y: 1 });
   });
 
+  it("clamps a held pointer to the screen edge when it leaves the displayed image", () => {
+    expect(toScreenPoint(1300, 25, box, 1280, 800, true)).toEqual({ x: 1, y: 0 });
+    expect(toScreenPoint(150, 300, box, 1280, 800, true)).toEqual({ x: 0, y: 0.5 });
+  });
+
   it("ignores the bars and a video without a size", () => {
     expect(toScreenPoint(100 + 50, 50 + 250, box, 1280, 800)).toBeNull();
     expect(toScreenPoint(500, 300, box, 0, 0)).toBeNull();

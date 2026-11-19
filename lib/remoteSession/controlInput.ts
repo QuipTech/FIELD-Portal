@@ -34,6 +34,7 @@ export const toScreenPoint = (
   box: ElementBox,
   videoWidth: number,
   videoHeight: number,
+  clampToScreen = false,
 ): { x: number; y: number } | null => {
   if (!videoWidth || !videoHeight || !box.width || !box.height) return null;
   const scale = Math.min(box.width / videoWidth, box.height / videoHeight);
@@ -43,8 +44,9 @@ export const toScreenPoint = (
   const offsetY = (box.height - shownHeight) / 2;
   const x = (clientX - box.left - offsetX) / shownWidth;
   const y = (clientY - box.top - offsetY) / shownHeight;
-  if (x < 0 || x > 1 || y < 0 || y > 1) return null;
-  return { x: round(x), y: round(y) };
+  if (!clampToScreen && (x < 0 || x > 1 || y < 0 || y > 1)) return null;
+  const clamp = (value: number) => round(Math.max(0, Math.min(1, value)));
+  return { x: clamp(x), y: clamp(y) };
 };
 
 // Browser shortcuts the viewer keeps for itself (closing or reloading the
@@ -60,7 +62,7 @@ export const shouldSendKey = (event: Pick<KeyboardEvent, "key" | "ctrlKey" | "me
 export const toKeyMessage = (
   action: "down" | "up",
   event: Pick<KeyboardEvent, "key" | "code" | "altKey" | "ctrlKey" | "shiftKey" | "metaKey">,
-): ControlMessage => ({
+): Extract<ControlMessage, { type: "key" }> => ({
   v: 1,
   type: "key",
   action,

@@ -19,6 +19,7 @@ const wait = (ms: number) => new Promise((done) => setTimeout(done, ms));
 export class SessionRecorder {
   private recorder: MediaRecorder | null = null;
   private audio: AudioContext | null = null;
+  private readonly mixedTracks = new WeakSet<MediaStreamTrack>();
   private mix: MediaStreamAudioDestinationNode | null = null;
   private chunks: Blob[] = [];
   private bufferedBytes = 0;
@@ -64,9 +65,15 @@ export class SessionRecorder {
 
   // Mixes a stream's audio (the tablet's, or the viewer's microphone) in.
   addAudio = (stream: MediaStream) => {
-    if (!this.audio || !this.mix || stream.getAudioTracks().length === 0) return;
-    this.audio.createMediaStreamSource(stream).connect(this.mix);
+    if (!this.audio || !this.mix) return;
+    for (const track of stream.getAudioTracks()) {
+      if (this.mixedTracks.has(track)) continue;
+      this.mixedTracks.add(track);
+      this.audio.createMediaStreamSource(new MediaStream([track])).connect(this.mix);
+    }
   };
+
+  resumeAudio = () => this.audio?.resume().catch(() => undefined);
 
   // Stops, uploads what is left, and resolves once every part is up. False
   // when anything failed.

@@ -29,7 +29,7 @@ export const RemoteSessionButton = ({ machineId, machineLabel, tabletOnline }: R
     <div className="flex flex-col items-start gap-1.5">
       <PermissionButton permission={PERMISSIONS.useMachineControlRemote} variant="primary" onClick={open} disabled={!tabletOnline}>
         <Icon name="broadcast" />
-        Connect as remote access
+        Connect to Remote Session
       </PermissionButton>
       {!tabletOnline && <span className="text-xs text-mutedGray">The tablet needs to be online with the FIELD Machine app open.</span>}
       {blocked && (

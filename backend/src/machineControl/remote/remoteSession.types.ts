@@ -1,4 +1,4 @@
-import { IsBoolean, IsIn, IsOptional } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsUUID } from 'class-validator';
 
 // How long the operator has to Allow or Decline.
 export const REMOTE_REQUEST_SECONDS = 60;
@@ -43,6 +43,7 @@ export interface RemoteSessionRow {
   tenant_id: string;
   machine_id: string;
   device_id: string;
+  initiated_by: 'portal' | 'tablet';
   requester_id: string | null;
   requester_tenant_id: string;
   requester_name: string;
@@ -80,6 +81,7 @@ export interface RemoteSession {
   machineId: string;
   deviceId: string;
   status: RemoteSessionStatus;
+  initiatedBy: 'portal' | 'tablet';
   requester: { name: string };
   scope: { view: true; control: boolean; record: boolean };
   createdAt: string;
@@ -106,6 +108,7 @@ export const toRemoteSession = (row: RemoteSessionRow): RemoteSession => {
     machineId: row.machine_id,
     deviceId: row.device_id,
     status: row.status,
+    initiatedBy: row.initiated_by,
     requester: { name: row.requester_name },
     scope: {
       view: true,
@@ -170,4 +173,13 @@ export class RemoteRecordingCompleteDto {
   @IsOptional()
   @IsBoolean()
   failed?: boolean;
+}
+
+export class RequestRemoteHelpDto {
+  @IsUUID('4')
+  requestId!: string;
+
+  // Control requires an explicit operator choice when requesting help.
+  @IsBoolean()
+  control!: boolean;
 }

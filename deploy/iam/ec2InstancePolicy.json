@@ -35,6 +35,33 @@
       "Resource": "arn:aws:s3:::<STORAGE_BUCKET>/*"
     },
     {
+      "Sid": "RemoteSupportRecordingUploads",
+      "Effect": "Allow",
+      "Action": ["s3:AbortMultipartUpload", "s3:ListMultipartUploadParts"],
+      "Resource": "arn:aws:s3:::<STORAGE_BUCKET>/documents/*"
+    },
+    {
+      "Sid": "RemoteSupportSignaling",
+      "Effect": "Allow",
+      "Action": [
+        "kinesisvideo:CreateSignalingChannel",
+        "kinesisvideo:DescribeSignalingChannel",
+        "kinesisvideo:GetSignalingChannelEndpoint",
+        "kinesisvideo:GetIceServerConfig",
+        "kinesisvideo:ConnectAsMaster",
+        "kinesisvideo:ConnectAsViewer",
+        "kinesisvideo:DeleteSignalingChannel",
+        "kinesisvideo:TagResource"
+      ],
+      "Resource": "arn:aws:kinesisvideo:ap-southeast-2:<ACCOUNT_ID>:channel/field-remote-*/*"
+    },
+    {
+      "Sid": "RemoteSupportTranscripts",
+      "Effect": "Allow",
+      "Action": ["transcribe:StartTranscriptionJob", "transcribe:GetTranscriptionJob"],
+      "Resource": "*"
+    },
+    {
       "Sid": "PortalFileStorageList",
       "Effect": "Allow",
       "Action": "s3:ListBucket",

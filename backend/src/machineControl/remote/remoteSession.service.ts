@@ -34,6 +34,7 @@ import {
   RemoteDecisionDto,
   RemoteSession,
   RemoteSessionRow,
+  RequestRemoteHelpDto,
   RemoteSignalingConnection,
   toRemoteSession,
 } from './remoteSession.types';
@@ -104,6 +105,21 @@ export class RemoteSessionService {
     sessionId: string,
   ): Promise<RemoteSession> =>
     toRemoteSession(await this.portalRow(actor, machineId, sessionId, 'read'));
+
+  pendingHelp = (actor: AuthenticatedUser, machineId: string) =>
+    this.db.withActor(actor, async (client) => {
+      await requireMachineAccess(client, machineId, 'contribute');
+      const row = await repository.findPendingHelp(client, machineId);
+      return { session: row ? toRemoteSession(row) : null };
+    });
+
+  claimHelp = (actor: AuthenticatedUser, machineId: string, sessionId: string) => {
+    this.kvs.requireEnabled();
+    return this.db.withActor(actor, async (client) => {
+      await requireMachineAccess(client, machineId, 'contribute');
+      return toRemoteSession(await repository.claimHelp(client, machineId, sessionId));
+    });
+  };
 
   // The viewer's presigned way onto the channel; the requester only.
   viewerConnection = async (
@@ -256,6 +272,21 @@ export class RemoteSessionService {
 
   // ── Tablet ──────────────────────────────────────────────────────────
 
+  requestHelp = (device: PairedDevice, token: string, dto: RequestRemoteHelpDto) => {
+    this.kvs.requireEnabled();
+    return this.withDevice(device, token, async (client) =>
+      toRemoteSession(
+        await repository.requestHelp(
+          client,
+          device.deviceId,
+          dto.requestId,
+          dto.control,
+          `viewer-${randomBytes(16).toString('hex')}`,
+        ),
+      ),
+    );
+  };
+
   // The tablet's open session (requested or active), if any: for start-up,
   // reconnects, and a missed remote:requested event.
   currentForDevice = (device: PairedDevice, token: string) =>
@@ -281,16 +312,24 @@ export class RemoteSessionService {
     sessionId: string,
     dto: RemoteDecisionDto,
   ): Promise<RemoteSession> =>
-    this.withDevice(device, token, async (client) =>
-      toRemoteSession(
+    this.withDevice(device, token, async (client) => {
+      const row = await repository.findForDevice(client, device.deviceId, sessionId);
+      if (!row) throw notFound();
+      if (row.initiated_by === 'tablet') {
+        throw new ConflictException({
+          code: 'remote_session_claim_required',
+          message: 'A Portal support user must join this help request.',
+        });
+      }
+      return toRemoteSession(
         await repository.decide(client, {
           deviceId: device.deviceId,
           sessionId,
           allow: dto.decision === 'allow',
           allowControl: dto.allowControl ?? true,
         }),
-      ),
-    );
+      );
+    });
 
   tabletConnection = async (
     device: PairedDevice,

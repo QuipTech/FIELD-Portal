@@ -16,6 +16,7 @@ describe('tablet remote support HTTP contract', () => {
     authenticate: jest.fn(async (token: string) => (token === 'good' ? device : null)),
   };
   const remote = {
+    requestHelp: jest.fn().mockResolvedValue({ id: sessionId, status: 'requested' }),
     currentForDevice: jest.fn().mockResolvedValue({ session: null }),
     decide: jest.fn().mockResolvedValue({ id: sessionId, status: 'active' }),
     endFromTablet: jest.fn().mockResolvedValue({ id: sessionId, status: 'ended' }),
@@ -53,6 +54,20 @@ describe('tablet remote support HTTP contract', () => {
       .expect(200);
     expect(response.body).toEqual({ session: null });
     expect(remote.currentForDevice).toHaveBeenCalledWith(device, 'good');
+  });
+
+  it('requires a device token and explicit consent scope for Request help', async () => {
+    const route = '/mc/device/remote-sessions/help';
+    const dto = { requestId: sessionId, control: false };
+    await request(server()).post(route).send(dto).expect(401);
+    await request(server()).post(route).set('Authorization', 'Bearer good')
+      .send({ requestId: sessionId }).expect(400);
+    await request(server()).post(route).set('Authorization', 'Bearer good')
+      .send({ ...dto, requestId: 'invalid' }).expect(400);
+    await request(server()).post(route).set('Authorization', 'Bearer good')
+      .send(dto).expect(200);
+    expect(remote.requestHelp).toHaveBeenCalledTimes(1);
+    expect(remote.requestHelp).toHaveBeenCalledWith(device, 'good', dto);
   });
 
   it('takes an Allow or Decline and refuses anything else', async () => {
