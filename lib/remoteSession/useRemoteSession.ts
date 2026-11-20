@@ -15,7 +15,19 @@ import {
 import { isOpenRemoteSession, type RemoteSession } from "../types/remoteSession";
 import type { ControlMessage } from "./controlInput";
 import { RemoteViewerConnection, type ViewerConnectionState } from "./remoteViewerConnection";
+import { describeError, remoteLog } from "./remoteDebugLog";
 import { SessionRecorder } from "./sessionRecorder";
+
+const sessionSummary = (session: RemoteSession) => ({
+  sessionId: session.id,
+  status: session.status,
+  deviceId: session.deviceId,
+  control: session.scope.control,
+  record: session.scope.record,
+  expiresAt: session.expiresAt,
+  endReason: session.endReason,
+  endedBy: session.endedBy,
+});
 
 export type RemotePhase = "requesting" | "waiting" | "connecting" | "live" | "ended" | "error";
 
@@ -56,6 +68,7 @@ export const useRemoteSession = (machineId: string) => {
     (endOnServer: boolean) => {
       finishing.current ??= (async () => {
         const current = sessionRef.current;
+        remoteLog.info("session: finishing", { endOnServer, ...(current ? sessionSummary(current) : {}) });
         const stopRecording = recorder.current?.stop() ?? Promise.resolve(false);
         connection.current?.close();
         mic.current?.getTracks().forEach((track) => track.stop());
@@ -79,6 +92,7 @@ export const useRemoteSession = (machineId: string) => {
             .then(remember)
             .catch(() => undefined);
         }
+        if (sessionRef.current) remoteLog.info("session: ended", sessionSummary(sessionRef.current));
         setPhase("ended");
       })();
       return finishing.current;
@@ -110,8 +124,10 @@ export const useRemoteSession = (machineId: string) => {
     const current = sessionRef.current;
     if (current?.status !== "active" || finishing.current) return;
     setPhase("connecting");
+    remoteLog.info("session: requesting viewer signaling connection", { sessionId: current.id, attempt: reconnects.current + 1 });
     try {
       const access = await getRemoteConnectionRequest(machineId, current.id);
+      remoteLog.info("session: viewer signaling connection issued", { sessionId: access.sessionId, role: access.role, expiresAt: access.expiresAt });
       if (finishing.current || sessionRef.current?.status !== "active") return;
       connection.current?.close();
       const viewer = new RemoteViewerConnection(access, {
@@ -129,8 +145,10 @@ export const useRemoteSession = (machineId: string) => {
           if (state === "failed" && !finishing.current) {
             if (reconnects.current < MAX_RECONNECTS) {
               reconnects.current += 1;
+              remoteLog.warn("session: viewer failed, reconnecting", { attempt: reconnects.current, max: MAX_RECONNECTS });
               void connect();
             } else {
+              remoteLog.error("session: gave up after reconnects", { max: MAX_RECONNECTS });
               setError("Lost the connection to the tablet.");
             }
           }
@@ -141,6 +159,7 @@ export const useRemoteSession = (machineId: string) => {
       viewer.start();
       if (mic.current) await viewer.setMicrophone(mic.current.getAudioTracks()[0] ?? null);
     } catch (connectError) {
+      remoteLog.error("session: couldn't get the viewer signaling connection (backend /connection)", describeError(connectError));
       setError(toApiErrorMessage(connectError, "Couldn't connect to the tablet."));
     }
   }, [machineId, startRecording]);
@@ -149,12 +168,15 @@ export const useRemoteSession = (machineId: string) => {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
+    remoteLog.info("session: creating remote session (Connect)", { machineId });
     createRemoteSessionRequest(machineId, true)
       .then((created) => {
+        remoteLog.info("session: created; waiting for the tablet operator to Allow", sessionSummary(created));
         remember(created);
         setPhase("waiting");
       })
       .catch((createError) => {
+        remoteLog.error("session: create failed", describeError(createError));
         setError(toApiErrorMessage(createError, "Couldn't start a remote session."));
         setPhase("error");
       });
@@ -169,6 +191,7 @@ export const useRemoteSession = (machineId: string) => {
       try {
         const next = await getRemoteSessionRequest(machineId, session.id);
         if (!current) return;
+        if (next.status !== sessionRef.current?.status) remoteLog.info("session: status changed", sessionSummary(next));
         remember(next);
         if (next.status === "active") {
           void connect();
@@ -178,8 +201,8 @@ export const useRemoteSession = (machineId: string) => {
           setPhase("ended");
           return;
         }
-      } catch {
-        // Try again on the next tick.
+      } catch (pollError) {
+        remoteLog.warn("session: status poll failed; retrying", describeError(pollError));
       }
       if (current) timer = setTimeout(poll, WAITING_POLL_MS);
     };
@@ -201,9 +224,11 @@ export const useRemoteSession = (machineId: string) => {
       interacted.current = false;
       try {
         const next = await remoteHeartbeatRequest(machineId, sessionId, wasInteracted);
+        if (next.status !== sessionRef.current?.status) remoteLog.info("session: status changed (heartbeat)", sessionSummary(next));
         remember(next);
         if (!isOpenRemoteSession(next.status)) void finish(false);
-      } catch {
+      } catch (heartbeatError) {
+        remoteLog.warn("session: heartbeat failed", describeError(heartbeatError));
         interacted.current ||= wasInteracted;
       }
     }, heartbeatSeconds * 1000);

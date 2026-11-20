@@ -23,6 +23,7 @@ import {
   revokedTokenError,
 } from '../session/deviceSession.service';
 import { KvsSignalingService } from './kvsSignaling.service';
+import { RemoteDebugLog, describeError } from './remoteDebugLog';
 import { RemoteRecordingService } from './remoteRecording.service';
 import * as repository from './remoteSession.repository';
 import {
@@ -38,6 +39,25 @@ import {
   RemoteSignalingConnection,
   toRemoteSession,
 } from './remoteSession.types';
+
+const sessionSummary = (session: RemoteSession) => ({
+  status: session.status,
+  endReason: session.endReason,
+  endedBy: session.endedBy,
+  control: session.scope.control,
+});
+
+const connectionSummary = (connection: RemoteSignalingConnection) => ({
+  channelArn: connection.channelArn,
+  clientId: connection.clientId,
+  viewerClientId: connection.viewerClientId,
+  controlAllowed: connection.controlAllowed,
+  iceServers: connection.iceServers.length,
+  turnServers: connection.iceServers.filter((server) =>
+    server.urls.some((url) => url.startsWith('turn')),
+  ).length,
+  expiresAt: connection.expiresAt,
+});
 
 const notActive = () =>
   new ConflictException({
@@ -64,6 +84,10 @@ const notRequester = () =>
 @Injectable()
 export class RemoteSessionService {
   private readonly logger = new Logger(RemoteSessionService.name);
+  private readonly debug = new RemoteDebugLog(RemoteSessionService.name);
+  // Debug only: last session/status each tablet saw on /current, so the
+  // log shows changes rather than every poll.
+  private readonly lastSeenByDevice = new Map<string, string>();
 
   constructor(
     private readonly db: DatabaseService,
@@ -77,11 +101,37 @@ export class RemoteSessionService {
     actor: AuthenticatedUser,
     machineId: string,
     dto: CreateRemoteSessionDto,
+  ): Promise<RemoteSession> =>
+    this.debug.trace(
+      'portal create (Connect)',
+      {
+        machineId,
+        userId: actor.userId,
+        control: dto.control ?? true,
+        kvsEnabled: this.kvs.isEnabled(),
+      },
+      () => this.createSession(actor, machineId, dto),
+      (session) => ({
+        sessionId: session.id,
+        deviceId: session.deviceId,
+        ...sessionSummary(session),
+      }),
+    );
+
+  private createSession = (
+    actor: AuthenticatedUser,
+    machineId: string,
+    dto: CreateRemoteSessionDto,
   ): Promise<RemoteSession> => {
     this.kvs.requireEnabled();
     return this.db.withActor(actor, async (client) => {
       await requireMachineAccess(client, machineId, 'contribute');
       const state = await findSessionState(client, machineId);
+      this.debug.info('portal create: tablet state', {
+        machineId,
+        hasPairedTablet: Boolean(state),
+        tabletOnline: state?.tabletOnline ?? null,
+      });
       if (state && !state.tabletOnline) {
         throw new ConflictException({
           code: 'remote_tablet_offline',
@@ -113,24 +163,42 @@ export class RemoteSessionService {
       return { session: row ? toRemoteSession(row) : null };
     });
 
-  claimHelp = (actor: AuthenticatedUser, machineId: string, sessionId: string) => {
-    this.kvs.requireEnabled();
-    return this.db.withActor(actor, async (client) => {
-      await requireMachineAccess(client, machineId, 'contribute');
-      return toRemoteSession(await repository.claimHelp(client, machineId, sessionId));
-    });
-  };
+  claimHelp = (
+    actor: AuthenticatedUser,
+    machineId: string,
+    sessionId: string,
+  ) =>
+    this.debug.trace(
+      'portal claim help',
+      { machineId, sessionId, userId: actor.userId },
+      () => {
+        this.kvs.requireEnabled();
+        return this.db.withActor(actor, async (client) => {
+          await requireMachineAccess(client, machineId, 'contribute');
+          return toRemoteSession(
+            await repository.claimHelp(client, machineId, sessionId),
+          );
+        });
+      },
+      sessionSummary,
+    );
 
   // The viewer's presigned way onto the channel; the requester only.
   viewerConnection = async (
     actor: AuthenticatedUser,
     machineId: string,
     sessionId: string,
-  ): Promise<RemoteSignalingConnection> => {
-    const row = await this.portalRow(actor, machineId, sessionId, 'read');
-    if (row.requester_id !== actor.userId) throw notRequester();
-    return this.connection(row, 'VIEWER');
-  };
+  ): Promise<RemoteSignalingConnection> =>
+    this.debug.trace(
+      'portal VIEWER connection',
+      { machineId, sessionId, userId: actor.userId },
+      async () => {
+        const row = await this.portalRow(actor, machineId, sessionId, 'read');
+        if (row.requester_id !== actor.userId) throw notRequester();
+        return this.connection(row, 'VIEWER');
+      },
+      connectionSummary,
+    );
 
   viewerHeartbeat = (
     actor: AuthenticatedUser,
@@ -138,23 +206,58 @@ export class RemoteSessionService {
     sessionId: string,
     interacted: boolean,
   ): Promise<RemoteSession> =>
-    this.db.withActor(actor, async (client) => {
-      await requireMachineAccess(client, machineId, 'read');
-      const row = await repository.findForMachine(client, machineId, sessionId);
-      if (!row) throw notFound();
-      if (row.requester_id !== actor.userId) throw notRequester();
-      return toRemoteSession(
-        await repository.touch(client, {
+    this.db
+      .withActor(actor, async (client) => {
+        await requireMachineAccess(client, machineId, 'read');
+        const row = await repository.findForMachine(
+          client,
+          machineId,
           sessionId,
-          side: 'viewer',
-          interacted,
-          deviceId: null,
-        }),
+        );
+        if (!row) throw notFound();
+        if (row.requester_id !== actor.userId) throw notRequester();
+        return toRemoteSession(
+          await repository.touch(client, {
+            sessionId,
+            side: 'viewer',
+            interacted,
+            deviceId: null,
+          }),
+        );
+      })
+      .then(
+        (session) => {
+          if (session.status !== 'active') {
+            this.debug.info('portal heartbeat: session not active', {
+              sessionId,
+              ...sessionSummary(session),
+            });
+          }
+          return session;
+        },
+        (error: unknown) => {
+          this.debug.warn('portal heartbeat FAILED', {
+            sessionId,
+            ...describeError(error),
+          });
+          throw error;
+        },
       );
-    });
 
   // The requester, or anyone allowed to add to the machine, ends it.
   endFromPortal = async (
+    actor: AuthenticatedUser,
+    machineId: string,
+    sessionId: string,
+  ): Promise<RemoteSession> =>
+    this.debug.trace(
+      'portal end',
+      { machineId, sessionId, userId: actor.userId },
+      () => this.endPortalSession(actor, machineId, sessionId),
+      sessionSummary,
+    );
+
+  private endPortalSession = async (
     actor: AuthenticatedUser,
     machineId: string,
     sessionId: string,
@@ -188,7 +291,11 @@ export class RemoteSessionService {
     partNumber: number,
     file: IncomingFile | undefined,
   ): Promise<{ part: number; bytes: number }> => {
-    if (!Number.isInteger(partNumber) || partNumber < 1 || partNumber > REMOTE_MAX_PARTS) {
+    if (
+      !Number.isInteger(partNumber) ||
+      partNumber < 1 ||
+      partNumber > REMOTE_MAX_PARTS
+    ) {
       throw new BadRequestException('Part number must be 1 to 2000.');
     }
     if (!file?.buffer?.length) throw new BadRequestException('Part is empty.');
@@ -203,7 +310,12 @@ export class RemoteSessionService {
     if (current.recording_status === 'pending') {
       const key = this.recordings.recordingKey(row);
       const uploadId = await this.recordings.createUpload(key);
-      current = await repository.recordingStart(this.db, sessionId, key, uploadId);
+      current = await repository.recordingStart(
+        this.db,
+        sessionId,
+        key,
+        uploadId,
+      );
       if (current.recording_upload_id !== uploadId) {
         await this.recordings.abort(key, uploadId);
       }
@@ -265,27 +377,45 @@ export class RemoteSessionService {
     const row = await this.portalRow(actor, machineId, sessionId, 'read');
     return {
       status: row.transcript_status,
-      text: row.transcript_status === 'completed' ? row.transcript_text ?? '' : null,
+      text:
+        row.transcript_status === 'completed'
+          ? (row.transcript_text ?? '')
+          : null,
       error: row.transcript_status === 'failed' ? row.transcript_error : null,
     };
   };
 
   // ── Tablet ──────────────────────────────────────────────────────────
 
-  requestHelp = (device: PairedDevice, token: string, dto: RequestRemoteHelpDto) => {
-    this.kvs.requireEnabled();
-    return this.withDevice(device, token, async (client) =>
-      toRemoteSession(
-        await repository.requestHelp(
-          client,
-          device.deviceId,
-          dto.requestId,
-          dto.control,
-          `viewer-${randomBytes(16).toString('hex')}`,
-        ),
-      ),
+  requestHelp = (
+    device: PairedDevice,
+    token: string,
+    dto: RequestRemoteHelpDto,
+  ) =>
+    this.debug.trace(
+      'tablet request help',
+      {
+        deviceId: device.deviceId,
+        machineId: device.machineId,
+        requestId: dto.requestId,
+        control: dto.control,
+      },
+      () => {
+        this.kvs.requireEnabled();
+        return this.withDevice(device, token, async (client) =>
+          toRemoteSession(
+            await repository.requestHelp(
+              client,
+              device.deviceId,
+              dto.requestId,
+              dto.control,
+              `viewer-${randomBytes(16).toString('hex')}`,
+            ),
+          ),
+        );
+      },
+      sessionSummary,
     );
-  };
 
   // The tablet's open session (requested or active), if any: for start-up,
   // reconnects, and a missed remote:requested event.
@@ -293,7 +423,30 @@ export class RemoteSessionService {
     this.withDevice(device, token, async (client) => {
       const row = await repository.findForDevice(client, device.deviceId, null);
       return { session: row ? toRemoteSession(row) : null };
-    });
+    }).then(
+      (result) => {
+        const seen = result.session
+          ? `${result.session.id}:${result.session.status}`
+          : 'none';
+        if (this.lastSeenByDevice.get(device.deviceId) !== seen) {
+          this.lastSeenByDevice.set(device.deviceId, seen);
+          this.debug.info('tablet /current: tablet now sees', {
+            deviceId: device.deviceId,
+            machineId: device.machineId,
+            sessionId: result.session?.id ?? null,
+            ...(result.session ? sessionSummary(result.session) : {}),
+          });
+        }
+        return result;
+      },
+      (error: unknown) => {
+        this.debug.warn('tablet /current FAILED', {
+          deviceId: device.deviceId,
+          ...describeError(error),
+        });
+        throw error;
+      },
+    );
 
   getForDevice = (device: PairedDevice, token: string, sessionId: string) =>
     this.withDevice(device, token, async (client) => {
@@ -312,8 +465,30 @@ export class RemoteSessionService {
     sessionId: string,
     dto: RemoteDecisionDto,
   ): Promise<RemoteSession> =>
+    this.debug.trace(
+      'tablet decision',
+      {
+        deviceId: device.deviceId,
+        sessionId,
+        decision: dto.decision,
+        allowControl: dto.allowControl ?? true,
+      },
+      () => this.decideSession(device, token, sessionId, dto),
+      sessionSummary,
+    );
+
+  private decideSession = (
+    device: PairedDevice,
+    token: string,
+    sessionId: string,
+    dto: RemoteDecisionDto,
+  ): Promise<RemoteSession> =>
     this.withDevice(device, token, async (client) => {
-      const row = await repository.findForDevice(client, device.deviceId, sessionId);
+      const row = await repository.findForDevice(
+        client,
+        device.deviceId,
+        sessionId,
+      );
       if (!row) throw notFound();
       if (row.initiated_by === 'tablet') {
         throw new ConflictException({
@@ -335,13 +510,19 @@ export class RemoteSessionService {
     device: PairedDevice,
     token: string,
     sessionId: string,
-  ): Promise<RemoteSignalingConnection> => {
-    const row = await this.withDevice(device, token, (client) =>
-      repository.findForDevice(client, device.deviceId, sessionId),
+  ): Promise<RemoteSignalingConnection> =>
+    this.debug.trace(
+      'tablet MASTER connection',
+      { deviceId: device.deviceId, machineId: device.machineId, sessionId },
+      async () => {
+        const row = await this.withDevice(device, token, (client) =>
+          repository.findForDevice(client, device.deviceId, sessionId),
+        );
+        if (!row) throw notFound();
+        return this.connection(row, 'MASTER');
+      },
+      connectionSummary,
     );
-    if (!row) throw notFound();
-    return this.connection(row, 'MASTER');
-  };
 
   tabletHeartbeat = (
     device: PairedDevice,
@@ -358,9 +539,39 @@ export class RemoteSessionService {
           deviceId: device.deviceId,
         }),
       ),
+    ).then(
+      (session) => {
+        if (session.status !== 'active') {
+          this.debug.info('tablet heartbeat: session not active', {
+            sessionId,
+            ...sessionSummary(session),
+          });
+        }
+        return session;
+      },
+      (error: unknown) => {
+        this.debug.warn('tablet heartbeat FAILED', {
+          deviceId: device.deviceId,
+          sessionId,
+          ...describeError(error),
+        });
+        throw error;
+      },
     );
 
   endFromTablet = async (
+    device: PairedDevice,
+    token: string,
+    sessionId: string,
+  ): Promise<RemoteSession> =>
+    this.debug.trace(
+      'tablet end',
+      { deviceId: device.deviceId, sessionId },
+      () => this.endTabletSession(device, token, sessionId),
+      sessionSummary,
+    );
+
+  private endTabletSession = async (
     device: PairedDevice,
     token: string,
     sessionId: string,
@@ -400,33 +611,56 @@ export class RemoteSessionService {
 
       const fail = async (message: string) => {
         if (row.recording_key && row.recording_upload_id) {
-          await this.recordings.abort(row.recording_key, row.recording_upload_id);
+          await this.recordings.abort(
+            row.recording_key,
+            row.recording_upload_id,
+          );
         }
-        return repository.recordingFinish(client, sessionId, 'failed', message, null);
+        return repository.recordingFinish(
+          client,
+          sessionId,
+          'failed',
+          message,
+          null,
+        );
       };
       if (viewerError) return fail(viewerError);
-      if (row.recording_status === 'pending' || row.recording_parts.length === 0) {
+      if (
+        row.recording_status === 'pending' ||
+        row.recording_parts.length === 0
+      ) {
         return fail('No recording was uploaded for this session.');
       }
       try {
         await this.recordings.complete(row);
       } catch (error) {
-        this.logger.warn(`Completing recording ${sessionId} failed: ${String(error)}`);
+        this.logger.warn(
+          `Completing recording ${sessionId} failed: ${String(error)}`,
+        );
         return fail('The recording could not be saved.');
       }
       const job = await this.recordings.startTranscription(row);
-      return repository.recordingFinish(client, sessionId, 'completed', null, job);
+      return repository.recordingFinish(
+        client,
+        sessionId,
+        'completed',
+        null,
+        job,
+      );
     });
 
   // Deletes a closed session's channel; the worker retries any failure.
   releaseChannel = async (row: RemoteSessionRow): Promise<void> => {
-    if (['requested', 'active'].includes(row.status) || !row.channel_arn) return;
+    if (['requested', 'active'].includes(row.status) || !row.channel_arn)
+      return;
     if (row.channel_deleted_at) return;
     try {
       await this.kvs.deleteChannel(row.channel_arn);
       await repository.channelDeleted(this.db, row.id);
     } catch (error) {
-      this.logger.warn(`Deleting channel for ${row.id} failed: ${String(error)}`);
+      this.logger.warn(
+        `Deleting channel for ${row.id} failed: ${String(error)}`,
+      );
     }
   };
 
@@ -434,10 +668,28 @@ export class RemoteSessionService {
     row: RemoteSessionRow,
     role: 'MASTER' | 'VIEWER',
   ): Promise<RemoteSignalingConnection> => {
-    if (row.status !== 'active' || !row.channel_name) throw notActive();
+    this.debug.info(`${role} connection: session row`, {
+      sessionId: row.id,
+      status: row.status,
+      channelName: row.channel_name,
+      channelArn: row.channel_arn,
+      viewerClientId: row.viewer_client_id,
+      controlGranted: row.control_granted,
+    });
+    if (row.status !== 'active' || !row.channel_name) {
+      this.debug.warn(
+        `${role} connection refused: session is not active (operator has not allowed yet, or it already ended)`,
+        {
+          sessionId: row.id,
+          status: row.status,
+        },
+      );
+      throw notActive();
+    }
     const channelArn =
       row.channel_arn ?? (await this.kvs.ensureChannel(row.channel_name));
-    if (!row.channel_arn) await repository.setChannel(this.db, row.id, channelArn);
+    if (!row.channel_arn)
+      await repository.setChannel(this.db, row.id, channelArn);
 
     // The session may have closed while the channel was being made.
     const { rows } = await this.db.query<RemoteSessionRow>(
@@ -445,6 +697,13 @@ export class RemoteSessionService {
       [row.id],
     );
     if (rows[0]?.status !== 'active') {
+      this.debug.warn(
+        `${role} connection: session closed while the channel was being made`,
+        {
+          sessionId: row.id,
+          status: rows[0]?.status,
+        },
+      );
       await this.releaseChannel({ ...rows[0], channel_arn: channelArn });
       throw notActive();
     }

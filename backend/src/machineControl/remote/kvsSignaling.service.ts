@@ -20,6 +20,7 @@ import { defaultProvider } from '@aws-sdk/credential-provider-node';
 import { Sha256 } from '@aws-crypto/sha256-js';
 import { SignatureV4 } from '@smithy/signature-v4';
 import type { AwsCredentialIdentity } from '@smithy/types';
+import { RemoteDebugLog, describeError } from './remoteDebugLog';
 
 export const DEFAULT_KVS_REGION = 'ap-southeast-2';
 // The presigned URL only has to open the socket.
@@ -58,6 +59,7 @@ export interface SignalingAccess {
 @Injectable()
 export class KvsSignalingService {
   private readonly logger = new Logger(KvsSignalingService.name);
+  private readonly debug = new RemoteDebugLog(KvsSignalingService.name);
   private readonly enabled: boolean;
   readonly region: string;
   private readonly client: KinesisVideoClient;
@@ -71,12 +73,21 @@ export class KvsSignalingService {
       configService.get<string>('REMOTE_SUPPORT_KVS_REGION') ||
       DEFAULT_KVS_REGION;
     this.client = new KinesisVideoClient({ region: this.region });
+    this.debug.info('KVS config', {
+      enabled: this.enabled,
+      region: this.region,
+    });
   }
 
   isEnabled = () => this.enabled;
 
   requireEnabled = () => {
-    if (!this.enabled) throw remoteSupportUnavailable();
+    if (!this.enabled) {
+      this.debug.warn(
+        'KVS disabled: set REMOTE_SUPPORT_KVS_ENABLED=true on this API',
+      );
+      throw remoteSupportUnavailable();
+    }
   };
 
   // The channel's ARN once it is ACTIVE; creating an existing one is fine.
@@ -94,8 +105,13 @@ export class KvsSignalingService {
           }),
         );
         arn = created.ChannelARN;
+        this.debug.info('KVS channel created', {
+          channelName,
+          channelArn: arn,
+        });
       } catch (error) {
         if ((error as Error).name !== 'ResourceInUseException') throw error;
+        this.debug.info('KVS channel already exists', { channelName });
       }
       for (let attempt = 0; attempt < CHANNEL_READY_ATTEMPTS; attempt += 1) {
         const { ChannelInfo } = await this.client.send(
@@ -104,12 +120,32 @@ export class KvsSignalingService {
           ),
         );
         arn = ChannelInfo?.ChannelARN ?? arn;
-        if (ChannelInfo?.ChannelStatus === 'ACTIVE' && arn) return arn;
+        if (ChannelInfo?.ChannelStatus === 'ACTIVE' && arn) {
+          this.debug.info('KVS channel active', {
+            channelName,
+            channelArn: arn,
+            attempts: attempt + 1,
+          });
+          return arn;
+        }
+        this.debug.info('KVS channel not active yet', {
+          channelName,
+          status: ChannelInfo?.ChannelStatus,
+          attempt: attempt + 1,
+        });
         await sleep(CHANNEL_READY_DELAY_MS);
       }
       throw new Error(`Signaling channel ${channelName} did not become active`);
     } catch (error) {
       this.logger.warn(`KVS channel unavailable: ${String(error)}`);
+      this.debug.warn(
+        'KVS ensureChannel FAILED (check IAM CreateSignalingChannel/DescribeSignalingChannel/TagResource and region)',
+        {
+          channelName,
+          region: this.region,
+          ...describeError(error),
+        },
+      );
       throw remoteSupportUnavailable();
     }
   };
@@ -136,6 +172,11 @@ export class KvsSignalingService {
           ?.ResourceEndpoint;
       const wss = endpoint('WSS');
       const https = endpoint('HTTPS');
+      this.debug.info('KVS endpoints', {
+        role: params.role,
+        wssHost: wss && new URL(wss).host,
+        httpsHost: https && new URL(https).host,
+      });
       if (!wss || !https) throw new Error('Signaling endpoints missing');
 
       const signaling = new KinesisVideoSignalingClient({
@@ -157,6 +198,22 @@ export class KvsSignalingService {
           credential: server.Password,
         })),
       ];
+      this.debug.info('KVS ICE servers', {
+        role: params.role,
+        clientId: params.clientId,
+        stun: 1,
+        turn: IceServerList?.length ?? 0,
+        turnUris: (IceServerList ?? []).reduce(
+          (count, server) => count + (server.Uris?.length ?? 0),
+          0,
+        ),
+      });
+      if (!IceServerList?.length) {
+        this.debug.warn(
+          'KVS returned no TURN servers; peers behind strict NAT/firewall will not connect',
+          { role: params.role },
+        );
+      }
       return {
         signalingUrl: await this.presign(wss, params),
         iceServers,
@@ -166,6 +223,14 @@ export class KvsSignalingService {
       };
     } catch (error) {
       this.logger.warn(`KVS signaling access failed: ${String(error)}`);
+      this.debug.warn(
+        'KVS access FAILED (check IAM GetSignalingChannelEndpoint/GetIceServerConfig/ConnectAs* and AWS credentials)',
+        {
+          role: params.role,
+          channelArn: params.channelArn,
+          ...describeError(error),
+        },
+      );
       throw remoteSupportUnavailable();
     }
   };
@@ -184,7 +249,11 @@ export class KvsSignalingService {
 
   private presign = async (
     wssEndpoint: string,
-    params: { channelArn: string; role: 'MASTER' | 'VIEWER'; clientId: string | null },
+    params: {
+      channelArn: string;
+      role: 'MASTER' | 'VIEWER';
+      clientId: string | null;
+    },
   ): Promise<string> => {
     const url = new URL(wssEndpoint);
     const query: Record<string, string> = {
@@ -223,6 +292,11 @@ export class KvsSignalingService {
       (expiration && expiration - Date.now() < CREDENTIAL_REFRESH_MARGIN_MS)
     ) {
       this.credentials = await this.credentialProvider();
+      this.debug.info('AWS credentials loaded for presigning', {
+        accessKeyPrefix: this.credentials.accessKeyId.slice(0, 4),
+        temporary: Boolean(this.credentials.sessionToken),
+        expiresAt: this.credentials.expiration?.toISOString() ?? null,
+      });
     }
     return this.credentials;
   };

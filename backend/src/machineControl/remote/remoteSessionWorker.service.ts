@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { DatabaseService } from '../../database/database.service';
 import { KvsSignalingService } from './kvsSignaling.service';
+import { RemoteDebugLog } from './remoteDebugLog';
 import { RemoteRecordingService } from './remoteRecording.service';
 import * as repository from './remoteSession.repository';
 import { RemoteSessionService } from './remoteSession.service';
@@ -24,6 +25,7 @@ const WORK_MS = 60 * 1000;
 @Injectable()
 export class RemoteSessionWorkerService {
   private readonly logger = new Logger(RemoteSessionWorkerService.name);
+  private readonly debug = new RemoteDebugLog(RemoteSessionWorkerService.name);
   private working = false;
 
   constructor(
@@ -36,7 +38,24 @@ export class RemoteSessionWorkerService {
   @Interval(SWEEP_MS)
   async sweep() {
     await repository
-      .sweep(this.db, REMOTE_INACTIVE_MINUTES, REMOTE_LOST_SECONDS, REMOTE_MAX_MINUTES)
+      .sweep(
+        this.db,
+        REMOTE_INACTIVE_MINUTES,
+        REMOTE_LOST_SECONDS,
+        REMOTE_MAX_MINUTES,
+      )
+      .then((closed) => {
+        if (closed > 0) {
+          this.debug.info(
+            'sweep closed sessions (unanswered request expired, no heartbeat for 60s, inactive, or over max length)',
+            {
+              closed,
+              lostSeconds: REMOTE_LOST_SECONDS,
+              inactiveMinutes: REMOTE_INACTIVE_MINUTES,
+            },
+          );
+        }
+      })
       .catch((error: unknown) =>
         this.logger.warn(`Remote session sweep failed: ${String(error)}`),
       );
@@ -70,16 +89,30 @@ export class RemoteSessionWorkerService {
       await this.sessions
         .finishRecording(row.id, null)
         .catch((error: unknown) =>
-          this.logger.warn(`Finishing recording ${row.id} failed: ${String(error)}`),
+          this.logger.warn(
+            `Finishing recording ${row.id} failed: ${String(error)}`,
+          ),
         );
     }
     if (row.transcript_status === 'processing') {
       try {
         const check = await this.recordings.checkTranscription(row);
         if (check.status === 'completed') {
-          await repository.transcriptFinish(this.db, row.id, 'completed', check.text, null);
+          await repository.transcriptFinish(
+            this.db,
+            row.id,
+            'completed',
+            check.text,
+            null,
+          );
         } else if (check.status === 'failed') {
-          await repository.transcriptFinish(this.db, row.id, 'failed', null, check.error);
+          await repository.transcriptFinish(
+            this.db,
+            row.id,
+            'failed',
+            null,
+            check.error,
+          );
         }
       } catch (error) {
         this.logger.warn(`Transcript check ${row.id} failed: ${String(error)}`);
