@@ -22,6 +22,7 @@ export const listDocuments = async (
   const result = await client.query<MachineDocumentListRow>(
     `SELECT ${DOCUMENT_COLUMNS},
             u.first_name AS uploader_first_name, u.last_name AS uploader_last_name,
+            d.source_device_id IS NOT NULL AS from_tablet,
             CASE WHEN u.id IS NULL AND d.uploaded_by IS NOT NULL
               THEN person_organisation_name(d.uploaded_by) END AS uploader_organisation_name
      FROM machine_documents d

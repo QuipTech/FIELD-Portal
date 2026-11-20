@@ -19,9 +19,10 @@ export interface DesignTarget {
   site: string | null;
 }
 
-interface Delivery {
+export interface Delivery {
   id: string;
   versionId: string;
+  machineId: string;
   versionCreatedAt: string;
   project: string;
   machineLabel: string;
