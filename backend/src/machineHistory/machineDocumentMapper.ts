@@ -43,4 +43,5 @@ export const toMachineDocument = async (
   ...(await toMachineDocumentFile(storageService, row)),
   uploadedByName: toUploaderName(row),
   canDelete,
+  fromTablet: Boolean(row.from_tablet),
 });

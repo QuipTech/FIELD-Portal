@@ -107,6 +107,8 @@ export interface MachineDocument extends MachineDocumentFile {
   uploadedByName: string | null;
   // The owning organisation can delete any file; a share only its own uploads.
   canDelete: boolean;
+  // Sent from the machine's paired tablet (Send to Portal).
+  fromTablet: boolean;
 }
 
 export interface GalleryPhoto {

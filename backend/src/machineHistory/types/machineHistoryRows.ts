@@ -101,4 +101,6 @@ export interface MachineDocumentListRow extends MachineDocumentRow {
   uploader_last_name: string | null;
   // An uploader in another organisation, whose people the reader can't see.
   uploader_organisation_name: string | null;
+  // Sent from the machine's paired tablet (Send to Portal).
+  from_tablet: boolean;
 }
