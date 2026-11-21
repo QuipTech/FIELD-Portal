@@ -24,6 +24,8 @@ class FakeRecorder {
 
 const track = (id: string) => ({ id, kind: "video", getSettings: () => ({ width: 640, height: 360 }), stop: vi.fn() });
 
+let audioState = "running";
+
 const setup = () => {
   vi.stubGlobal("MediaRecorder", FakeRecorder);
   vi.stubGlobal("MediaStream", function (this: { tracks: unknown[] }, tracks: unknown[] = []) {
@@ -31,7 +33,13 @@ const setup = () => {
     Object.assign(this, { getVideoTracks: () => tracks.filter((t) => (t as { kind?: string }).kind === "video"), getAudioTracks: () => [] });
   });
   vi.stubGlobal("AudioContext", function () {
-    return { createMediaStreamDestination: () => ({ stream: { getAudioTracks: () => [] } }), close: async () => undefined };
+    return {
+      state: audioState,
+      onstatechange: null,
+      resume: async () => undefined,
+      createMediaStreamDestination: () => ({ stream: { getAudioTracks: () => [] } }),
+      close: async () => undefined,
+    };
   });
   const sources: { srcObject: unknown }[] = [];
   const createElement = document.createElement.bind(document);
@@ -50,6 +58,7 @@ const setup = () => {
 };
 
 afterEach(() => {
+  audioState = "running";
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -95,6 +104,22 @@ describe("session recorder", () => {
     visible = { readyState: 4, videoWidth: 1920, videoHeight: 1080 } as HTMLVideoElement;
     vi.advanceTimersByTime(100);
     expect(drawImage).toHaveBeenCalledWith(visible, 0, 0, 1280, 720);
+    vi.useRealTimers();
+  });
+
+  it("waits for a click to start sound, then records video only after 10 s", () => {
+    vi.useFakeTimers();
+    audioState = "suspended";
+    setup();
+    const waits: boolean[] = [];
+    const states: boolean[] = [];
+    const recorder = new SessionRecorder(vi.fn(), vi.fn(), (state) => states.push(state), undefined, (waiting) => waits.push(waiting));
+    recorder.start(new MediaStream([track("tablet")] as never));
+    expect(waits).toEqual([true]);
+    expect(states).toEqual([]);
+    vi.advanceTimersByTime(10_000);
+    expect(waits).toEqual([true, false]);
+    expect(states).toEqual([true]);
     vi.useRealTimers();
   });
 

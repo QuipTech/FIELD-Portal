@@ -9,6 +9,11 @@ const TIMESLICE_MS = 4000;
 // reconnect (a new video track) carries on in the same file.
 const RECORD_FPS = 15;
 const RECORD_SIZE = { width: 1280, height: 720 };
+// Chrome keeps a new window's AudioContext suspended until someone clicks
+// or presses a key in it, and its recorder writes nothing (not even video)
+// while the audio track is silent that way. Wait this long for a click,
+// then record video without sound rather than nothing.
+const AUDIO_WAIT_MS = 10_000;
 const UPLOAD_ATTEMPTS = 4;
 
 type UploadPart = (partNumber: number, part: Blob) => Promise<unknown>;
@@ -43,7 +48,14 @@ export class SessionRecorder {
     private readonly onStateChange: (recording: boolean) => void = () => undefined,
     // The <video> showing the tablet on the page, the best source of frames.
     private readonly visibleVideo?: () => HTMLVideoElement | null,
+    // True while recording waits for a click to start the sound.
+    private readonly onAudioWait: (waiting: boolean) => void = () => undefined,
   ) {}
+
+  private audioWaitTimer: ReturnType<typeof setTimeout> | null = null;
+  private began = false;
+  private mimeType = "";
+  private canvasVideo: MediaStreamTrack | null = null;
 
   static isSupported = () => Boolean(pickMimeType()) && typeof AudioContext !== "undefined";
 
@@ -58,13 +70,38 @@ export class SessionRecorder {
       this.fail("This browser can't record the session.");
       return;
     }
+    this.mimeType = mimeType;
     this.audio = new AudioContext();
     this.mix = this.audio.createMediaStreamDestination();
     this.addAudio(remote);
-    const canvasTrack = this.startCanvas(video);
-    // Always one audio track, so the file has audio for transcription.
-    const recorded = new MediaStream([canvasTrack, ...this.mix.stream.getAudioTracks()]);
-    const recorder = new MediaRecorder(recorded, { mimeType, videoBitsPerSecond: 1_000_000, audioBitsPerSecond: 64_000 });
+    this.canvasVideo = this.startCanvas(video);
+    const audio = this.audio;
+    if (audio.state === "running") {
+      this.begin(true);
+      return;
+    }
+    this.onAudioWait(true);
+    audio.onstatechange = () => {
+      if (audio.state === "running") this.begin(true);
+    };
+    void audio.resume().catch(() => undefined);
+    this.audioWaitTimer = setTimeout(() => this.begin(false), AUDIO_WAIT_MS);
+  };
+
+  // Starts the recorder once: with the mixed audio (for the transcript), or
+  // video only when nobody clicked to allow sound.
+  private begin(withAudio: boolean) {
+    if (this.began || this.stopping || this.failed || !this.canvasVideo || !this.mix) return;
+    this.began = true;
+    if (this.audioWaitTimer !== null) clearTimeout(this.audioWaitTimer);
+    this.audioWaitTimer = null;
+    this.onAudioWait(false);
+    const recorded = new MediaStream([this.canvasVideo, ...(withAudio ? this.mix.stream.getAudioTracks() : [])]);
+    const recorder = new MediaRecorder(recorded, {
+      mimeType: withAudio ? this.mimeType : this.mimeType.replace(/,opus/, ""),
+      videoBitsPerSecond: 1_000_000,
+      ...(withAudio ? { audioBitsPerSecond: 64_000 } : {}),
+    });
     this.recorder = recorder;
     recorder.ondataavailable = (event) => {
       if (!event.data.size) return;
@@ -79,7 +116,12 @@ export class SessionRecorder {
       if (!this.stopping) this.fail("Recording stopped unexpectedly.");
     };
     recorder.start(TIMESLICE_MS);
-  };
+  }
+
+  // Whether the recording has sound (false when it started video-only).
+  get hasAudio() {
+    return (this.recorder?.stream.getAudioTracks().length ?? 0) > 0;
+  }
 
   // After a reconnect: record the new video track in the same file.
   setVideo = (track: MediaStreamTrack | undefined) => {
@@ -159,6 +201,9 @@ export class SessionRecorder {
   // when anything failed.
   stop = (): Promise<boolean> => {
     this.stopping = true;
+    if (this.audioWaitTimer !== null) clearTimeout(this.audioWaitTimer);
+    this.audioWaitTimer = null;
+    this.onAudioWait(false);
     this.stopped ??= new Promise<void>((done) => {
       const recorder = this.recorder;
       if (!recorder || recorder.state === "inactive") return done();
