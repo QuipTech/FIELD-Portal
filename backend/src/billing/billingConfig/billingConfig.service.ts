@@ -3,6 +3,7 @@ import { ServiceDatabaseService } from '../../database/serviceDatabase.service';
 import { listBillingConfigRows } from './billingConfig.repository';
 import { BillingConfig, BillingConfigEntry } from './billingConfigKeys';
 import { isBillingConfigKey, toBillingConfig } from './billingConfigValueRules';
+import { withDevBillingDefaults } from './devBillingConfigFallback';
 
 // Read fresh on every call: config is edited without a deploy and the API
 // runs in several containers, so a per-process cache could serve a stale
@@ -12,7 +13,9 @@ export class BillingConfigService {
   constructor(private readonly serviceDatabase: ServiceDatabaseService) {}
 
   loadConfig = async (): Promise<BillingConfig> =>
-    toBillingConfig(await listBillingConfigRows(this.serviceDatabase));
+    toBillingConfig(
+      withDevBillingDefaults(await listBillingConfigRows(this.serviceDatabase)),
+    );
 
   // For the super admin config editor: every key with its "not final" flag.
   listEntries = async (): Promise<BillingConfigEntry[]> => {
