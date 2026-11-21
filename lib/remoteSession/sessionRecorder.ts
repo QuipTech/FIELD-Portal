@@ -5,6 +5,10 @@
 // still buffering.
 export const MIN_PART_BYTES = 5 * 1024 * 1024;
 const TIMESLICE_MS = 4000;
+// The recording draws the tablet's video onto a canvas at this rate, so a
+// reconnect (a new video track) carries on in the same file.
+const RECORD_FPS = 15;
+const DEFAULT_SIZE = { width: 1280, height: 720 };
 const UPLOAD_ATTEMPTS = 4;
 
 type UploadPart = (partNumber: number, part: Blob) => Promise<unknown>;
@@ -27,10 +31,16 @@ export class SessionRecorder {
   private queue: Promise<void> = Promise.resolve();
   private failed = false;
   private stopped: Promise<void> | null = null;
+  private stopping = false;
+  private canvasTrack: MediaStreamTrack | null = null;
+  private source: HTMLVideoElement | null = null;
+  private drawTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(
     private readonly upload: UploadPart,
     private readonly onFailure: (message: string) => void,
+    // Called whenever the recorder starts or stops, so the UI shows the truth.
+    private readonly onStateChange: (recording: boolean) => void = () => undefined,
   ) {}
 
   static isSupported = () => Boolean(pickMimeType()) && typeof AudioContext !== "undefined";
@@ -49,8 +59,9 @@ export class SessionRecorder {
     this.audio = new AudioContext();
     this.mix = this.audio.createMediaStreamDestination();
     this.addAudio(remote);
+    const canvasTrack = this.startCanvas(video);
     // Always one audio track, so the file has audio for transcription.
-    const recorded = new MediaStream([video, ...this.mix.stream.getAudioTracks()]);
+    const recorded = new MediaStream([canvasTrack, ...this.mix.stream.getAudioTracks()]);
     const recorder = new MediaRecorder(recorded, { mimeType, videoBitsPerSecond: 1_000_000, audioBitsPerSecond: 64_000 });
     this.recorder = recorder;
     recorder.ondataavailable = (event) => {
@@ -60,8 +71,61 @@ export class SessionRecorder {
       if (this.bufferedBytes >= MIN_PART_BYTES) this.flush();
     };
     recorder.onerror = () => this.fail("Recording stopped unexpectedly.");
+    recorder.onstart = () => this.onStateChange(true);
+    recorder.onstop = () => {
+      this.onStateChange(false);
+      if (!this.stopping) this.fail("Recording stopped unexpectedly.");
+    };
     recorder.start(TIMESLICE_MS);
   };
+
+  // After a reconnect: record the new video track in the same file.
+  setVideo = (track: MediaStreamTrack | undefined) => {
+    if (!track || !this.source) return;
+    const current = (this.source.srcObject as MediaStream | null)?.getVideoTracks()[0];
+    if (current === track) return;
+    this.source.srcObject = new MediaStream([track]);
+    void this.source.play().catch(() => undefined);
+  };
+
+  private startCanvas(track: MediaStreamTrack): MediaStreamTrack {
+    const canvas = document.createElement("canvas");
+    const settings = track.getSettings?.() ?? {};
+    canvas.width = settings.width || DEFAULT_SIZE.width;
+    canvas.height = settings.height || DEFAULT_SIZE.height;
+    const context = canvas.getContext("2d");
+    const source = document.createElement("video");
+    source.muted = true;
+    source.playsInline = true;
+    source.srcObject = new MediaStream([track]);
+    void source.play().catch(() => undefined);
+    this.source = source;
+    let sized = Boolean(settings.width && settings.height);
+    this.drawTimer = setInterval(() => {
+      if (!context || source.readyState < 2 || !source.videoWidth) return;
+      // The file keeps the first real size; later sizes are letterboxed.
+      if (!sized) {
+        canvas.width = source.videoWidth;
+        canvas.height = source.videoHeight;
+        sized = true;
+      }
+      const scale = Math.min(canvas.width / source.videoWidth, canvas.height / source.videoHeight);
+      const width = source.videoWidth * scale;
+      const height = source.videoHeight * scale;
+      context.fillStyle = "#000";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(source, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
+    }, 1000 / RECORD_FPS);
+    this.canvasTrack = canvas.captureStream(RECORD_FPS).getVideoTracks()[0];
+    return this.canvasTrack;
+  }
+
+  private stopCanvas() {
+    if (this.drawTimer !== null) clearInterval(this.drawTimer);
+    this.drawTimer = null;
+    if (this.source) this.source.srcObject = null;
+    this.canvasTrack?.stop();
+  }
 
   // Mixes a stream's audio (the tablet's, or the viewer's microphone) in.
   addAudio = (stream: MediaStream) => {
@@ -78,12 +142,17 @@ export class SessionRecorder {
   // Stops, uploads what is left, and resolves once every part is up. False
   // when anything failed.
   stop = (): Promise<boolean> => {
+    this.stopping = true;
     this.stopped ??= new Promise<void>((done) => {
       const recorder = this.recorder;
       if (!recorder || recorder.state === "inactive") return done();
-      recorder.onstop = () => done();
+      recorder.onstop = () => {
+        this.onStateChange(false);
+        done();
+      };
       recorder.stop();
     }).then(async () => {
+      this.stopCanvas();
       this.flush();
       await this.queue;
       await this.audio?.close().catch(() => undefined);
