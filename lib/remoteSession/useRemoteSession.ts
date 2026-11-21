@@ -314,9 +314,25 @@ export const useRemoteSession = (machineId: string) => {
     return () => window.removeEventListener("pagehide", onHide);
   }, [machineId]);
 
+  // Debug only: how many control messages went to the tablet, by type.
+  const controlSent = useRef<Record<string, number>>({});
   const sendControl = useCallback((message: ControlMessage) => {
     if (finishing.current || sessionRef.current?.status !== "active" || !sessionRef.current.scope.control) return;
-    if (connection.current?.send(message)) interacted.current = true;
+    const sent = Boolean(connection.current?.send(message));
+    if (sent) interacted.current = true;
+    // Log clicks, keys and text (not every mouse move) so the tablet's side
+    // can be checked against what the Portal sent.
+    const isMove = message.type === "pointer" && message.action === "move";
+    if (!isMove) {
+      const kind = message.type === "pointer" ? `pointer ${message.action}` : message.type;
+      controlSent.current[kind] = (controlSent.current[kind] ?? 0) + 1;
+      (sent ? remoteLog.info : remoteLog.warn)(sent ? "control: sent to tablet" : "control: NOT sent (data channel closed)", {
+        kind,
+        ...(message.type === "pointer" || message.type === "wheel" ? { x: message.x, y: message.y } : {}),
+        ...(message.type === "key" ? { code: message.code } : {}),
+        totals: { ...controlSent.current },
+      });
+    }
   }, []);
 
   const toggleMic = useCallback(async () => {
