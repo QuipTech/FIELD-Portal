@@ -7,6 +7,7 @@ import { IndexingJob, IndexingStage } from './indexingWorker.repository';
 import {
   DocumentExtractionError,
   ExtractedDocument,
+  removeNulCharacters,
   UNSUPPORTED_DOC_MESSAGE,
 } from './extraction/documentBlocks';
 import { extractPdf } from './extraction/pdfPageExtractor';
@@ -80,7 +81,9 @@ export class IndexingPipelineService {
       );
     }
     const bytes = await this.storageService.readObject(job.storage_key);
-    const extracted = await this.extract(job, bytes, report);
+    const extracted = removeNulCharacters(
+      await this.extract(job, bytes, report),
+    );
     if (!extracted.blocks.some((block) => block.text.trim())) {
       throw new DocumentExtractionError(
         this.indexingConfig.isOcrEnabled
