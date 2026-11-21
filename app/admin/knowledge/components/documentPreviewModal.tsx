@@ -21,6 +21,17 @@ const PREVIEW_FAILED_MESSAGE = "Couldn't open the preview. Please try again.";
 const isPdf = (document: KnowledgeDocument) =>
   document.contentType === "application/pdf" || (document.fileName?.toLowerCase().endsWith(".pdf") ?? false);
 
+// A failed document's full indexing error, shown above the preview so it
+// can be read and copied (the table row truncates it to one line).
+const IndexingErrorBanner = ({ message }: { message: string }) => (
+  <div role="alert" className="flex-none border-b border-dangerBorder bg-dangerTint px-4 py-3">
+    <div className="text-xs font-medium uppercase tracking-wide text-danger">Indexing failed</div>
+    <p className="mt-1 max-h-32 overflow-y-auto whitespace-pre-wrap break-words font-mono text-xs text-danger select-text">
+      {message}
+    </p>
+  </div>
+);
+
 const PreviewMessage = ({ children }: { children: ReactNode }) => (
   <div className="flex flex-1 flex-col items-center justify-center gap-3 p-10 text-sm text-mutedGray">{children}</div>
 );
@@ -29,6 +40,7 @@ export const DocumentPreviewModal = ({ document, onDownload, onClose }: Document
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const canPreview = isPdf(document);
+  const indexingError = document.state === "failed" ? document.errorMessage : null;
 
   useEffect(() => {
     if (!canPreview) return;
@@ -52,12 +64,15 @@ export const DocumentPreviewModal = ({ document, onDownload, onClose }: Document
     if (loadError) return <PreviewMessage><span className="text-danger">{loadError}</span></PreviewMessage>;
     if (!previewUrl) return <PreviewMessage><LoadingSpinner /> Loading preview…</PreviewMessage>;
     // FitH: Chrome/Edge's viewer opens the page at the frame's full width.
-    return <iframe src={`${previewUrl}#view=FitH`} title={document.title} className="h-[calc(90vh-3.5rem)] w-full flex-none border-0" />;
+    return <iframe src={`${previewUrl}#view=FitH`} title={document.title} className="min-h-0 w-full flex-1 border-0" />;
   };
 
   return (
     <Modal title={document.title} onClose={onClose} widthClassName="w-[95vw]">
-      {renderBody()}
+      <div className="flex h-[calc(90vh-3.5rem)] flex-col">
+        {indexingError && <IndexingErrorBanner message={indexingError} />}
+        {renderBody()}
+      </div>
     </Modal>
   );
 };

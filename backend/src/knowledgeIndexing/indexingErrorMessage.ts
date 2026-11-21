@@ -18,5 +18,16 @@ export const toIndexingErrorMessage = (error: unknown): string => {
   if (name === 'ThrottlingException') {
     return 'The AI service was busy for too long. Retry in a few minutes.';
   }
-  return 'Indexing failed unexpectedly. Retry, or contact support if it keeps happening.';
+  return `Indexing failed unexpectedly. Retry, or contact support if it keeps happening.${technicalDetail(error)}`;
+};
+
+// Outside production (staging, development) the generic message also
+// carries the underlying error, so a failure can be diagnosed from the
+// Knowledge page without the server log. Production keeps it plain.
+const technicalDetail = (error: unknown): string => {
+  if (process.env.NODE_ENV === 'production') return '';
+  const name = (error as { name?: string })?.name || 'Error';
+  const message = error instanceof Error ? error.message : String(error);
+  const detail = `${name}: ${message}`.replace(/\s+/g, ' ').trim();
+  return ` [${detail.length > 300 ? `${detail.slice(0, 300)}…` : detail}]`;
 };
