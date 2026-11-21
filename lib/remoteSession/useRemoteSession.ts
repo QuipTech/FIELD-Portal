@@ -36,6 +36,9 @@ const WAITING_POLL_MS = 1500;
 // session is still active, before ending it anyway.
 const FINAL_UPLOAD_WAIT_MS = 30_000;
 const MAX_RECONNECTS = 3;
+// A connection "disconnected" this long is treated as lost and reconnected
+// (the tablet stopped sharing, or its network dropped).
+const DISCONNECTED_RECONNECT_MS = 8000;
 
 // One remote session from this window: Connect, wait for the operator's
 // answer, then view, control and record until either side ends it.
@@ -50,6 +53,8 @@ export const useRemoteSession = (machineId: string) => {
   const [isRecording, setIsRecording] = useState(false);
   const [micOn, setMicOn] = useState(false);
   const [micPending, setMicPending] = useState(false);
+  // The tablet's video track is muted: it stopped sending its screen.
+  const [videoPaused, setVideoPaused] = useState(false);
 
   const started = useRef(false);
   const sessionRef = useRef<RemoteSession | null>(null);
@@ -59,6 +64,7 @@ export const useRemoteSession = (machineId: string) => {
   const changingMic = useRef(false);
   const interacted = useRef(false);
   const reconnects = useRef(0);
+  const disconnectedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const finishing = useRef<Promise<void> | null>(null);
 
   const remember = useCallback((next: RemoteSession) => {
@@ -72,6 +78,7 @@ export const useRemoteSession = (machineId: string) => {
       finishing.current ??= (async () => {
         const current = sessionRef.current;
         remoteLog.info("session: finishing", { endOnServer, ...(current ? sessionSummary(current) : {}) });
+        if (disconnectedTimer.current !== null) clearTimeout(disconnectedTimer.current);
         const stopRecording = recorder.current?.stop() ?? Promise.resolve(false);
         connection.current?.close();
         mic.current?.getTracks().forEach((track) => track.stop());
@@ -140,13 +147,17 @@ export const useRemoteSession = (machineId: string) => {
         (message) => {
           remoteLog.error("recording: failed", { message });
           setRecordingError(message);
+          setIsRecording(false);
+        },
+        (recording) => {
+          remoteLog.info(recording ? "recording: recorder running" : "recording: recorder stopped");
+          setIsRecording(recording);
         },
       );
       recorder.current = sessionRecorder;
       remoteLog.info("recording: started (first video track arrived)", { sessionId: current.id });
       sessionRecorder.start(media);
       if (mic.current) sessionRecorder.addAudio(mic.current);
-      setIsRecording(sessionRecorder.isRecording);
     },
     [machineId],
   );
@@ -164,14 +175,39 @@ export const useRemoteSession = (machineId: string) => {
       const viewer = new RemoteViewerConnection(access, {
         onStream: (media) => {
           setStream(media);
+          const videoTrack = media.getVideoTracks()[0];
+          if (videoTrack) {
+            setVideoPaused(videoTrack.muted);
+            videoTrack.onmute = () => {
+              remoteLog.warn("viewer: tablet video paused (it stopped sending its screen)");
+              setVideoPaused(true);
+            };
+            videoTrack.onunmute = () => {
+              remoteLog.info("viewer: tablet video resumed");
+              setVideoPaused(false);
+            };
+          }
           startRecording(media);
+          // After a reconnect, the recording carries on with the new video.
+          recorder.current?.setVideo(videoTrack);
           recorder.current?.addAudio(media);
         },
         onState: (state) => {
           setConnectionState(state);
+          if (disconnectedTimer.current !== null) clearTimeout(disconnectedTimer.current);
+          disconnectedTimer.current = null;
           if (state === "connected") {
             reconnects.current = 0;
+            setError(null);
             setPhase("live");
+          }
+          if (state === "disconnected" && !finishing.current) {
+            disconnectedTimer.current = setTimeout(() => {
+              if (finishing.current || connection.current !== viewer) return;
+              remoteLog.warn("session: disconnected for 8 s; reconnecting");
+              reconnects.current = 0;
+              void connect();
+            }, DISCONNECTED_RECONNECT_MS);
           }
           if (state === "failed" && !finishing.current) {
             if (reconnects.current < MAX_RECONNECTS) {
@@ -318,6 +354,17 @@ export const useRemoteSession = (machineId: string) => {
     }
   }, []);
 
+  // The Reconnect button: a fresh signaling connection and offer, for when
+  // the tablet shared its screen again or the picture froze.
+  const reconnect = useCallback(() => {
+    if (finishing.current || sessionRef.current?.status !== "active") return;
+    remoteLog.info("session: reconnect requested by the user");
+    reconnects.current = 0;
+    setError(null);
+    setVideoPaused(false);
+    void connect();
+  }, [connect]);
+
   const end = useCallback(() => {
     const current = sessionRef.current;
     if (!current) return Promise.resolve();
@@ -335,6 +382,8 @@ export const useRemoteSession = (machineId: string) => {
     recordingError,
     micOn,
     micPending,
+    videoPaused,
+    reconnect,
     resumeRecordingAudio: () => recorder.current?.resumeAudio(),
     sendControl,
     toggleMic,

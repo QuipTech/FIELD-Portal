@@ -210,6 +210,7 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
             {phase === "connecting" && "Connecting to the tablet…"}
             {phase === "live" && (
               remote.connectionState === "disconnected" ? "Reconnecting…" :
+                remote.videoPaused ? "Live · the tablet isn't sharing its screen" :
                 canControl ? "Live · you can tap, type and scroll" :
                   session?.scope.control ? "Live · tablet control unavailable" : "Live · view only"
             )}
@@ -258,6 +259,18 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
               Paste to tablet
             </Button>
           )}
+          {live && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="!text-white hover:!bg-white/10"
+              onClick={remote.reconnect}
+              title="Connect to the tablet's screen again"
+            >
+              <Icon name="history" />
+              Reconnect
+            </Button>
+          )}
           {(phase === "waiting" || live) && (
             <Button size="sm" variant="danger" onClick={() => void end()} disabled={isEnding}>
               {isEnding ? "Ending…" : phase === "waiting" ? "Cancel" : "End session"}
@@ -270,8 +283,13 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
         <div className="flex items-center gap-2 bg-amber-500/15 px-4 py-2 text-sm text-amber-200" role="alert">
           <Icon name="alert" className="h-4 w-4" />
           <span>{remote.error ?? remote.recordingError}</span>
+          {remote.error && live && (
+            <button type="button" className="ml-auto text-xs font-medium underline" onClick={remote.reconnect}>
+              Reconnect
+            </button>
+          )}
           {remote.error && (
-            <button type="button" className="ml-auto text-xs underline" onClick={remote.clearError}>
+            <button type="button" className={`${live ? "" : "ml-auto "}text-xs underline`} onClick={remote.clearError}>
               Dismiss
             </button>
           )}
@@ -331,6 +349,28 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
                 {remote.connectionState !== "disconnected" && (
                   <span className="text-xs text-white/60">On the tablet, choose the screen to share.</span>
                 )}
+                <span className="max-w-xs text-center text-xs text-white/50">
+                  Already sharing on the tablet, or it shared again? Reconnect to pick up its screen.
+                </span>
+                <Button size="sm" onClick={remote.reconnect}>
+                  <Icon name="history" className="h-3.5 w-3.5" />
+                  Reconnect
+                </Button>
+              </div>
+            )}
+            {phase === "live" && !playbackBlocked && (remote.connectionState === "disconnected" || remote.videoPaused) && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60 text-sm text-white/80">
+                {remote.connectionState === "disconnected" ? <LoadingSpinner size="md" /> : <Icon name="alert" className="h-6 w-6 text-amber-300" />}
+                {remote.connectionState === "disconnected"
+                  ? "Connection to the tablet dropped. Reconnecting…"
+                  : "The tablet stopped sharing its screen."}
+                <span className="max-w-xs text-center text-xs text-white/60">
+                  When the operator shares the screen again, select Reconnect.
+                </span>
+                <Button size="sm" onClick={remote.reconnect}>
+                  <Icon name="history" className="h-3.5 w-3.5" />
+                  Reconnect
+                </Button>
               </div>
             )}
           </div>
