@@ -20,6 +20,7 @@ import { usePendingHistoryEntries } from "./usePendingHistoryEntries";
 import { useComponentOptions } from "@/lib/machineDetail/useComponentOptions";
 import { HistoryFilterBar } from "./components/historyFilterBar";
 import { HistoryTimeline } from "./components/historyTimeline";
+import { SessionTransfersProvider } from "@/components/remoteSession/sessionTransfers";
 
 const SAVE_FAILED_MESSAGE = "Couldn't save the entry. Please try again.";
 
@@ -99,17 +100,19 @@ const MachineHistoryPage = () => {
           </PermissionButton>
         )}
       </div>
-      <HistoryTimeline
-        entries={[...pending, ...pages.entries]}
-        isLoading={pages.isLoading}
-        error={pages.error}
-        onRetry={pages.reload}
-        hasMore={pages.hasMore}
-        isLoadingMore={pages.isLoadingMore}
-        onLoadMore={() => void pages.loadMore()}
-        onDeletePhoto={deletePhoto}
-        emptyState={emptyState}
-      />
+      <SessionTransfersProvider machineId={machineId} enabled={pages.entries.some((entry) => Boolean(entry.remoteSession))}>
+        <HistoryTimeline
+          entries={[...pending, ...pages.entries]}
+          isLoading={pages.isLoading}
+          error={pages.error}
+          onRetry={pages.reload}
+          hasMore={pages.hasMore}
+          isLoadingMore={pages.isLoadingMore}
+          onLoadMore={() => void pages.loadMore()}
+          onDeletePhoto={deletePhoto}
+          emptyState={emptyState}
+        />
+      </SessionTransfersProvider>
       {isAdding && (
         <HistoryEntryModal
           machineLabel={machine?.assetId ?? ""}

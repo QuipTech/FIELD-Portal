@@ -8,6 +8,7 @@ import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import { getRecordingUrlRequest, getTranscriptRequest } from "@/lib/api/remoteSessionApi";
 import { PERMISSIONS } from "@/lib/auth/permissionCodes";
 import { formatRemoteDuration, remoteEndReasonLabel, type RemoteSessionSummary } from "@/lib/types/remoteSession";
+import { SessionTransferList } from "./sessionTransfers";
 
 interface RemoteSessionHistoryDetailsProps {
   machineId: string;
@@ -31,7 +32,8 @@ const highlight = (text: string, query: string) => {
 };
 
 // A remote session on the machine's History: who, how long, why it ended,
-// and (with remote support permission) its recording and transcript.
+// its recording and transcript (with remote support permission), and the
+// files sent to or from the tablet during it.
 export const RemoteSessionHistoryDetails = ({ machineId, session }: RemoteSessionHistoryDetailsProps) => {
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<string | null>(null);
@@ -114,6 +116,7 @@ export const RemoteSessionHistoryDetails = ({ machineId, session }: RemoteSessio
           {error}
         </p>
       )}
+      <SessionTransferList session={session} />
       {recordingUrl && (
         // eslint-disable-next-line jsx-a11y/media-has-caption -- the transcript is shown alongside
         <video src={recordingUrl} controls autoPlay className="max-h-[420px] w-full rounded-lg bg-black" />

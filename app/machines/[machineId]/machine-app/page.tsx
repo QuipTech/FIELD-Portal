@@ -5,7 +5,6 @@ import { useState } from "react";
 import { PermissionButton } from "@/components/auth/permissionButton";
 import { Icon } from "@/components/icons/icon";
 import { ConnectMachineAppDialog } from "@/components/machines/machineApp/connectMachineAppDialog";
-import { MachineAppActivity } from "@/components/machines/machineApp/machineAppActivity";
 import { RemoteSessionButton } from "@/components/machines/machineApp/remoteSessionButton";
 import { buttonBaseClasses, buttonSizeClasses, buttonVariantClasses } from "@/components/ui/buttonStyles";
 import { Card } from "@/components/ui/card";
@@ -99,7 +98,7 @@ const MachineAppPage = () => {
             <span className="text-[15px] font-medium text-ink">Remote access</span>
             <p className="text-sm text-bodyGray">
               See and control this machine&apos;s tablet in a new window. The operator allows each session on the tablet, and
-              every session is recorded and listed below.
+              every session is recorded to this machine&apos;s History.
             </p>
             <RemoteSessionButton
               machineId={machineId}
@@ -109,7 +108,6 @@ const MachineAppPage = () => {
           </div>
         </Card>
       )}
-      <MachineAppActivity machineId={machineId} />
       {isConnecting && (
         <ConnectMachineAppDialog
           machineId={machineId}
