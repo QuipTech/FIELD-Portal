@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { toApiErrorMessage } from "../api/apiErrorMessage";
 import {
   completeRecordingRequest,
@@ -42,7 +42,9 @@ const DISCONNECTED_RECONNECT_MS = 8000;
 
 // One remote session from this window: Connect, wait for the operator's
 // answer, then view, control and record until either side ends it.
-export const useRemoteSession = (machineId: string) => {
+// `videoElement`: the page's <video> showing the tablet, which the recording
+// copies its frames from.
+export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTMLVideoElement | null>) => {
   const [phase, setPhase] = useState<RemotePhase>("requesting");
   const [session, setSession] = useState<RemoteSession | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -153,13 +155,14 @@ export const useRemoteSession = (machineId: string) => {
           remoteLog.info(recording ? "recording: recorder running" : "recording: recorder stopped");
           setIsRecording(recording);
         },
+        () => videoElement?.current ?? null,
       );
       recorder.current = sessionRecorder;
       remoteLog.info("recording: started (first video track arrived)", { sessionId: current.id });
       sessionRecorder.start(media);
       if (mic.current) sessionRecorder.addAudio(mic.current);
     },
-    [machineId],
+    [machineId, videoElement],
   );
 
   const connect = useCallback(async () => {
