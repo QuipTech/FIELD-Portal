@@ -53,6 +53,8 @@ export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTM
   const [controlReady, setControlReady] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  // Recording waits for a click in this window to start the sound.
+  const [recordingNeedsClick, setRecordingNeedsClick] = useState(false);
   const [micOn, setMicOn] = useState(false);
   const [micPending, setMicPending] = useState(false);
   // The tablet's video track is muted: it stopped sending its screen.
@@ -156,6 +158,10 @@ export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTM
           setIsRecording(recording);
         },
         () => videoElement?.current ?? null,
+        (waiting) => {
+          if (waiting) remoteLog.warn("recording: waiting for a click in this window to start sound (browser autoplay rule); video-only after 10 s");
+          setRecordingNeedsClick(waiting);
+        },
       );
       recorder.current = sessionRecorder;
       remoteLog.info("recording: started (first video track arrived)", { sessionId: current.id });
@@ -305,6 +311,18 @@ export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTM
     return () => clearInterval(timer);
   }, [running, sessionId, heartbeatSeconds, machineId, remember, finish]);
 
+  // Any click or key press in this window lets the browser start the
+  // recording's sound (its autoplay rule needs one).
+  useEffect(() => {
+    const resume = () => void recorder.current?.resumeAudio();
+    window.addEventListener("pointerdown", resume, true);
+    window.addEventListener("keydown", resume, true);
+    return () => {
+      window.removeEventListener("pointerdown", resume, true);
+      window.removeEventListener("keydown", resume, true);
+    };
+  }, []);
+
   // Closing the window ends the session.
   useEffect(() => {
     const onHide = () => {
@@ -398,6 +416,7 @@ export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTM
     connectionState,
     controlReady,
     isRecording,
+    recordingNeedsClick,
     recordingError,
     micOn,
     micPending,
