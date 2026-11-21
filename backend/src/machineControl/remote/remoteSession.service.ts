@@ -304,6 +304,13 @@ export class RemoteSessionService {
     }
     const row = await this.portalRow(actor, machineId, sessionId, 'read');
     if (row.requester_id !== actor.userId) throw notRequester();
+    this.debug.info('recording part received', {
+      sessionId,
+      partNumber,
+      bytes: file.buffer.length,
+      status: row.status,
+      recordingStatus: row.recording_status,
+    });
     this.assertRecordingOpen(row);
 
     let current = row;
@@ -320,7 +327,14 @@ export class RemoteSessionService {
         await this.recordings.abort(key, uploadId);
       }
     }
-    if (current.recording_status !== 'recording') throw notActive();
+    if (current.recording_status !== 'recording') {
+      this.debug.warn('recording upload could not start (database refused)', {
+        sessionId,
+        status: current.status,
+        recordingStatus: current.recording_status,
+      });
+      throw notActive();
+    }
     const etag = await this.recordings.uploadPart(
       current.recording_key!,
       current.recording_upload_id!,
@@ -346,6 +360,12 @@ export class RemoteSessionService {
   ): Promise<RemoteSession> => {
     const row = await this.portalRow(actor, machineId, sessionId, 'read');
     if (row.requester_id !== actor.userId) throw notRequester();
+    this.debug.info('recording complete requested by viewer', {
+      sessionId,
+      viewerFailed: failed,
+      recordingStatus: row.recording_status,
+      parts: row.recording_parts.length,
+    });
     return toRemoteSession(
       await this.finishRecording(
         sessionId,
@@ -624,11 +644,18 @@ export class RemoteSessionService {
           null,
         );
       };
-      if (viewerError) return fail(viewerError);
+      if (viewerError) {
+        this.debug.warn('recording failed: viewer reported a failure', { sessionId, viewerError });
+        return fail(viewerError);
+      }
       if (
         row.recording_status === 'pending' ||
         row.recording_parts.length === 0
       ) {
+        this.debug.warn(
+          'recording failed: no part was uploaded (the Portal never got video, or every upload was refused)',
+          { sessionId, recordingStatus: row.recording_status },
+        );
         return fail('No recording was uploaded for this session.');
       }
       try {
@@ -640,6 +667,11 @@ export class RemoteSessionService {
         return fail('The recording could not be saved.');
       }
       const job = await this.recordings.startTranscription(row);
+      this.debug.info('recording completed', {
+        sessionId,
+        parts: row.recording_parts.length,
+        transcriptJob: job,
+      });
       return repository.recordingFinish(
         client,
         sessionId,
@@ -728,7 +760,17 @@ export class RemoteSessionService {
     const withinGrace =
       row.status === 'ended' &&
       Date.now() - endedAt < REMOTE_RECORDING_GRACE_SECONDS * 1000;
-    if (!withinGrace || row.recording_status !== 'recording') throw notActive();
+    // 'pending' too: a short session's first and only part arrives as it
+    // ends (migration 0141 lets that upload start within the grace period).
+    if (!withinGrace || !['pending', 'recording'].includes(row.recording_status)) {
+      this.debug.warn('recording part refused: session closed and outside the grace period', {
+        sessionId: row.id,
+        status: row.status,
+        recordingStatus: row.recording_status,
+        endedAt: row.ended_at,
+      });
+      throw notActive();
+    }
   }
 
   private portalRow = (

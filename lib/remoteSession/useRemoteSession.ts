@@ -32,6 +32,9 @@ const sessionSummary = (session: RemoteSession) => ({
 export type RemotePhase = "requesting" | "waiting" | "connecting" | "live" | "ended" | "error";
 
 const WAITING_POLL_MS = 1500;
+// How long ending waits for the last recording part to upload while the
+// session is still active, before ending it anyway.
+const FINAL_UPLOAD_WAIT_MS = 30_000;
 const MAX_RECONNECTS = 3;
 
 // One remote session from this window: Connect, wait for the operator's
@@ -76,12 +79,25 @@ export const useRemoteSession = (machineId: string) => {
         setMicOn(false);
         setStream(null);
         setIsRecording(false);
+        // Upload the last part before ending: a short session's only part
+        // is uploaded here, and the backend takes it most reliably while
+        // the session is still active.
+        let uploaded: boolean | null = null;
+        if (recorder.current) {
+          remoteLog.info("recording: stopping; uploading the last part before ending the session");
+          uploaded = await Promise.race([
+            stopRecording,
+            new Promise<null>((done) => setTimeout(() => done(null), FINAL_UPLOAD_WAIT_MS)),
+          ]);
+          if (uploaded === null) remoteLog.warn("recording: last part still uploading after 30 s; ending the session anyway");
+        }
         if (current && endOnServer) {
           await endRemoteSessionRequest(machineId, current.id)
             .then(remember)
             .catch(() => undefined);
         }
-        const uploaded = await stopRecording;
+        uploaded ??= await stopRecording;
+        if (recorder.current) remoteLog[uploaded ? "info" : "error"]("recording: upload finished", { uploaded });
         if (current && recorder.current) {
           await completeRecordingRequest(machineId, current.id, !uploaded)
             .then(remember)
@@ -105,14 +121,29 @@ export const useRemoteSession = (machineId: string) => {
       const current = sessionRef.current;
       if (!current?.scope.record || recorder.current || media.getVideoTracks().length === 0) return;
       if (!SessionRecorder.isSupported()) {
+        remoteLog.error("recording: this browser can't record (MediaRecorder/AudioContext missing)");
         setRecordingError("This browser can't record the session. Use a current Chrome or Edge.");
         return;
       }
       const sessionRecorder = new SessionRecorder(
-        (partNumber, part) => uploadRecordingPartRequest(machineId, current.id, partNumber, part),
-        (message) => setRecordingError(message),
+        (partNumber, part) =>
+          uploadRecordingPartRequest(machineId, current.id, partNumber, part).then(
+            (result) => {
+              remoteLog.info("recording: part uploaded", { partNumber, bytes: part.size });
+              return result;
+            },
+            (uploadError: unknown) => {
+              remoteLog.warn("recording: part upload failed", { partNumber, bytes: part.size, ...describeError(uploadError) });
+              throw uploadError;
+            },
+          ),
+        (message) => {
+          remoteLog.error("recording: failed", { message });
+          setRecordingError(message);
+        },
       );
       recorder.current = sessionRecorder;
+      remoteLog.info("recording: started (first video track arrived)", { sessionId: current.id });
       sessionRecorder.start(media);
       if (mic.current) sessionRecorder.addAudio(mic.current);
       setIsRecording(sessionRecorder.isRecording);
