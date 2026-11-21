@@ -254,8 +254,15 @@ export const requestHelp = (
     viewerClientId,
   ]);
 
-export const claimHelp = (client: Queryable, machineId: string, sessionId: string) =>
-  one(client, 'SELECT * FROM mc_remote_claim_help($1, $2)', [machineId, sessionId]);
+export const claimHelp = (
+  client: Queryable,
+  machineId: string,
+  sessionId: string,
+) =>
+  one(client, 'SELECT * FROM mc_remote_claim_help($1, $2)', [
+    machineId,
+    sessionId,
+  ]);
 
 export const findPendingHelp = async (client: Queryable, machineId: string) => {
   const { rows } = await client.query<RemoteSessionRow>(
@@ -267,3 +274,23 @@ export const findPendingHelp = async (client: Queryable, machineId: string) => {
   );
   return rows[0] ?? null;
 };
+
+// A closed session's recording and transcript cleared (migration 0142);
+// the session as it was before, or undefined when it isn't this
+// organisation's or is still open.
+export const deleteRecording = async (client: Queryable, sessionId: string) =>
+  (
+    await client.query<RemoteSessionRow>(
+      'SELECT * FROM mc_remote_recording_delete($1)',
+      [sessionId],
+    )
+  ).rows[0];
+
+// As deleteRecording, and the session's History entry removed.
+export const deleteSession = async (client: Queryable, sessionId: string) =>
+  (
+    await client.query<RemoteSessionRow>(
+      'SELECT * FROM mc_remote_session_delete($1)',
+      [sessionId],
+    )
+  ).rows[0];

@@ -219,10 +219,27 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
           </span>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          {live && remote.isRecording && (
-            <span className="flex items-center gap-1.5 rounded-full bg-red-600/20 px-2.5 py-1 text-xs font-medium text-red-300" role="status">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
-              Recording
+          {live && remote.isRecording && !remote.recordingStopped && (
+            <>
+              <span className="flex items-center gap-1.5 rounded-full bg-red-600/20 px-2.5 py-1 text-xs font-medium text-red-300" role="status">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
+                Recording
+              </span>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="!text-red-200 hover:!bg-red-600/20"
+                onClick={() => void remote.stopRecording()}
+                title="Stop and save the recording. It can't be restarted in this session."
+              >
+                <span className="h-2.5 w-2.5 rounded-sm bg-red-400" />
+                Stop recording
+              </Button>
+            </>
+          )}
+          {live && remote.recordingStopped && (
+            <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-white/70" role="status">
+              Recording stopped
             </span>
           )}
           {live && elapsed !== null && <span className="tabular-nums text-sm text-white/70">{formatClock(elapsed)}</span>}
@@ -346,6 +363,15 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
             }}
           >
             <video ref={video} autoPlay playsInline className="h-full w-full object-contain" />
+            {remote.isRecording && !remote.recordingStopped && (
+              <>
+                <div aria-hidden className="pointer-events-none absolute inset-0 animate-pulse border-4 border-red-600" />
+                <span className="pointer-events-none absolute left-3 top-3 flex items-center gap-1.5 rounded-md bg-red-600 px-2 py-1 text-xs font-semibold tracking-wide text-white shadow">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
+                  REC
+                </span>
+              </>
+            )}
             {phase === "live" && playbackBlocked && (
               <div className="absolute inset-0 flex items-center justify-center bg-black/60">
                 <Button variant="primary" onClick={() => void playMedia()}>Play tablet audio and video</Button>

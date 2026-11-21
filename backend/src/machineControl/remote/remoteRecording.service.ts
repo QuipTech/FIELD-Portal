@@ -194,4 +194,25 @@ export class RemoteRecordingService {
 
   playbackUrl = (row: RemoteSessionRow) =>
     this.storage.getSignedDownloadUrl(row.recording_key!);
+
+  // Deletes a session's recording and transcript from storage (an upload
+  // still open is aborted). Failures are logged, not thrown: the database
+  // no longer points at the files.
+  deleteFiles = async (row: RemoteSessionRow): Promise<void> => {
+    const folder = sessionFilesFolder(row);
+    if (row.recording_key && row.recording_upload_id) {
+      await this.abort(row.recording_key, row.recording_upload_id);
+    }
+    const keys = [
+      row.recording_key ?? `${folder}/recording.webm`,
+      `${folder}/transcript.json`,
+    ];
+    for (const key of keys) {
+      await this.storage
+        .deleteFile(key, row.tenant_id)
+        .catch((error: unknown) =>
+          this.logger.warn(`Deleting ${key} failed: ${String(error)}`),
+        );
+    }
+  };
 }

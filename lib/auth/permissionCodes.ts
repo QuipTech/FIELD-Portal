@@ -26,6 +26,8 @@ export const PERMISSIONS = {
   sendMachineControlFiles: "mc.deliver",
   manageMachineControlDevices: "mc.manage_devices",
   useMachineControlRemote: "mc.remote",
+  // Owner and Organisation Admin: delete remote session recordings and sessions.
+  deleteMachineControlRemote: "mc.remote_delete",
 } as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -51,6 +53,7 @@ export const permissionLabels: Record<PermissionCode, string> = {
   "mc.deliver": "Send files to machines",
   "mc.manage_devices": "Connect and disconnect machine tablets",
   "mc.remote": "Use remote support on machine tablets",
+  "mc.remote_delete": "Delete remote session recordings and sessions",
 };
 
 export const describeMissingPermission = (permission: PermissionCode): string =>

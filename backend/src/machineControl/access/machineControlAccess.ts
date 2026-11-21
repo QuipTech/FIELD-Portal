@@ -11,6 +11,8 @@ export const MC_PERMISSIONS = {
   deliver: 'mc.deliver',
   manageDevices: 'mc.manage_devices',
   remote: 'mc.remote',
+  // Delete a remote session's recording, or the session (migration 0142).
+  remoteDelete: 'mc.remote_delete',
 } as const;
 
 export const isMachineControlEnabled = async (

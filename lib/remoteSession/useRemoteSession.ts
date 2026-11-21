@@ -53,6 +53,9 @@ export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTM
   const [controlReady, setControlReady] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  // The viewer stopped the recording; the session carries on unrecorded.
+  const [recordingStopped, setRecordingStopped] = useState(false);
+  const stoppingRecording = useRef<Promise<void> | null>(null);
   // Recording waits for a click in this window to start the sound.
   const [recordingNeedsClick, setRecordingNeedsClick] = useState(false);
   const [micOn, setMicOn] = useState(false);
@@ -402,6 +405,24 @@ export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTM
     void connect();
   }, [connect]);
 
+  // "Stop recording": saves what was recorded so far (upload, complete,
+  // transcript). It can't be restarted in the same session.
+  const stopRecording = useCallback(() => {
+    const current = sessionRef.current;
+    const active = recorder.current;
+    if (!current || !active || finishing.current) return Promise.resolve();
+    stoppingRecording.current ??= (async () => {
+      remoteLog.info("recording: stopped by the user; saving it");
+      setRecordingStopped(true);
+      const uploaded = await active.stop();
+      remoteLog[uploaded ? "info" : "error"]("recording: upload finished", { uploaded });
+      await completeRecordingRequest(machineId, current.id, !uploaded)
+        .then(remember)
+        .catch((completeError: unknown) => remoteLog.warn("recording: complete failed", describeError(completeError)));
+    })();
+    return stoppingRecording.current;
+  }, [machineId, remember]);
+
   const end = useCallback(() => {
     const current = sessionRef.current;
     if (!current) return Promise.resolve();
@@ -417,6 +438,8 @@ export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTM
     controlReady,
     isRecording,
     recordingNeedsClick,
+    recordingStopped,
+    stopRecording,
     recordingError,
     micOn,
     micPending,

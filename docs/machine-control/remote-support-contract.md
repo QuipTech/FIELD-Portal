@@ -268,6 +268,23 @@ screen. Map them to the real desktop coordinates and inject with
   requester, date, duration, playback and searchable transcript. Playback
   and the transcript need Portal login, machine access and `mc.remote`.
 
+### Starting, stopping and deleting (Portal)
+
+- Recording starts automatically in the Portal viewer as soon as the tablet's
+  screen appears; no click is needed. A red frame and **REC** label show
+  while it records.
+- **Stop recording** saves what was recorded so far (upload, complete,
+  transcript). It can't be restarted in the same session. The tablet gets
+  `remote:recording` with `completed`.
+- Admins with `mc.remote_delete` (Owner, Organisation Admin; migration 0142)
+  can, once the session has ended:
+  - `DELETE /machines/{machineId}/remote-sessions/{id}/recording`: delete
+    the video and transcript; the session stays in History.
+  - `DELETE /machines/{machineId}/remote-sessions/{id}`: delete them and
+    remove the session from History (its entry is soft-deleted for audit).
+  - `409 remote_session_open` while the session runs; `403` for a machine
+    shared from another organisation.
+
 ## What the Windows team needs to build
 
 1. Listen for `remote:*` on the existing socket. On start and reconnect, call
