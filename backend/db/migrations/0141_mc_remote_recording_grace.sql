@@ -29,3 +29,6 @@ END;
 $$;
 REVOKE ALL ON FUNCTION mc_remote_recording_start(uuid, varchar, varchar) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION mc_remote_recording_start(uuid, varchar, varchar) TO field_app;
+
+INSERT INTO schema_migrations (version)
+VALUES ('0141_mc_remote_recording_grace') ON CONFLICT DO NOTHING;
