@@ -75,6 +75,29 @@ describe("session recorder", () => {
     expect((sources[0].srcObject as { tracks: unknown[] }).tracks).toEqual([next]);
   });
 
+  it("draws frames from the visible video, and keeps the timeline going without one", () => {
+    vi.useFakeTimers();
+    setup();
+    const drawImage = vi.fn();
+    const fillRect = vi.fn();
+    const createElement = document.createElement as unknown as { getMockImplementation: () => (name: string) => unknown };
+    const original = createElement.getMockImplementation();
+    vi.spyOn(document, "createElement").mockImplementation(((name: string) =>
+      name === "canvas"
+        ? { getContext: () => ({ drawImage, fillRect, fillStyle: "" }), captureStream: () => ({ getVideoTracks: () => [track("canvas")] }) }
+        : original(name)) as never);
+    let visible: HTMLVideoElement | null = null;
+    const recorder = new SessionRecorder(vi.fn(), vi.fn(), undefined, () => visible);
+    recorder.start(new MediaStream([track("tablet")] as never));
+    vi.advanceTimersByTime(100);
+    expect(drawImage).not.toHaveBeenCalled();
+    expect(fillRect).toHaveBeenCalledWith(0, 0, 1, 1);
+    visible = { readyState: 4, videoWidth: 1920, videoHeight: 1080 } as HTMLVideoElement;
+    vi.advanceTimersByTime(100);
+    expect(drawImage).toHaveBeenCalledWith(visible, 0, 0, 1280, 720);
+    vi.useRealTimers();
+  });
+
   it("does not report a failure when stopped on purpose", async () => {
     setup();
     const failures: string[] = [];

@@ -8,7 +8,7 @@ const TIMESLICE_MS = 4000;
 // The recording draws the tablet's video onto a canvas at this rate, so a
 // reconnect (a new video track) carries on in the same file.
 const RECORD_FPS = 15;
-const DEFAULT_SIZE = { width: 1280, height: 720 };
+const RECORD_SIZE = { width: 1280, height: 720 };
 const UPLOAD_ATTEMPTS = 4;
 
 type UploadPart = (partNumber: number, part: Blob) => Promise<unknown>;
@@ -41,6 +41,8 @@ export class SessionRecorder {
     private readonly onFailure: (message: string) => void,
     // Called whenever the recorder starts or stops, so the UI shows the truth.
     private readonly onStateChange: (recording: boolean) => void = () => undefined,
+    // The <video> showing the tablet on the page, the best source of frames.
+    private readonly visibleVideo?: () => HTMLVideoElement | null,
   ) {}
 
   static isSupported = () => Boolean(pickMimeType()) && typeof AudioContext !== "undefined";
@@ -88,26 +90,39 @@ export class SessionRecorder {
     void this.source.play().catch(() => undefined);
   };
 
+  // Draws the tablet's video onto a fixed-size canvas and records that, so
+  // a reconnect (a new video track) carries on in the same file. Frames come
+  // from the visible <video> on the page when there is one: Chrome pauses
+  // muted videos that aren't on screen, so an off-screen copy gets no frames.
   private startCanvas(track: MediaStreamTrack): MediaStreamTrack {
     const canvas = document.createElement("canvas");
-    const settings = track.getSettings?.() ?? {};
-    canvas.width = settings.width || DEFAULT_SIZE.width;
-    canvas.height = settings.height || DEFAULT_SIZE.height;
+    // Fixed for the whole file: resizing a canvas while it's recorded can
+    // stop the recorder. Other shapes are letterboxed.
+    canvas.width = RECORD_SIZE.width;
+    canvas.height = RECORD_SIZE.height;
     const context = canvas.getContext("2d");
-    const source = document.createElement("video");
-    source.muted = true;
-    source.playsInline = true;
-    source.srcObject = new MediaStream([track]);
-    void source.play().catch(() => undefined);
-    this.source = source;
-    let sized = Boolean(settings.width && settings.height);
+    const fallback = document.createElement("video");
+    fallback.muted = true;
+    fallback.playsInline = true;
+    fallback.srcObject = new MediaStream([track]);
+    void fallback.play().catch(() => undefined);
+    this.source = fallback;
+    const ready = (video: HTMLVideoElement | null | undefined): video is HTMLVideoElement =>
+      Boolean(video && video.readyState >= 2 && video.videoWidth && video.videoHeight);
+    if (context) {
+      context.fillStyle = "#000";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+    }
     this.drawTimer = setInterval(() => {
-      if (!context || source.readyState < 2 || !source.videoWidth) return;
-      // The file keeps the first real size; later sizes are letterboxed.
-      if (!sized) {
-        canvas.width = source.videoWidth;
-        canvas.height = source.videoHeight;
-        sized = true;
+      if (!context) return;
+      const visible = this.visibleVideo?.();
+      const source = ready(visible) ? visible : ready(fallback) ? fallback : null;
+      if (!source) {
+        // No picture right now (connecting or reconnecting): keep the last
+        // frame and touch one pixel so the recording keeps its timeline.
+        context.fillStyle = "#000";
+        context.fillRect(0, 0, 1, 1);
+        return;
       }
       const scale = Math.min(canvas.width / source.videoWidth, canvas.height / source.videoHeight);
       const width = source.videoWidth * scale;
@@ -119,6 +134,7 @@ export class SessionRecorder {
     this.canvasTrack = canvas.captureStream(RECORD_FPS).getVideoTracks()[0];
     return this.canvasTrack;
   }
+
 
   private stopCanvas() {
     if (this.drawTimer !== null) clearInterval(this.drawTimer);

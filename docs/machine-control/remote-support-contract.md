@@ -255,7 +255,7 @@ screen. Map them to the real desktop coordinates and inject with
 
 - **Who records:** the Portal viewer records the stream it receives (screen
   plus both microphones) and uploads it while the session runs. The backend
-  completes it in S3 (`documents/{tenantId}/remote-sessions/{machineId}/{sessionId}/recording.webm`),
+  completes it in S3 (`documents/{tenantId}/machines/{machineId}/remote-sessions/{YYYY-MM-DD}_{sessionId}/recording.webm`, with `transcript.json` beside it),
   then AWS Transcribe (en-AU) produces the transcript.
 - **Tablet's job:** show a clear **Recording** indicator whenever the session
   is `active` and `scope.record` is `true`, from Allow until it ends.

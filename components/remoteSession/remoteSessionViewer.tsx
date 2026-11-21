@@ -67,10 +67,10 @@ const EndedSummary = ({ session }: { session: RemoteSession | null }) => {
 // The remote session window: the tablet's live screen, with tap, type and
 // scroll sent to it, a microphone, the recording indicator and End.
 export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionViewerProps) => {
-  const remote = useRemoteSession(machineId);
+  const video = useRef<HTMLVideoElement>(null);
+  const remote = useRemoteSession(machineId, video);
   const { phase, session, stream, sendControl } = remote;
   const viewer = useRef<HTMLDivElement>(null);
-  const video = useRef<HTMLVideoElement>(null);
   const surface = useRef<HTMLDivElement>(null);
   const pressedPointer = useRef<{ id: number; button: number; x: number; y: number } | null>(null);
   const pressedKeys = useRef(new Map<string, Extract<ControlMessage, { type: "key" }>>());
@@ -305,7 +305,7 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
             tabIndex={0}
             role="application"
             aria-label="Tablet screen"
-            className={`relative flex h-full w-full items-center justify-center bg-black outline-none ${canControl ? "cursor-crosshair" : ""}`}
+            className={`relative flex h-full w-full items-center justify-center bg-black outline-none ${canControl ? "cursor-default" : ""}`}
             style={{ touchAction: "none" }}
             onPointerDown={onPointer("down")}
             onPointerMove={onPointer("move")}
