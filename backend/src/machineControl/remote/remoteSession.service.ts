@@ -405,6 +405,68 @@ export class RemoteSessionService {
     };
   };
 
+  // Deletes a closed session's recording and transcript (files and the
+  // session's pointers to them). The session stays in History.
+  deleteRecording = (
+    actor: AuthenticatedUser,
+    machineId: string,
+    sessionId: string,
+  ): Promise<RemoteSession> =>
+    this.debug.trace(
+      'portal delete recording',
+      { machineId, sessionId, userId: actor.userId },
+      () => this.deleteWith(actor, machineId, sessionId, repository.deleteRecording),
+      sessionSummary,
+    );
+
+  // Deletes the recording and removes the session from the machine's
+  // History (its history entry is soft-deleted for audit).
+  deleteSession = (
+    actor: AuthenticatedUser,
+    machineId: string,
+    sessionId: string,
+  ): Promise<RemoteSession> =>
+    this.debug.trace(
+      'portal delete session',
+      { machineId, sessionId, userId: actor.userId },
+      () => this.deleteWith(actor, machineId, sessionId, repository.deleteSession),
+      sessionSummary,
+    );
+
+  private deleteWith = async (
+    actor: AuthenticatedUser,
+    machineId: string,
+    sessionId: string,
+    remove: (client: PoolClient, sessionId: string) => Promise<RemoteSessionRow | undefined>,
+  ): Promise<RemoteSession> => {
+    const before = await this.db.withActor(actor, async (client) => {
+      await requireMachineAccess(client, machineId, 'contribute');
+      const row = await repository.findForMachine(client, machineId, sessionId);
+      if (!row) throw notFound();
+      if (['requested', 'active'].includes(row.status)) {
+        throw new ConflictException({
+          code: 'remote_session_open',
+          message: 'End the remote session before deleting it.',
+        });
+      }
+      const removed = await remove(client, sessionId);
+      if (!removed) {
+        throw new ForbiddenException({
+          code: 'remote_session_not_owner',
+          message: "Only the machine's organisation can delete its remote sessions.",
+        });
+      }
+      return removed;
+    });
+    await this.recordings.deleteFiles(before);
+    return toRemoteSession({
+      ...before,
+      recording_status: 'none',
+      recording_key: null,
+      transcript_status: 'none',
+    });
+  };
+
   // ── Tablet ──────────────────────────────────────────────────────────
 
   requestHelp = (

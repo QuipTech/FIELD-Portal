@@ -3,6 +3,8 @@
 // 5 MiB (S3's multipart minimum; the last may be smaller) upload one at a
 // time while the session runs, so a closed window loses at most the part
 // still buffering.
+import { AudioPump } from "./audioPump";
+
 export const MIN_PART_BYTES = 5 * 1024 * 1024;
 const TIMESLICE_MS = 4000;
 // The recording draws the tablet's video onto a canvas at this rate, so a
@@ -56,6 +58,7 @@ export class SessionRecorder {
   private began = false;
   private mimeType = "";
   private canvasVideo: MediaStreamTrack | null = null;
+  private pump: AudioPump | null = null;
 
   static isSupported = () => Boolean(pickMimeType()) && typeof AudioContext !== "undefined";
 
@@ -71,32 +74,53 @@ export class SessionRecorder {
       return;
     }
     this.mimeType = mimeType;
-    this.audio = new AudioContext();
+    // 48 kHz, what the AudioPump writes.
+    this.audio = new AudioContext({ sampleRate: 48_000 });
     this.mix = this.audio.createMediaStreamDestination();
-    this.addAudio(remote);
     this.canvasVideo = this.startCanvas(video);
     const audio = this.audio;
+    const mixed = this.mix.stream.getAudioTracks()[0];
+
+    // Chrome/Edge: start now with a track that is never stalled. Before
+    // anyone clicks (AudioContext suspended) it carries the tablet's own
+    // audio or silence; once the AudioContext runs, the full mix.
+    if (AudioPump.isSupported() && mixed) {
+      const pump = new AudioPump();
+      this.pump = pump;
+      this.addAudio(remote);
+      if (audio.state === "running") pump.useSource(mixed);
+      audio.onstatechange = () => {
+        if (audio.state === "running") pump.useSource(mixed);
+      };
+      void audio.resume().catch(() => undefined);
+      this.begin(pump.track);
+      return;
+    }
+
+    // Other browsers: wait for a click to start the sound.
+    this.addAudio(remote);
     if (audio.state === "running") {
-      this.begin(true);
+      this.begin(mixed ?? null);
       return;
     }
     this.onAudioWait(true);
     audio.onstatechange = () => {
-      if (audio.state === "running") this.begin(true);
+      if (audio.state === "running") this.begin(mixed ?? null);
     };
     void audio.resume().catch(() => undefined);
-    this.audioWaitTimer = setTimeout(() => this.begin(false), AUDIO_WAIT_MS);
+    this.audioWaitTimer = setTimeout(() => this.begin(null), AUDIO_WAIT_MS);
   };
 
   // Starts the recorder once: with the mixed audio (for the transcript), or
   // video only when nobody clicked to allow sound.
-  private begin(withAudio: boolean) {
-    if (this.began || this.stopping || this.failed || !this.canvasVideo || !this.mix) return;
+  private begin(audioTrack: MediaStreamTrack | null) {
+    if (this.began || this.stopping || this.failed || !this.canvasVideo) return;
+    const withAudio = Boolean(audioTrack);
     this.began = true;
     if (this.audioWaitTimer !== null) clearTimeout(this.audioWaitTimer);
     this.audioWaitTimer = null;
     this.onAudioWait(false);
-    const recorded = new MediaStream([this.canvasVideo, ...(withAudio ? this.mix.stream.getAudioTracks() : [])]);
+    const recorded = new MediaStream(audioTrack ? [this.canvasVideo, audioTrack] : [this.canvasVideo]);
     const recorder = new MediaRecorder(recorded, {
       mimeType: withAudio ? this.mimeType : this.mimeType.replace(/,opus/, ""),
       videoBitsPerSecond: 1_000_000,
@@ -183,6 +207,7 @@ export class SessionRecorder {
     this.drawTimer = null;
     if (this.source) this.source.srcObject = null;
     this.canvasTrack?.stop();
+    this.pump?.stop();
   }
 
   // Mixes a stream's audio (the tablet's, or the viewer's microphone) in.
@@ -192,6 +217,9 @@ export class SessionRecorder {
       if (this.mixedTracks.has(track)) continue;
       this.mixedTracks.add(track);
       this.audio.createMediaStreamSource(new MediaStream([track])).connect(this.mix);
+      // Until a click starts the AudioContext, record the tablet's audio
+      // straight from its track.
+      if (this.pump && this.audio.state !== "running") this.pump.useSource(track);
     }
   };
 

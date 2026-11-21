@@ -5,14 +5,24 @@ import { PermissionButton } from "@/components/auth/permissionButton";
 import { Icon } from "@/components/icons/icon";
 import { LoadingSpinner } from "@/components/ui/loadingSpinner";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
-import { getRecordingUrlRequest, getTranscriptRequest } from "@/lib/api/remoteSessionApi";
+import {
+  deleteRemoteRecordingRequest,
+  deleteRemoteSessionRequest,
+  getRecordingUrlRequest,
+  getTranscriptRequest,
+} from "@/lib/api/remoteSessionApi";
 import { PERMISSIONS } from "@/lib/auth/permissionCodes";
+import { usePermissions } from "@/lib/auth/usePermissions";
+import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirmDialog";
 import { formatRemoteDuration, remoteEndReasonLabel, type RemoteSessionSummary } from "@/lib/types/remoteSession";
 import { SessionTransferList } from "./sessionTransfers";
 
 interface RemoteSessionHistoryDetailsProps {
   machineId: string;
   session: RemoteSessionSummary;
+  // After an admin deleted the whole session, so the entry can disappear.
+  onSessionDeleted?: () => void;
 }
 
 // Highlights every match of `query` in `text`.
@@ -34,7 +44,11 @@ const highlight = (text: string, query: string) => {
 // A remote session on the machine's History: who, how long, why it ended,
 // its recording and transcript (with remote support permission), and the
 // files sent to or from the tablet during it.
-export const RemoteSessionHistoryDetails = ({ machineId, session }: RemoteSessionHistoryDetailsProps) => {
+export const RemoteSessionHistoryDetails = ({ machineId, session: initialSession, onSessionDeleted }: RemoteSessionHistoryDetailsProps) => {
+  const [session, setSession] = useState(initialSession);
+  const [confirming, setConfirming] = useState<"recording" | "session" | null>(null);
+  const { can } = usePermissions();
+  const canDelete = can(PERMISSIONS.deleteMachineControlRemote);
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -109,6 +123,19 @@ export const RemoteSessionHistoryDetails = ({ machineId, session }: RemoteSessio
           </PermissionButton>
         )}
         {recordingNote && <span className="text-xs text-mutedGray">{recordingNote}</span>}
+        {canDelete && (
+          <span className="ml-auto flex items-center gap-1">
+            {(session.recordingStatus === "completed" || session.recordingStatus === "failed") && (
+              <Button size="sm" variant="ghost" onClick={() => setConfirming("recording")}>
+                <Icon name="x" className="h-3.5 w-3.5" />
+                Delete recording
+              </Button>
+            )}
+            <Button size="sm" variant="danger" onClick={() => setConfirming("session")}>
+              Delete session
+            </Button>
+          </span>
+        )}
         {transcriptNote && <span className="text-xs text-mutedGray">{transcriptNote}</span>}
       </div>
       {error && (
@@ -117,6 +144,36 @@ export const RemoteSessionHistoryDetails = ({ machineId, session }: RemoteSessio
         </p>
       )}
       <SessionTransferList session={session} />
+      {confirming === "recording" && (
+        <ConfirmDialog
+          title="Delete recording"
+          confirmLabel="Delete recording"
+          onConfirm={async () => {
+            await deleteRemoteRecordingRequest(machineId, session.id);
+            setRecordingUrl(null);
+            setTranscript(null);
+            setSession({ ...session, recordingStatus: "none", transcriptStatus: "none" });
+          }}
+          onClose={() => setConfirming(null)}
+          toErrorMessage={(deleteError) => toApiErrorMessage(deleteError, "Couldn't delete the recording. Please try again.")}
+        >
+          The video and transcript of this session are deleted for good. The session stays in History.
+        </ConfirmDialog>
+      )}
+      {confirming === "session" && (
+        <ConfirmDialog
+          title="Delete remote session"
+          confirmLabel="Delete session"
+          onConfirm={async () => {
+            await deleteRemoteSessionRequest(machineId, session.id);
+            onSessionDeleted?.();
+          }}
+          onClose={() => setConfirming(null)}
+          toErrorMessage={(deleteError) => toApiErrorMessage(deleteError, "Couldn't delete the session. Please try again.")}
+        >
+          The session is removed from this machine&apos;s History, and its video and transcript are deleted for good.
+        </ConfirmDialog>
+      )}
       {recordingUrl && (
         // eslint-disable-next-line jsx-a11y/media-has-caption -- the transcript is shown alongside
         <video src={recordingUrl} controls autoPlay className="max-h-[420px] w-full rounded-lg bg-black" />

@@ -11,6 +11,8 @@ import { HistoryPhotoLightbox } from "./historyPhotoLightbox";
 import { HistoryEntryDocuments } from "./historyEntryDocuments";
 import { RemoteSessionHistoryDetails } from "@/components/remoteSession/remoteSessionHistoryDetails";
 import { useMachineDetail } from "../../machineDetailContext";
+import { invalidateCached } from "@/lib/machineDetail/resourceCache";
+import { machineKeyPrefix } from "@/lib/machineDetail/machineDetailCacheKeys";
 
 interface HistoryTimelineEntryProps {
   entry: HistoryEntry;
@@ -36,9 +38,11 @@ const syncStateLabels: Record<HistorySyncState, string> = {
 export const HistoryTimelineEntry = ({ entry, onDeletePhoto }: HistoryTimelineEntryProps) => {
   const [photoIndex, setPhotoIndex] = useState<number | null>(null);
   const [photoToDelete, setPhotoToDelete] = useState<HistoryPhoto | null>(null);
-  const { machineId } = useMachineDetail();
+  const [isRemoved, setIsRemoved] = useState(false);
+  const { machineId, notify } = useMachineDetail();
   const meta = historyEntryTypeMeta[entry.type];
   const isSynced = entry.syncState === "synced";
+  if (isRemoved) return null;
 
   return (
     <article className={`relative flex flex-col gap-2 border-b border-borderGray py-3.5 last:border-b-0 ${isSynced ? "" : "opacity-80"}`}>
@@ -82,7 +86,17 @@ export const HistoryTimelineEntry = ({ entry, onDeletePhoto }: HistoryTimelineEn
         </div>
       )}
       <HistoryEntryDocuments documents={entry.documents} />
-      {entry.remoteSession && <RemoteSessionHistoryDetails machineId={machineId} session={entry.remoteSession} />}
+      {entry.remoteSession && (
+        <RemoteSessionHistoryDetails
+          machineId={machineId}
+          session={entry.remoteSession}
+          onSessionDeleted={() => {
+            invalidateCached(machineKeyPrefix(machineId));
+            setIsRemoved(true);
+            notify("Remote session deleted");
+          }}
+        />
+      )}
       {photoIndex !== null && (
         <HistoryPhotoLightbox
           photos={entry.photos}

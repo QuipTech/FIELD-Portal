@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   HttpCode,
@@ -136,6 +137,29 @@ export class RemoteSessionController {
     @Param('sessionId', ParseUUIDPipe) sessionId: string,
   ) {
     return this.sessions.endFromPortal(actor, machineId, sessionId);
+  }
+
+  // Admins (mc.remote_delete): delete the recording and transcript only.
+  @Delete(':sessionId/recording')
+  @RequirePermissions(MC_PERMISSIONS.remoteDelete)
+  deleteRecording(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('machineId', ParseUUIDPipe) machineId: string,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+  ) {
+    return this.sessions.deleteRecording(actor, machineId, sessionId);
+  }
+
+  // Admins (mc.remote_delete): delete the recording and remove the session
+  // from the machine's History.
+  @Delete(':sessionId')
+  @RequirePermissions(MC_PERMISSIONS.remoteDelete)
+  deleteSession(
+    @CurrentUser() actor: AuthenticatedUser,
+    @Param('machineId', ParseUUIDPipe) machineId: string,
+    @Param('sessionId', ParseUUIDPipe) sessionId: string,
+  ) {
+    return this.sessions.deleteSession(actor, machineId, sessionId);
   }
 
   // multipart/form-data with one "part" file field.
