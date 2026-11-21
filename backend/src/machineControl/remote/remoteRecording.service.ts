@@ -17,10 +17,22 @@ import { RemoteSessionRow } from './remoteSession.types';
 
 const RECORDING_CONTENT_TYPE = 'video/webm';
 
-// Under documents/{tenantId}/, which the backend's IAM policy already
-// allows; the machine's owning organisation holds it.
-export const remoteSessionFolder = (row: RemoteSessionRow) =>
-  `documents/${row.tenant_id}/remote-sessions/${row.machine_id}/${row.id}`;
+// With the machine's other files, under documents/{tenantId}/ (which the
+// backend's IAM policy already allows; the owning organisation holds it):
+//   documents/{tenantId}/machines/{machineId}/remote-sessions/
+//     {YYYY-MM-DD}_{sessionId}/recording.webm and transcript.json
+// The date is the session's creation day (UTC), so folders sort by date.
+export const remoteSessionFolder = (row: RemoteSessionRow) => {
+  const day = new Date(row.created_at).toISOString().slice(0, 10);
+  return `documents/${row.tenant_id}/machines/${row.machine_id}/remote-sessions/${day}_${row.id}`;
+};
+
+// The folder a session's files are actually in: the recording's own folder
+// once it has one (so an older layout keeps working), else the current one.
+const sessionFilesFolder = (row: RemoteSessionRow) =>
+  row.recording_key
+    ? row.recording_key.slice(0, row.recording_key.lastIndexOf('/'))
+    : remoteSessionFolder(row);
 
 export type TranscriptCheck =
   | { status: 'processing' }
@@ -122,7 +134,9 @@ export class RemoteRecordingService {
   };
 
   // The job's name, or null when transcription is off or couldn't start.
-  startTranscription = async (row: RemoteSessionRow): Promise<string | null> => {
+  startTranscription = async (
+    row: RemoteSessionRow,
+  ): Promise<string | null> => {
     if (!this.transcribe || !row.recording_key) return null;
     const jobName = `field-remote-${row.id}`;
     try {
@@ -135,7 +149,7 @@ export class RemoteRecordingService {
             MediaFileUri: `s3://${this.bucket.requireBucket()}/${row.recording_key}`,
           },
           OutputBucketName: this.bucket.requireBucket(),
-          OutputKey: `${remoteSessionFolder(row)}/transcript.json`,
+          OutputKey: `${sessionFilesFolder(row)}/transcript.json`,
         }),
       );
       return jobName;
@@ -166,7 +180,7 @@ export class RemoteRecordingService {
     }
     if (status !== 'COMPLETED') return { status: 'processing' };
     const bytes = await this.storage.readObject(
-      `${remoteSessionFolder(row)}/transcript.json`,
+      `${sessionFilesFolder(row)}/transcript.json`,
     );
     const json = JSON.parse(Buffer.from(bytes).toString('utf8')) as {
       results?: { transcripts?: { transcript?: string }[] };
