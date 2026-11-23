@@ -270,12 +270,15 @@ screen. Map them to the real desktop coordinates and inject with
 
 ### Starting, stopping and deleting (Portal)
 
-- Recording starts automatically in the Portal viewer as soon as the tablet's
-  screen appears; no click is needed. A red frame and **REC** label show
-  while it records.
-- **Stop recording** saves what was recorded so far (upload, complete,
-  transcript). It can't be restarted in the same session. The tablet gets
-  `remote:recording` with `completed`.
+- Recording starts only when the viewer clicks **Start recording** (shown
+  once the tablet's screen appears, when the session allows recording). The
+  click also lets the browser record sound. A red frame and **REC** label
+  show while it records.
+- **Stop recording** pauses it; **Start recording** carries on in the same
+  file. The one recording is saved (upload, complete, transcript) when the
+  session ends, and the tablet then gets `remote:recording` with
+  `completed`. A session never started recording ends with no recording
+  (`failed`, shown as "No recording" in History).
 - Admins with `mc.remote_delete` (Owner, Organisation Admin; migration 0142)
   can, once the session has ended:
   - `DELETE /machines/{machineId}/remote-sessions/{id}/recording`: delete
