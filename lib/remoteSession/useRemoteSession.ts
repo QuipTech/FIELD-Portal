@@ -56,6 +56,10 @@ export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTM
   // Recording starts only when the viewer clicks "Start recording"; true
   // once it has (a later Stop only pauses it).
   const [hasRecorded, setHasRecorded] = useState(false);
+  // The viewer wants it recording (Start, until Stop). While the tablet
+  // isn't sharing its screen the recorder pauses anyway, so no black
+  // stretch is recorded, and carries on when the picture is back.
+  const [wantsRecording, setWantsRecording] = useState(false);
   // Recording waits for a click in this window to start the sound.
   const [recordingNeedsClick, setRecordingNeedsClick] = useState(false);
   const [micOn, setMicOn] = useState(false);
@@ -200,6 +204,9 @@ export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTM
               remoteLog.info("viewer: tablet video resumed");
               setVideoPaused(false);
             };
+          } else {
+            // No screen from the tablet yet: nothing to record.
+            setVideoPaused(true);
           }
           latestMedia.current = media;
           // After a reconnect, the recording carries on with the new video.
@@ -408,27 +415,56 @@ export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTM
   }, [connect]);
 
   // "Start recording": the first click starts the recorder (the click also
-  // lets the browser record sound); after a Stop it carries on in the same
-  // file. The file is saved to History when the session ends.
+  // lets the browser record sound); after a Pause it carries on in the same
+  // file. The file is saved to History when the session ends. Nothing is
+  // recorded before this click.
   const startRecording = useCallback(() => {
     if (finishing.current || sessionRef.current?.status !== "active") return;
+    setWantsRecording(true);
     if (recorder.current) {
       remoteLog.info("recording: resumed by the user");
       void recorder.current.resumeAudio();
-      recorder.current.resume();
+      if (!videoPaused) recorder.current.resume();
       return;
     }
-    if (!latestMedia.current) return;
+    if (!latestMedia.current || videoPaused) return;
+    remoteLog.info("recording: started by the user");
     createRecorder(latestMedia.current);
     if (recorder.current) setHasRecorded(true);
-  }, [createRecorder]);
+  }, [createRecorder, videoPaused]);
 
-  // "Stop recording": pauses; Start carries on in the same recording.
+  // "Pause recording": Start carries on in the same recording.
   const stopRecording = useCallback(() => {
+    setWantsRecording(false);
     if (finishing.current || !recorder.current) return;
     remoteLog.info("recording: paused by the user");
     recorder.current.pause();
   }, []);
+
+  // While the tablet isn't sharing its screen, pause instead of recording
+  // black; carry on (or begin, if Start was pressed meanwhile) once its
+  // picture is back.
+  useEffect(() => {
+    if (!wantsRecording || finishing.current) return;
+    if (videoPaused) {
+      if (recorder.current?.isRecording) {
+        remoteLog.info("recording: paused while the tablet isn't sharing its screen");
+        recorder.current.pause();
+      }
+      return;
+    }
+    if (recorder.current) {
+      if (recorder.current.isPaused) {
+        remoteLog.info("recording: carrying on, the tablet's screen is back");
+        recorder.current.resume();
+      }
+      return;
+    }
+    if (latestMedia.current) {
+      createRecorder(latestMedia.current);
+      if (recorder.current) setHasRecorded(true);
+    }
+  }, [wantsRecording, videoPaused, createRecorder]);
 
   const end = useCallback(() => {
     const current = sessionRef.current;
@@ -446,6 +482,8 @@ export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTM
     isRecording,
     recordingNeedsClick,
     hasRecorded,
+    // Start was pressed, but the tablet isn't sharing its screen yet.
+    recordingWaitsForScreen: wantsRecording && videoPaused,
     canRecord: Boolean(session?.scope.record && stream),
     startRecording,
     stopRecording,

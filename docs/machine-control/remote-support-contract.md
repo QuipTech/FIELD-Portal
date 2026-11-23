@@ -274,11 +274,15 @@ screen. Map them to the real desktop coordinates and inject with
   once the tablet's screen appears, when the session allows recording). The
   click also lets the browser record sound. A red frame and **REC** label
   show while it records.
-- **Stop recording** pauses it; **Start recording** carries on in the same
-  file. The one recording is saved (upload, complete, transcript) when the
-  session ends, and the tablet then gets `remote:recording` with
-  `completed`. A session never started recording ends with no recording
-  (`failed`, shown as "No recording" in History).
+- **Pause recording** pauses it; **Resume recording** carries on in the
+  same file. While the tablet isn't sharing its screen (no video track, or
+  it is muted) the recording pauses by itself and carries on when the
+  picture is back, so no black stretch is recorded; Start pressed before
+  the screen appears begins once it does. The one recording is saved
+  (upload, complete, transcript) when the session ends, and the tablet then
+  gets `remote:recording` with `completed`. A session never started
+  recording ends with no recording (`failed`, shown as "No recording" in
+  History).
 - Admins with `mc.remote_delete` (Owner, Organisation Admin; migration 0142)
   can, once the session has ended:
   - `DELETE /machines/{machineId}/remote-sessions/{id}/recording`: delete

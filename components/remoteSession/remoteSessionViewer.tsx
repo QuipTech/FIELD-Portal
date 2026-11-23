@@ -221,25 +221,33 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
           </span>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          {live && remote.isRecording && (
+          {live && remote.canRecord && (remote.isRecording || remote.recordingWaitsForScreen) && (
             <>
-              <span className="flex items-center gap-1.5 rounded-full bg-red-600/20 px-2.5 py-1 text-xs font-medium text-red-300" role="status">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
-                Recording
-              </span>
+              {remote.isRecording ? (
+                <span className="flex items-center gap-1.5 rounded-full bg-red-600/20 px-2.5 py-1 text-xs font-medium text-red-300" role="status">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
+                  Recording
+                </span>
+              ) : (
+                <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-white/70" role="status">
+                  Recording waits for the tablet&apos;s screen
+                </span>
+              )}
               <Button
                 size="sm"
-                variant="ghost"
-                className="!text-red-200 hover:!bg-red-600/20"
+                variant="danger"
                 onClick={remote.stopRecording}
-                title="Pause the recording. Start carries on in the same recording, saved when the session ends."
+                title="Pause the recording. Resume carries on in the same recording, saved when the session ends."
               >
-                <span className="h-2.5 w-2.5 rounded-sm bg-red-400" />
-                Stop recording
+                <span className="flex gap-0.5" aria-hidden>
+                  <span className="h-3 w-1 rounded-sm bg-current" />
+                  <span className="h-3 w-1 rounded-sm bg-current" />
+                </span>
+                Pause recording
               </Button>
             </>
           )}
-          {live && remote.canRecord && !remote.isRecording && (
+          {live && remote.canRecord && !remote.isRecording && !remote.recordingWaitsForScreen && (
             <>
               {remote.hasRecorded && (
                 <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-white/70" role="status">
@@ -248,13 +256,18 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
               )}
               <Button
                 size="sm"
-                variant="ghost"
-                className="!text-red-200 hover:!bg-red-600/20"
+                variant="primary"
                 onClick={remote.startRecording}
-                title={remote.hasRecorded ? "Carry on recording in the same file." : "Record this session to the machine's History."}
+                title={
+                  remote.videoPaused
+                    ? "Starts as soon as the tablet shares its screen."
+                    : remote.hasRecorded
+                      ? "Carry on recording in the same file."
+                      : "Record this session to the machine's History. Nothing is recorded before you click."
+                }
               >
-                <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
-                Start recording
+                <span className="h-2.5 w-2.5 rounded-full bg-red-500" aria-hidden />
+                {remote.hasRecorded ? "Resume recording" : "Start recording"}
               </Button>
             </>
           )}
