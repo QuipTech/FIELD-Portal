@@ -66,6 +66,22 @@ export class SessionRecorder {
     return this.recorder?.state === "recording";
   }
 
+  // "Stop recording" in the viewer pauses the recorder, and "Start
+  // recording" resumes it, so every stretch lands in the same file, which
+  // is saved when the session ends.
+  get isPaused() {
+    return this.recorder?.state === "paused";
+  }
+
+  pause = () => {
+    if (this.recorder?.state !== "recording") return;
+    this.recorder.pause();
+  };
+
+  resume = () => {
+    if (this.recorder?.state === "paused") this.recorder.resume();
+  };
+
   start = (remote: MediaStream) => {
     const mimeType = pickMimeType();
     const video = remote.getVideoTracks()[0];
@@ -135,6 +151,8 @@ export class SessionRecorder {
     };
     recorder.onerror = () => this.fail("Recording stopped unexpectedly.");
     recorder.onstart = () => this.onStateChange(true);
+    recorder.onpause = () => this.onStateChange(false);
+    recorder.onresume = () => this.onStateChange(true);
     recorder.onstop = () => {
       this.onStateChange(false);
       if (!this.stopping) this.fail("Recording stopped unexpectedly.");

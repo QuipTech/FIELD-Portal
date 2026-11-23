@@ -53,9 +53,9 @@ export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTM
   const [controlReady, setControlReady] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
-  // The viewer stopped the recording; the session carries on unrecorded.
-  const [recordingStopped, setRecordingStopped] = useState(false);
-  const stoppingRecording = useRef<Promise<void> | null>(null);
+  // Recording starts only when the viewer clicks "Start recording"; true
+  // once it has (a later Stop only pauses it).
+  const [hasRecorded, setHasRecorded] = useState(false);
   // Recording waits for a click in this window to start the sound.
   const [recordingNeedsClick, setRecordingNeedsClick] = useState(false);
   const [micOn, setMicOn] = useState(false);
@@ -67,6 +67,8 @@ export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTM
   const sessionRef = useRef<RemoteSession | null>(null);
   const connection = useRef<RemoteViewerConnection | null>(null);
   const recorder = useRef<SessionRecorder | null>(null);
+  // The tablet's latest stream, which "Start recording" records.
+  const latestMedia = useRef<MediaStream | null>(null);
   const mic = useRef<MediaStream | null>(null);
   const changingMic = useRef(false);
   const interacted = useRef(false);
@@ -130,7 +132,7 @@ export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTM
     [machineId, remember],
   );
 
-  const startRecording = useCallback(
+  const createRecorder = useCallback(
     (media: MediaStream) => {
       const current = sessionRef.current;
       if (!current?.scope.record || recorder.current || media.getVideoTracks().length === 0) return;
@@ -167,7 +169,7 @@ export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTM
         },
       );
       recorder.current = sessionRecorder;
-      remoteLog.info("recording: started (first video track arrived)", { sessionId: current.id });
+      remoteLog.info("recording: started by the user", { sessionId: current.id });
       sessionRecorder.start(media);
       if (mic.current) sessionRecorder.addAudio(mic.current);
     },
@@ -199,7 +201,7 @@ export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTM
               setVideoPaused(false);
             };
           }
-          startRecording(media);
+          latestMedia.current = media;
           // After a reconnect, the recording carries on with the new video.
           recorder.current?.setVideo(videoTrack);
           recorder.current?.addAudio(media);
@@ -241,7 +243,7 @@ export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTM
       remoteLog.error("session: couldn't get the viewer signaling connection (backend /connection)", describeError(connectError));
       setError(toApiErrorMessage(connectError, "Couldn't connect to the tablet."));
     }
-  }, [machineId, startRecording]);
+  }, [machineId]);
 
   // Connect once (StrictMode runs effects twice in development).
   useEffect(() => {
@@ -405,23 +407,28 @@ export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTM
     void connect();
   }, [connect]);
 
-  // "Stop recording": saves what was recorded so far (upload, complete,
-  // transcript). It can't be restarted in the same session.
+  // "Start recording": the first click starts the recorder (the click also
+  // lets the browser record sound); after a Stop it carries on in the same
+  // file. The file is saved to History when the session ends.
+  const startRecording = useCallback(() => {
+    if (finishing.current || sessionRef.current?.status !== "active") return;
+    if (recorder.current) {
+      remoteLog.info("recording: resumed by the user");
+      void recorder.current.resumeAudio();
+      recorder.current.resume();
+      return;
+    }
+    if (!latestMedia.current) return;
+    createRecorder(latestMedia.current);
+    if (recorder.current) setHasRecorded(true);
+  }, [createRecorder]);
+
+  // "Stop recording": pauses; Start carries on in the same recording.
   const stopRecording = useCallback(() => {
-    const current = sessionRef.current;
-    const active = recorder.current;
-    if (!current || !active || finishing.current) return Promise.resolve();
-    stoppingRecording.current ??= (async () => {
-      remoteLog.info("recording: stopped by the user; saving it");
-      setRecordingStopped(true);
-      const uploaded = await active.stop();
-      remoteLog[uploaded ? "info" : "error"]("recording: upload finished", { uploaded });
-      await completeRecordingRequest(machineId, current.id, !uploaded)
-        .then(remember)
-        .catch((completeError: unknown) => remoteLog.warn("recording: complete failed", describeError(completeError)));
-    })();
-    return stoppingRecording.current;
-  }, [machineId, remember]);
+    if (finishing.current || !recorder.current) return;
+    remoteLog.info("recording: paused by the user");
+    recorder.current.pause();
+  }, []);
 
   const end = useCallback(() => {
     const current = sessionRef.current;
@@ -438,7 +445,9 @@ export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTM
     controlReady,
     isRecording,
     recordingNeedsClick,
-    recordingStopped,
+    hasRecorded,
+    canRecord: Boolean(session?.scope.record && stream),
+    startRecording,
     stopRecording,
     recordingError,
     micOn,

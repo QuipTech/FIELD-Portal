@@ -35,7 +35,7 @@ const formatClock = (seconds: number | null) => {
   return h ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 };
 
-const EndedSummary = ({ session }: { session: RemoteSession | null }) => {
+const EndedSummary = ({ session, hasRecorded }: { session: RemoteSession | null; hasRecorded: boolean }) => {
   if (!session) return null;
   const declined = session.status === "declined";
   return (
@@ -52,6 +52,8 @@ const EndedSummary = ({ session }: { session: RemoteSession | null }) => {
         <p className="text-sm text-bodyGray">
           {session.recording.status === "completed"
             ? "The recording is saved to the machine's History."
+            : !hasRecorded && session.recording.status !== "recording"
+              ? "This session wasn't recorded."
             : session.recording.status === "failed"
               ? `The recording couldn't be saved${session.recording.error ? `: ${session.recording.error}` : "."}`
               : "The recording is being saved to the machine's History."}
@@ -219,7 +221,7 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
           </span>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          {live && remote.isRecording && !remote.recordingStopped && (
+          {live && remote.isRecording && (
             <>
               <span className="flex items-center gap-1.5 rounded-full bg-red-600/20 px-2.5 py-1 text-xs font-medium text-red-300" role="status">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
@@ -229,18 +231,32 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
                 size="sm"
                 variant="ghost"
                 className="!text-red-200 hover:!bg-red-600/20"
-                onClick={() => void remote.stopRecording()}
-                title="Stop and save the recording. It can't be restarted in this session."
+                onClick={remote.stopRecording}
+                title="Pause the recording. Start carries on in the same recording, saved when the session ends."
               >
                 <span className="h-2.5 w-2.5 rounded-sm bg-red-400" />
                 Stop recording
               </Button>
             </>
           )}
-          {live && remote.recordingStopped && (
-            <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-white/70" role="status">
-              Recording stopped
-            </span>
+          {live && remote.canRecord && !remote.isRecording && (
+            <>
+              {remote.hasRecorded && (
+                <span className="rounded-full bg-white/10 px-2.5 py-1 text-xs text-white/70" role="status">
+                  Recording paused
+                </span>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="!text-red-200 hover:!bg-red-600/20"
+                onClick={remote.startRecording}
+                title={remote.hasRecorded ? "Carry on recording in the same file." : "Record this session to the machine's History."}
+              >
+                <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+                Start recording
+              </Button>
+            </>
           )}
           {live && elapsed !== null && <span className="tabular-nums text-sm text-white/70">{formatClock(elapsed)}</span>}
           {live && (
@@ -363,7 +379,7 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
             }}
           >
             <video ref={video} autoPlay playsInline className="h-full w-full object-contain" />
-            {remote.isRecording && !remote.recordingStopped && (
+            {remote.isRecording && (
               <>
                 <div aria-hidden className="pointer-events-none absolute inset-0 animate-pulse border-4 border-red-600" />
                 <span className="pointer-events-none absolute left-3 top-3 flex items-center gap-1.5 rounded-md bg-red-600 px-2 py-1 text-xs font-semibold tracking-wide text-white shadow">
@@ -416,8 +432,8 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
             <LoadingSpinner size="md" />
             <h2 className="text-lg font-medium">Waiting for the operator</h2>
             <p className="text-sm text-white/70">
-              The tablet on {machineLabel || "this machine"} is asking its operator to allow remote support. The session
-              is recorded. You can talk with the operator and control the tablet if they allow it.
+              The tablet on {machineLabel || "this machine"} is asking its operator to allow remote support. Once
+              connected, Start recording saves the session to History. You can talk with the operator and control the tablet if they allow it.
             </p>
             {session && <ExpiryCountdown expiresAt={session.expiresAt} />}
           </div>
@@ -436,7 +452,7 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
 
         {phase === "ended" && (
           <div className="rounded-xl bg-surface px-8 py-7">
-            <EndedSummary session={session} />
+            <EndedSummary session={session} hasRecorded={remote.hasRecorded} />
           </div>
         )}
       </main>
