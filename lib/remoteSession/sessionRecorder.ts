@@ -3,7 +3,6 @@
 // 5 MiB (S3's multipart minimum; the last may be smaller) upload one at a
 // time while the session runs, so a closed window loses at most the part
 // still buffering.
-import { AudioPump } from "./audioPump";
 
 export const MIN_PART_BYTES = 5 * 1024 * 1024;
 const TIMESLICE_MS = 4000;
@@ -16,6 +15,9 @@ const RECORD_SIZE = { width: 1280, height: 720 };
 // while the audio track is silent that way. Wait this long for a click,
 // then record video without sound rather than nothing.
 const AUDIO_WAIT_MS = 10_000;
+// After a click the AudioContext starts within milliseconds; ask for another
+// click only when it hasn't by then.
+const AUDIO_NOTICE_MS = 1000;
 const UPLOAD_ATTEMPTS = 4;
 
 type UploadPart = (partNumber: number, part: Blob) => Promise<unknown>;
@@ -55,10 +57,12 @@ export class SessionRecorder {
   ) {}
 
   private audioWaitTimer: ReturnType<typeof setTimeout> | null = null;
+  private audioNoticeTimer: ReturnType<typeof setTimeout> | null = null;
   private began = false;
+  // Paused before the recorder began: it begins paused.
+  private pauseRequested = false;
   private mimeType = "";
   private canvasVideo: MediaStreamTrack | null = null;
-  private pump: AudioPump | null = null;
 
   static isSupported = () => Boolean(pickMimeType()) && typeof AudioContext !== "undefined";
 
@@ -74,13 +78,20 @@ export class SessionRecorder {
   }
 
   pause = () => {
-    if (this.recorder?.state !== "recording") return;
-    this.recorder.pause();
+    this.pauseRequested = true;
+    if (this.recorder?.state === "recording") this.recorder.pause();
+    this.reportState();
   };
 
   resume = () => {
+    this.pauseRequested = false;
     if (this.recorder?.state === "paused") this.recorder.resume();
+    this.reportState();
   };
+
+  // Chrome fires "start" only with the first data, possibly after a pause,
+  // so always report the recorder's current state, not the event's.
+  private reportState = () => this.onStateChange(this.isRecording);
 
   start = (remote: MediaStream) => {
     const mimeType = pickMimeType();
@@ -90,36 +101,20 @@ export class SessionRecorder {
       return;
     }
     this.mimeType = mimeType;
-    // 48 kHz, what the AudioPump writes.
     this.audio = new AudioContext({ sampleRate: 48_000 });
     this.mix = this.audio.createMediaStreamDestination();
     this.canvasVideo = this.startCanvas(video);
     const audio = this.audio;
     const mixed = this.mix.stream.getAudioTracks()[0];
 
-    // Chrome/Edge: start now with a track that is never stalled. Before
-    // anyone clicks (AudioContext suspended) it carries the tablet's own
-    // audio or silence; once the AudioContext runs, the full mix.
-    if (AudioPump.isSupported() && mixed) {
-      const pump = new AudioPump();
-      this.pump = pump;
-      this.addAudio(remote);
-      if (audio.state === "running") pump.useSource(mixed);
-      audio.onstatechange = () => {
-        if (audio.state === "running") pump.useSource(mixed);
-      };
-      void audio.resume().catch(() => undefined);
-      this.begin(pump.track);
-      return;
-    }
-
-    // Other browsers: wait for a click to start the sound.
+    // Recording starts from a click, so the AudioContext may run. It has to
+    // be running first: the recorder writes nothing while it is silent.
     this.addAudio(remote);
     if (audio.state === "running") {
       this.begin(mixed ?? null);
       return;
     }
-    this.onAudioWait(true);
+    this.audioNoticeTimer = setTimeout(() => this.onAudioWait(true), AUDIO_NOTICE_MS);
     audio.onstatechange = () => {
       if (audio.state === "running") this.begin(mixed ?? null);
     };
@@ -133,9 +128,7 @@ export class SessionRecorder {
     if (this.began || this.stopping || this.failed || !this.canvasVideo) return;
     const withAudio = Boolean(audioTrack);
     this.began = true;
-    if (this.audioWaitTimer !== null) clearTimeout(this.audioWaitTimer);
-    this.audioWaitTimer = null;
-    this.onAudioWait(false);
+    this.clearAudioWait();
     const recorded = new MediaStream(audioTrack ? [this.canvasVideo, audioTrack] : [this.canvasVideo]);
     const recorder = new MediaRecorder(recorded, {
       mimeType: withAudio ? this.mimeType : this.mimeType.replace(/,opus/, ""),
@@ -150,14 +143,24 @@ export class SessionRecorder {
       if (this.bufferedBytes >= MIN_PART_BYTES) this.flush();
     };
     recorder.onerror = () => this.fail("Recording stopped unexpectedly.");
-    recorder.onstart = () => this.onStateChange(true);
-    recorder.onpause = () => this.onStateChange(false);
-    recorder.onresume = () => this.onStateChange(true);
+    recorder.onstart = this.reportState;
+    recorder.onpause = this.reportState;
+    recorder.onresume = this.reportState;
     recorder.onstop = () => {
       this.onStateChange(false);
       if (!this.stopping) this.fail("Recording stopped unexpectedly.");
     };
     recorder.start(TIMESLICE_MS);
+    if (this.pauseRequested) recorder.pause();
+    this.reportState();
+  }
+
+  private clearAudioWait() {
+    if (this.audioWaitTimer !== null) clearTimeout(this.audioWaitTimer);
+    if (this.audioNoticeTimer !== null) clearTimeout(this.audioNoticeTimer);
+    this.audioWaitTimer = null;
+    this.audioNoticeTimer = null;
+    this.onAudioWait(false);
   }
 
   // Whether the recording has sound (false when it started video-only).
@@ -197,10 +200,11 @@ export class SessionRecorder {
       context.fillStyle = "#000";
       context.fillRect(0, 0, canvas.width, canvas.height);
     }
-    this.drawTimer = setInterval(() => {
+    const draw = () => {
       if (!context) return;
       const visible = this.visibleVideo?.();
-      const source = ready(visible) ? visible : ready(fallback) ? fallback : null;
+      // A paused element (blocked playback) holds an old or black frame.
+      const source = ready(visible) && !visible.paused ? visible : ready(fallback) ? fallback : null;
       if (!source) {
         // No picture right now (connecting or reconnecting): keep the last
         // frame and touch one pixel so the recording keeps its timeline.
@@ -214,7 +218,10 @@ export class SessionRecorder {
       context.fillStyle = "#000";
       context.fillRect(0, 0, canvas.width, canvas.height);
       context.drawImage(source, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
-    }, 1000 / RECORD_FPS);
+    };
+    // The first recorded frame is the tablet's screen, not a black canvas.
+    draw();
+    this.drawTimer = setInterval(draw, 1000 / RECORD_FPS);
     this.canvasTrack = canvas.captureStream(RECORD_FPS).getVideoTracks()[0];
     return this.canvasTrack;
   }
@@ -225,7 +232,6 @@ export class SessionRecorder {
     this.drawTimer = null;
     if (this.source) this.source.srcObject = null;
     this.canvasTrack?.stop();
-    this.pump?.stop();
   }
 
   // Mixes a stream's audio (the tablet's, or the viewer's microphone) in.
@@ -235,9 +241,6 @@ export class SessionRecorder {
       if (this.mixedTracks.has(track)) continue;
       this.mixedTracks.add(track);
       this.audio.createMediaStreamSource(new MediaStream([track])).connect(this.mix);
-      // Until a click starts the AudioContext, record the tablet's audio
-      // straight from its track.
-      if (this.pump && this.audio.state !== "running") this.pump.useSource(track);
     }
   };
 
@@ -247,9 +250,7 @@ export class SessionRecorder {
   // when anything failed.
   stop = (): Promise<boolean> => {
     this.stopping = true;
-    if (this.audioWaitTimer !== null) clearTimeout(this.audioWaitTimer);
-    this.audioWaitTimer = null;
-    this.onAudioWait(false);
+    this.clearAudioWait();
     this.stopped ??= new Promise<void>((done) => {
       const recorder = this.recorder;
       if (!recorder || recorder.state === "inactive") return done();
