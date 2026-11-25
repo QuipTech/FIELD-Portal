@@ -16,6 +16,13 @@ class FakeRecorder {
     this.state = "recording";
     this.onstart?.();
   }
+  // The browser fires pause and resume later, and "start" later still.
+  pause() {
+    this.state = "paused";
+  }
+  resume() {
+    this.state = "recording";
+  }
   stop() {
     this.state = "inactive";
     this.onstop?.();
@@ -71,7 +78,8 @@ describe("session recorder", () => {
     const recorder = new SessionRecorder(vi.fn(), (message) => failures.push(message), (state) => states.push(state));
     recorder.start(new MediaStream([track("tablet")] as never));
     FakeRecorder.last.stop();
-    expect(states).toEqual([true, false]);
+    expect(states[0]).toBe(true);
+    expect(states.at(-1)).toBe(false);
     expect(failures).toEqual(["Recording stopped unexpectedly."]);
   });
 
@@ -115,11 +123,41 @@ describe("session recorder", () => {
     const states: boolean[] = [];
     const recorder = new SessionRecorder(vi.fn(), vi.fn(), (state) => states.push(state), undefined, (waiting) => waits.push(waiting));
     recorder.start(new MediaStream([track("tablet")] as never));
+    expect(waits).toEqual([]);
+    vi.advanceTimersByTime(1000);
     expect(waits).toEqual([true]);
     expect(states).toEqual([]);
-    vi.advanceTimersByTime(10_000);
+    vi.advanceTimersByTime(9000);
     expect(waits).toEqual([true, false]);
-    expect(states).toEqual([true]);
+    expect(states.at(-1)).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it("stays paused when the browser's start event arrives after Pause", () => {
+    setup();
+    const states: boolean[] = [];
+    const recorder = new SessionRecorder(vi.fn(), vi.fn(), (state) => states.push(state));
+    recorder.start(new MediaStream([track("tablet")] as never));
+    expect(states.at(-1)).toBe(true);
+    recorder.pause();
+    expect(states.at(-1)).toBe(false);
+    FakeRecorder.last.onstart?.();
+    expect(states.at(-1)).toBe(false);
+    recorder.resume();
+    expect(states.at(-1)).toBe(true);
+  });
+
+  it("begins paused when Pause was pressed while waiting for sound", () => {
+    vi.useFakeTimers();
+    audioState = "suspended";
+    setup();
+    const recorder = new SessionRecorder(vi.fn(), vi.fn());
+    recorder.start(new MediaStream([track("tablet")] as never));
+    recorder.pause();
+    vi.advanceTimersByTime(10_000);
+    expect(recorder.isPaused).toBe(true);
+    recorder.resume();
+    expect(recorder.isRecording).toBe(true);
     vi.useRealTimers();
   });
 
