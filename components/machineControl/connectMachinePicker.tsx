@@ -49,7 +49,7 @@ export const ConnectMachinePicker = ({ onPick, onClose }: ConnectMachinePickerPr
   return (
     <Modal title="Connect a machine" onClose={onClose} widthClassName="w-[520px]">
       <div className="flex flex-col gap-3 p-5">
-        <p className="text-sm text-bodyGray">Pick the machine whose tablet you want to connect. You&apos;ll get a 6-digit code to enter on it.</p>
+        <p className="text-sm text-bodyGray">Pick the machine the tablet is on. Then enter the tablet&apos;s FIELD ID and password.</p>
         <Input icon="search" placeholder="Search by Plant ID, serial, make or site" value={search} onChange={(event) => setSearch(event.target.value)} autoFocus />
         <div className="flex max-h-[360px] flex-col gap-1.5 overflow-y-auto">
           {error && <p role="alert" className="p-4 text-center text-sm text-danger">{error}</p>}

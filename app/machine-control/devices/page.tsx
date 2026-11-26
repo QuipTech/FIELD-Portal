@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui/emptyState";
 import { Input } from "@/components/ui/input";
 import { LoadErrorState } from "@/components/ui/loadErrorState";
 import { SkeletonBar } from "@/components/ui/skeletonBar";
+import { ConnectByIdButton } from "@/components/machineControl/connectByIdButton";
 import { ConnectMachineButton } from "@/components/machineControl/connectMachineButton";
 import { DevicesTable } from "@/components/machineControl/devicesTable";
 import { useMcDevicesContext } from "@/components/machineControl/mcDevicesContext";
@@ -33,7 +34,7 @@ const MachineControlDevicesPage = () => {
       <EmptyState
         icon="broadcast"
         title="No machines connected yet"
-        description="Connect a machine's tablet with a 6-digit code. It shows up here with whether it's online."
+        description="Add a machine's tablet with its FIELD ID and password. It shows up here with whether it's online."
         actions={<ConnectMachineButton label="Connect your first machine" />}
       />
     );
@@ -45,12 +46,15 @@ const MachineControlDevicesPage = () => {
         <Input
           icon="search"
           aria-label="Search devices"
-          placeholder="Search by machine, site or tablet serial"
+          placeholder="Search by machine, site, FIELD ID or serial"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           className="w-full max-w-sm"
         />
-        <ConnectMachineButton className="ml-auto" />
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <ConnectByIdButton />
+          <ConnectMachineButton />
+        </div>
       </div>
       {visible.length === 0 ? (
         <EmptyState

@@ -19,6 +19,8 @@ export interface McDevice {
   online: boolean;
   // When the tablet last talked to FIELD; null until it first does.
   lastSeenAt: string | null;
+  // Null for a tablet paired with a code.
+  fieldId: string | null;
 }
 
 export interface McDeviceList {
@@ -57,6 +59,7 @@ export class McDevicesService {
           pairedAt: new Date(row.paired_at).toISOString(),
           online: row.online_since !== null,
           lastSeenAt: toIso(row.last_seen_at),
+          fieldId: row.field_id,
         })),
         connectableMachineCount:
           await devicesRepository.countConnectableMachines(

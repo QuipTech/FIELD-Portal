@@ -33,6 +33,7 @@ import {
   CurrentDeviceToken,
   DeviceTokenGuard,
 } from '../session/deviceToken.guard';
+import { ConnectByFieldIdDto } from '../tablets/tabletAccess.dtos';
 import { RemoteSessionService } from './remoteSession.service';
 import {
   CreateRemoteSessionDto,
@@ -42,6 +43,23 @@ import {
   RemoteRecordingCompleteDto,
   RequestRemoteHelpDto,
 } from './remoteSession.types';
+
+// Remote support from a FIELD ID and password alone; the machine comes from
+// the tablet, and its access and state are checked in the service.
+@Controller('mc/remote-access')
+@UseGuards(JwtAuthGuard, RequirePermissionsGuard, RequireMachineControlGuard)
+@RequirePermissions(MC_PERMISSIONS.remote)
+export class RemoteAccessController {
+  constructor(private readonly sessions: RemoteSessionService) {}
+
+  @Post('connect')
+  connect(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: ConnectByFieldIdDto,
+  ) {
+    return this.sessions.connectByFieldId(user, dto);
+  }
+}
 
 // The Portal side of remote support on one machine. Needs Machine Control
 // and the mc.remote permission.

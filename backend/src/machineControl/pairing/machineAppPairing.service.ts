@@ -28,6 +28,8 @@ export interface MachineAppConnection {
     appVersion: string | null;
     pairedAt: string;
     online: boolean;
+    // Null for a tablet paired with a code.
+    fieldId: string | null;
   } | null;
   // Null when no tablet is connected.
   session: SessionState | null;
@@ -77,6 +79,7 @@ export class MachineAppPairingService {
           appVersion: device.app_version,
           pairedAt: new Date(device.paired_at).toISOString(),
           online: device.online_since !== null,
+          fieldId: device.field_id,
         },
         session: device && (await findSessionState(client, machineId)),
       };

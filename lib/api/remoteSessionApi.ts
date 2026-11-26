@@ -6,12 +6,21 @@ const sessionsPath = (machineId: string) => `/machines/${machineId}/remote-sessi
 const sessionPath = (machineId: string, sessionId: string) => `${sessionsPath(machineId)}/${sessionId}`;
 const authorization = () => ({ Authorization: `Bearer ${requireAccessToken()}` });
 
-// Connect: the machine's tablet asks its operator to Allow or Decline.
-export const createRemoteSessionRequest = (machineId: string, control = true): Promise<RemoteSession> =>
+// Connect. With the password of a tablet that has a FIELD ID the session
+// starts at once; without, the tablet asks its operator to Allow or Decline.
+export const createRemoteSessionRequest = (machineId: string, control = true, password?: string): Promise<RemoteSession> =>
   apiRequest<RemoteSession>(sessionsPath(machineId), {
     method: "POST",
     headers: authorization(),
-    body: JSON.stringify({ control }),
+    body: JSON.stringify({ control, password }),
+  });
+
+// Connect with only the tablet's FIELD ID and password.
+export const connectByFieldIdRequest = (fieldId: string, password: string, control: boolean): Promise<RemoteSession> =>
+  apiRequest<RemoteSession>("/mc/remote-access/connect", {
+    method: "POST",
+    headers: authorization(),
+    body: JSON.stringify({ fieldId, password, control }),
   });
 
 export const getRemoteSessionRequest = (machineId: string, sessionId: string): Promise<RemoteSession> =>

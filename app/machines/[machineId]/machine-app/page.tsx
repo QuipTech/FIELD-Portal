@@ -6,6 +6,7 @@ import { PermissionButton } from "@/components/auth/permissionButton";
 import { Icon } from "@/components/icons/icon";
 import { ConnectMachineAppDialog } from "@/components/machines/machineApp/connectMachineAppDialog";
 import { RemoteSessionButton } from "@/components/machines/machineApp/remoteSessionButton";
+import { ResetTabletPasswordDialog } from "@/components/machines/machineApp/resetTabletPasswordDialog";
 import { buttonBaseClasses, buttonSizeClasses, buttonVariantClasses } from "@/components/ui/buttonStyles";
 import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirmDialog";
@@ -17,18 +18,20 @@ import { disconnectMachineAppRequest } from "@/lib/api/machineAppConnectionApi";
 import { toApiErrorMessage } from "@/lib/api/apiErrorMessage";
 import { PERMISSIONS } from "@/lib/auth/permissionCodes";
 import { formatShortDateTime } from "@/lib/format/shortDate";
+import { formatFieldId } from "@/lib/types/machineAppConnection";
 import { canContributeTo } from "@/lib/machineDetail/machineAccessRules";
 import { useMachineAppStatus } from "@/components/machines/machineApp/useMachineAppStatus";
 import { useMachineDetail } from "../machineDetailContext";
 import { usePermissions } from "@/lib/auth/usePermissions";
 import { MachineControlOffNotice } from "@/components/machineControl/machineControlOffNotice";
 
-// Machine app tab: connect this machine's tablet, then reach it remotely.
+// Machine app tab: add this machine's tablet, then reach it remotely.
 const MachineAppPage = () => {
   const { machineId, machine, notify } = useMachineDetail();
   const { machineControlEnabled } = usePermissions();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const connection = useMachineAppStatus(machineId, machineControlEnabled);
   const canManage = canContributeTo(machine);
   const label = machine?.assetId ?? "";
@@ -50,13 +53,13 @@ const MachineAppPage = () => {
       {!device ? (
         <EmptyState
           icon="cloud"
-          title="Machine app unpaired"
-          description="Connect this machine's tablet to the FIELD machine app with a 6-digit code."
+          title="No tablet on this machine"
+          description="Add this machine's tablet with the FIELD ID and password the FIELD machine app shows."
           actions={
             canManage && (
               <PermissionButton permission={PERMISSIONS.manageMachineControlDevices} variant="primary" onClick={() => setIsConnecting(true)}>
                 <Icon name="cloud" />
-                Connect app
+                Add tablet
               </PermissionButton>
             )
           }
@@ -66,7 +69,7 @@ const MachineAppPage = () => {
           <div className="flex flex-wrap items-center gap-2">
             <Tag tone="ok">
               <Icon name="check" className="h-3.5 w-3.5" />
-              Paired
+              Connected
             </Tag>
             <Tag tone={!connection.error && connection.data?.session?.tabletOnline ? "ok" : "default"}>
               {connection.error || !connection.data?.session ? "Status unavailable" : connection.data.session.tabletOnline ? "Online" : "Offline"}
@@ -74,10 +77,22 @@ const MachineAppPage = () => {
             <span className="text-sm text-bodyGray">Since {formatShortDateTime(device.pairedAt)}</span>
             {canManage && (
               <PermissionButton permission={PERMISSIONS.manageMachineControlDevices} size="sm" variant="ghost" className="ml-auto" onClick={() => setIsDisconnecting(true)}>
-                Disconnect
+                Remove
               </PermissionButton>
             )}
           </div>
+          {device.fieldId && (
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-bodyGray">
+              <span>
+                FIELD ID: <span className="font-mono text-[15px] font-medium text-ink">{formatFieldId(device.fieldId)}</span>
+              </span>
+              {canManage && (
+                <PermissionButton permission={PERMISSIONS.manageMachineControlDevices} size="sm" variant="ghost" onClick={() => setIsChangingPassword(true)}>
+                  Change password
+                </PermissionButton>
+              )}
+            </div>
+          )}
           <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-bodyGray">
             {device.serialNumber && <span>Tablet serial: {device.serialNumber}</span>}
             {device.platform && <span className="capitalize">{device.platform}</span>}
@@ -97,12 +112,14 @@ const MachineAppPage = () => {
           <div className="mt-2 flex flex-col items-start gap-2 border-t border-borderGray pt-4">
             <span className="text-[15px] font-medium text-ink">Remote access</span>
             <p className="text-sm text-bodyGray">
-              See and control this machine&apos;s tablet in a new window. The operator allows each session on the tablet, and
-              every session is recorded to this machine&apos;s History.
+              {device.fieldId
+                ? "See and control this machine's tablet in a new window with its password. Nobody has to accept on the tablet, and every session is recorded to this machine's History."
+                : "See and control this machine's tablet in a new window. The operator allows each session on the tablet. Update the FIELD machine app to connect with a FIELD ID and password."}
             </p>
             <RemoteSessionButton
               machineId={machineId}
               machineLabel={label}
+              hasFieldId={Boolean(device.fieldId)}
               tabletOnline={!connection.error && Boolean(connection.data?.session?.tabletOnline)}
             />
           </div>
@@ -122,19 +139,30 @@ const MachineAppPage = () => {
           }}
         />
       )}
+      {isChangingPassword && (
+        <ResetTabletPasswordDialog
+          machineId={machineId}
+          machineLabel={label}
+          onSaved={() => {
+            setIsChangingPassword(false);
+            notify("Tablet password changed");
+          }}
+          onClose={() => setIsChangingPassword(false)}
+        />
+      )}
       {isDisconnecting && (
         <ConfirmDialog
-          title="Disconnect machine app"
-          confirmLabel="Disconnect"
+          title="Remove tablet"
+          confirmLabel="Remove"
           onConfirm={async () => {
             await disconnectMachineAppRequest(machineId);
             connection.reload();
-            notify("Machine app disconnected");
+            notify("Tablet removed");
           }}
           onClose={() => setIsDisconnecting(false)}
-          toErrorMessage={(error) => toApiErrorMessage(error, "Couldn't disconnect. Please try again.")}
+          toErrorMessage={(error) => toApiErrorMessage(error, "Couldn't remove the tablet. Please try again.")}
         >
-          The tablet on {label} stops being connected, and needs a new code to connect again.
+          The tablet is taken off {label}. It keeps its FIELD ID and password, and can be added again with them.
         </ConfirmDialog>
       )}
     </section>

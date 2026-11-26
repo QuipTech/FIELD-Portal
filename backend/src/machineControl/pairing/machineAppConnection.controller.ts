@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Delete,
   Get,
@@ -7,6 +8,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Put,
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from '../../auth/decorators/currentUser.decorator';
@@ -15,6 +17,11 @@ import { JwtAuthGuard } from '../../auth/guards/jwtAuthGuard';
 import { RequirePermissionsGuard } from '../../auth/guards/requirePermissions.guard';
 import { AuthenticatedUser } from '../../auth/types/authenticatedUser';
 import { RequireActiveMachineGuard } from '../../machineLifecycle/activeMachine/requireActiveMachine.guard';
+import {
+  AddTabletDto,
+  TabletPasswordDto,
+} from '../tablets/tabletAccess.dtos';
+import { TabletAccessService } from '../tablets/tabletAccess.service';
 import { MachineAppPairingService } from './machineAppPairing.service';
 import { MC_PERMISSIONS } from '../access/machineControlAccess';
 import { RequireMachineControlGuard } from '../access/requireMachineControl.guard';
@@ -29,7 +36,10 @@ import { RequireMachineControlGuard } from '../access/requireMachineControl.guar
   RequireActiveMachineGuard,
 )
 export class MachineAppConnectionController {
-  constructor(private readonly pairing: MachineAppPairingService) {}
+  constructor(
+    private readonly pairing: MachineAppPairingService,
+    private readonly tablets: TabletAccessService,
+  ) {}
 
   // Polled while a code is waiting to be used.
   @Get()
@@ -48,6 +58,29 @@ export class MachineAppConnectionController {
     @Param('machineId', ParseUUIDPipe) machineId: string,
   ) {
     return this.pairing.createPairingCode(user, machineId);
+  }
+
+  // Adds the tablet with this FIELD ID and password to the machine.
+  @Post('tablet')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermissions(MC_PERMISSIONS.manageDevices)
+  addTablet(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('machineId', ParseUUIDPipe) machineId: string,
+    @Body() dto: AddTabletDto,
+  ) {
+    return this.tablets.addToMachine(user, machineId, dto);
+  }
+
+  @Put('tablet/password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermissions(MC_PERMISSIONS.manageDevices)
+  resetPassword(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('machineId', ParseUUIDPipe) machineId: string,
+    @Body() dto: TabletPasswordDto,
+  ) {
+    return this.tablets.resetPassword(user, machineId, dto);
   }
 
   @Delete()

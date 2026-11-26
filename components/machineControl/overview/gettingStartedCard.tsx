@@ -21,7 +21,7 @@ const StepNumber = ({ index, isDone }: { index: number; isDone: boolean }) => (
 // Three steps from nothing to files on a machine; later ones open as they're built.
 export const GettingStartedCard = ({ hasConnectedMachine }: { hasConnectedMachine: boolean }) => {
   const steps: Step[] = [
-    { title: "Connect a machine", description: "Pair its tablet with a 6-digit code.", isDone: hasConnectedMachine, isSoon: false },
+    { title: "Connect a machine", description: "Add its tablet with the FIELD ID and password.", isDone: hasConnectedMachine, isSoon: false },
     { title: "Set up a site", description: "Group machines that work on the same job.", isDone: false, isSoon: true },
     { title: "Send your first files", description: "Drop in designs, check, and send.", isDone: false, isSoon: true },
   ];
