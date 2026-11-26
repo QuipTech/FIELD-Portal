@@ -15,12 +15,12 @@ describe("ConnectMachineAppButton", () => {
       </a>,
     );
     // fireEvent returns false when the click's default action was cancelled.
-    expect(fireEvent.click(screen.getByRole("button", { name: "Connect app" }))).toBe(false);
+    expect(fireEvent.click(screen.getByRole("button", { name: "Add tablet" }))).toBe(false);
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  it("says Paired once the machine has paired", () => {
+  it("says Connected once the machine has a tablet", () => {
     render(<ConnectMachineAppButton isConnected onClick={vi.fn()} />);
-    expect(screen.getByRole("button", { name: "Paired" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Connected" })).toBeTruthy();
   });
 });

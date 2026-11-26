@@ -4,27 +4,21 @@ import { useState } from "react";
 import { PermissionButton } from "@/components/auth/permissionButton";
 import { Icon } from "@/components/icons/icon";
 import { PERMISSIONS } from "@/lib/auth/permissionCodes";
+import { openRemoteSessionWindow, remoteSessionWindowUrl } from "@/lib/remoteSession/remoteSessionWindow";
 
 interface RemoteSessionButtonProps {
   machineId: string;
   machineLabel: string;
   tabletOnline: boolean;
+  hasFieldId: boolean;
 }
-
-const WINDOW_FEATURES = "popup=yes,width=1100,height=720,resizable=yes,scrollbars=no";
-
-export const remoteSessionWindowUrl = (machineId: string, machineLabel: string) =>
-  `/remote-session/${encodeURIComponent(machineId)}?label=${encodeURIComponent(machineLabel)}`;
 
 // Opens the remote session in its own small window, which asks the tablet
 // and runs the session. One window per machine: clicking again focuses it.
-export const RemoteSessionButton = ({ machineId, machineLabel, tabletOnline }: RemoteSessionButtonProps) => {
+export const RemoteSessionButton = ({ machineId, machineLabel, tabletOnline, hasFieldId }: RemoteSessionButtonProps) => {
   const [blocked, setBlocked] = useState(false);
-  const open = () => {
-    const opened = window.open(remoteSessionWindowUrl(machineId, machineLabel), `field-remote-${machineId}`, WINDOW_FEATURES);
-    setBlocked(!opened);
-    opened?.focus();
-  };
+  const open = () =>
+    setBlocked(!openRemoteSessionWindow(remoteSessionWindowUrl(machineId, machineLabel, hasFieldId), `field-remote-${machineId}`));
   return (
     <div className="flex flex-col items-start gap-1.5">
       <PermissionButton permission={PERMISSIONS.useMachineControlRemote} variant="primary" onClick={open} disabled={!tabletOnline}>

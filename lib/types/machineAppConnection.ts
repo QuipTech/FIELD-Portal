@@ -8,23 +8,19 @@ export interface MachineAppConnection {
     appVersion: string | null;
     pairedAt: string;
     online?: boolean;
+    // Null or absent for a tablet paired with a code, which asks its operator.
+    fieldId?: string | null;
   } | null;
 }
 
-// connected: the machine already has a tablet, so there's no code.
-export interface PairingCodeResult {
-  connected: boolean;
-  code?: string;
-  expiresAt?: string;
-}
+export const TABLET_PASSWORD_MIN = 8;
 
-// "2:05" left on a code; never below zero.
-export const formatCodeTimeLeft = (expiresAt: string, now: number): string => {
-  const secondsLeft = Math.max(0, Math.ceil((Date.parse(expiresAt) - now) / 1000));
-  return `${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, "0")}`;
-};
+// "482915307", from however it was typed or pasted.
+export const normaliseFieldId = (value: string): string => value.replace(/[\s-]/g, "");
 
-// "123 456", easier to read across to a tablet.
-export const formatPairingCode = (code: string): string => `${code.slice(0, 3)} ${code.slice(3)}`;
+export const isFieldId = (value: string): boolean => /^\d{9}$/.test(normaliseFieldId(value));
+
+// "482 915 307", easier to read across to a tablet.
+export const formatFieldId = (fieldId: string): string => fieldId.replace(/(\d{3})(?=\d)/g, "$1 ");
 
 export const machineAppPagePath = (machineId: string): string => `/machines/${machineId}/machine-app`;

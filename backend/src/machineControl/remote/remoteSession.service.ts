@@ -22,6 +22,11 @@ import {
   PairedDevice,
   revokedTokenError,
 } from '../session/deviceSession.service';
+import { assertFullMachineAccess } from '../../machineLifecycle/activeMachine/activeMachine.repository';
+import { ACCESSIBLE_MACHINES } from '../../machineSharing/access/machineScope';
+import { ConnectByFieldIdDto } from '../tablets/tabletAccess.dtos';
+import { findMachineFieldId } from '../tablets/tabletAccess.repository';
+import { TabletCredentialsService } from '../tablets/tabletCredentials.service';
 import { KvsSignalingService } from './kvsSignaling.service';
 import { RemoteDebugLog, describeError } from './remoteDebugLog';
 import { RemoteRecordingService } from './remoteRecording.service';
@@ -93,6 +98,7 @@ export class RemoteSessionService {
     private readonly db: DatabaseService,
     private readonly kvs: KvsSignalingService,
     private readonly recordings: RemoteRecordingService,
+    private readonly credentials: TabletCredentialsService,
   ) {}
 
   // ── Portal ──────────────────────────────────────────────────────────
@@ -118,14 +124,80 @@ export class RemoteSessionService {
       }),
     );
 
-  private createSession = (
+  // A tablet with a FIELD ID needs its password and starts at once; one
+  // paired with a code asks its operator to Allow.
+  private createSession = async (
     actor: AuthenticatedUser,
     machineId: string,
     dto: CreateRemoteSessionDto,
   ): Promise<RemoteSession> => {
     this.kvs.requireEnabled();
-    return this.db.withActor(actor, async (client) => {
+    const fieldId = await this.db.withActor(actor, async (client) => {
       await requireMachineAccess(client, machineId, 'contribute');
+      return findMachineFieldId(client, machineId);
+    });
+    if (fieldId) {
+      if (!dto.password) {
+        throw new BadRequestException({
+          code: 'remote_password_required',
+          message: "Enter this tablet's password.",
+        });
+      }
+      await this.credentials.verify(actor, {
+        fieldId,
+        password: dto.password,
+        machineId,
+      });
+    }
+    return this.openSession(actor, machineId, dto.control ?? true, !!fieldId);
+  };
+
+  // Connect from anywhere in the Portal with only the tablet's ID and password.
+  connectByFieldId = (
+    actor: AuthenticatedUser,
+    dto: ConnectByFieldIdDto,
+  ): Promise<RemoteSession> =>
+    this.debug.trace(
+      'portal connect by FIELD ID',
+      { userId: actor.userId, control: dto.control ?? true },
+      async () => {
+        this.kvs.requireEnabled();
+        const { machineId } = await this.credentials.verify(actor, {
+          fieldId: dto.fieldId,
+          password: dto.password,
+          machineId: null,
+        });
+        if (!machineId) {
+          throw new ConflictException({
+            code: 'tablet_not_assigned',
+            message: 'Add this tablet to a machine first.',
+          });
+        }
+        await this.db.withActor(actor, async (client) => {
+          await requireMachineAccess(client, machineId, 'contribute');
+          await assertFullMachineAccess(
+            client,
+            actor.tenantId,
+            machineId,
+            ACCESSIBLE_MACHINES,
+          );
+        });
+        return this.openSession(actor, machineId, dto.control ?? true, true);
+      },
+      (session) => ({
+        sessionId: session.id,
+        deviceId: session.deviceId,
+        ...sessionSummary(session),
+      }),
+    );
+
+  private openSession = (
+    actor: AuthenticatedUser,
+    machineId: string,
+    control: boolean,
+    unattended: boolean,
+  ): Promise<RemoteSession> =>
+    this.db.withActor(actor, async (client) => {
       const state = await findSessionState(client, machineId);
       this.debug.info('portal create: tablet state', {
         machineId,
@@ -139,15 +211,19 @@ export class RemoteSessionService {
             "This machine's tablet is offline. Remote support needs the FIELD Machine app open and online.",
         });
       }
-      const row = await repository.requestSession(client, {
+      const params = {
         machineId,
-        control: dto.control ?? true,
+        control,
         viewerClientId: `viewer-${randomBytes(16).toString('hex')}`,
-        requestSeconds: REMOTE_REQUEST_SECONDS,
-      });
+      };
+      const row = unattended
+        ? await repository.startUnattended(client, params)
+        : await repository.requestSession(client, {
+            ...params,
+            requestSeconds: REMOTE_REQUEST_SECONDS,
+          });
       return toRemoteSession(row);
     });
-  };
 
   get = async (
     actor: AuthenticatedUser,

@@ -18,6 +18,7 @@ export interface McDeviceRow {
   paired_at: Date;
   online_since: Date | null;
   last_seen_at: Date | null;
+  field_id: string | null;
 }
 
 // Connected tablets on machines the caller can see, online ones first.
@@ -29,7 +30,7 @@ export const listConnectedDevices = async (
     `SELECT d.id, d.machine_id, ${MACHINE_LABEL_SQL} AS machine_label,
             mf.name AS manufacturer_name, mm.name AS model_name, m.site,
             d.serial_number, d.platform, d.app_version, d.paired_at,
-            d.online_since, d.last_seen_at
+            d.online_since, d.last_seen_at, mc_tablet_field_id(d.id) AS field_id
      FROM mc_devices d
      JOIN machines m ON m.id = d.machine_id AND m.deleted_at IS NULL
      JOIN machine_manufacturers mf ON mf.id = m.manufacturer_id

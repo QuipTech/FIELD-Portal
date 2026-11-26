@@ -44,7 +44,13 @@ const DISCONNECTED_RECONNECT_MS = 8000;
 // answer, then view, control and record until either side ends it.
 // `videoElement`: the page's <video> showing the tablet, which the recording
 // copies its frames from.
-export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTMLVideoElement | null>) => {
+export const useRemoteSession = (
+  machineId: string,
+  videoElement?: RefObject<HTMLVideoElement | null>,
+  // Already running (opened with the tablet's password): connect straight
+  // away and record without waiting for "Start recording".
+  startedSession?: RemoteSession,
+) => {
   const [phase, setPhase] = useState<RemotePhase>("requesting");
   const [session, setSession] = useState<RemoteSession | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -59,7 +65,9 @@ export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTM
   // The viewer wants it recording (Start, until Stop). While the tablet
   // isn't sharing its screen the recorder pauses anyway, so no black
   // stretch is recorded, and carries on when the picture is back.
-  const [wantsRecording, setWantsRecording] = useState(false);
+  const [wantsRecording, setWantsRecording] = useState(
+    () => startedSession?.access === "unattended" && startedSession.scope.record,
+  );
   // Recording waits for a click in this window to start the sound.
   const [recordingNeedsClick, setRecordingNeedsClick] = useState(false);
   const [micOn, setMicOn] = useState(false);
@@ -256,6 +264,11 @@ export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTM
   useEffect(() => {
     if (started.current) return;
     started.current = true;
+    if (startedSession) {
+      remember(startedSession);
+      void connect();
+      return;
+    }
     remoteLog.info("session: creating remote session (Connect)", { machineId });
     createRemoteSessionRequest(machineId, true)
       .then((created) => {
@@ -268,7 +281,7 @@ export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTM
         setError(toApiErrorMessage(createError, "Couldn't start a remote session."));
         setPhase("error");
       });
-  }, [machineId, remember]);
+  }, [machineId, remember, startedSession, connect]);
 
   // Waiting for Allow or Decline.
   useEffect(() => {
@@ -464,7 +477,7 @@ export const useRemoteSession = (machineId: string, videoElement?: RefObject<HTM
       createRecorder(latestMedia.current);
       if (recorder.current) setHasRecorded(true);
     }
-  }, [wantsRecording, videoPaused, createRecorder]);
+  }, [wantsRecording, videoPaused, stream, createRecorder]);
 
   const end = useCallback(() => {
     const current = sessionRef.current;

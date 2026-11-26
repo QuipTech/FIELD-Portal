@@ -11,6 +11,8 @@ import { formatRemoteDuration, remoteEndReasonLabel, type RemoteSession } from "
 interface RemoteSessionViewerProps {
   machineId: string;
   machineLabel: string;
+  // Already running (opened with the tablet's password).
+  startedSession?: RemoteSession;
 }
 
 const HOVER_INTERVAL_MS = 33;
@@ -68,9 +70,9 @@ const EndedSummary = ({ session, hasRecorded }: { session: RemoteSession | null;
 
 // The remote session window: the tablet's live screen, with tap, type and
 // scroll sent to it, a microphone, the recording indicator and End.
-export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionViewerProps) => {
+export const RemoteSessionViewer = ({ machineId, machineLabel, startedSession }: RemoteSessionViewerProps) => {
   const video = useRef<HTMLVideoElement>(null);
-  const remote = useRemoteSession(machineId, video);
+  const remote = useRemoteSession(machineId, video, startedSession);
   const { phase, session, stream, sendControl } = remote;
   const viewer = useRef<HTMLDivElement>(null);
   const surface = useRef<HTMLDivElement>(null);
@@ -411,7 +413,9 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
                 <LoadingSpinner size="md" />
                 {remote.connectionState === "disconnected" ? "Reconnecting…" : "Connecting to the tablet…"}
                 {remote.connectionState !== "disconnected" && (
-                  <span className="text-xs text-white/60">On the tablet, choose the screen to share.</span>
+                  <span className="text-xs text-white/60">
+                    {session?.access === "unattended" ? "Waiting for the tablet's screen." : "On the tablet, choose the screen to share."}
+                  </span>
                 )}
                 <span className="max-w-xs text-center text-xs text-white/50">
                   Already sharing on the tablet, or it shared again? Reconnect to pick up its screen.
@@ -429,7 +433,7 @@ export const RemoteSessionViewer = ({ machineId, machineLabel }: RemoteSessionVi
                   ? "Connection to the tablet dropped. Reconnecting…"
                   : "The tablet stopped sharing its screen."}
                 <span className="max-w-xs text-center text-xs text-white/60">
-                  When the operator shares the screen again, select Reconnect.
+                  When the tablet shares its screen again, select Reconnect.
                 </span>
                 <Button size="sm" onClick={remote.reconnect}>
                   <Icon name="history" className="h-3.5 w-3.5" />

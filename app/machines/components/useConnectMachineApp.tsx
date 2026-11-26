@@ -6,8 +6,8 @@ import { ConnectMachineAppDialog } from "@/components/machines/machineApp/connec
 import { machineAppPagePath } from "@/lib/types/machineAppConnection";
 import type { FleetMachine } from "@/lib/types/machineFleet";
 
-// A row's Connect app button: a connected machine opens its Machine app tab;
-// otherwise the pairing dialog opens, rendered by the table (outside the row's
+// A row's Add tablet button: a connected machine opens its Machine app tab;
+// otherwise the Add tablet dialog opens, rendered by the table (outside the row's
 // link, so clicks inside it don't open the machine).
 export const useConnectMachineApp = () => {
   const router = useRouter();

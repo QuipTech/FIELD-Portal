@@ -6,6 +6,7 @@ import { KvsSignalingService } from '../../src/machineControl/remote/kvsSignalin
 import { RemoteRecordingService } from '../../src/machineControl/remote/remoteRecording.service';
 import { RemoteSessionService } from '../../src/machineControl/remote/remoteSession.service';
 import * as repository from '../../src/machineControl/remote/remoteSession.repository';
+import { TabletCredentialsService } from '../../src/machineControl/tablets/tabletCredentials.service';
 import {
   BillingTestDatabase,
   createBillingTestDatabase,
@@ -62,6 +63,7 @@ describe('remote support sessions', () => {
       fixture.database,
       kvs as unknown as KvsSignalingService,
       recordings as unknown as RemoteRecordingService,
+      new TabletCredentialsService(fixture.database),
     );
   });
   afterAll(() => fixture.db.close());

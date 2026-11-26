@@ -8,6 +8,8 @@ export interface RemoteSession {
   machineId: string;
   deviceId: string;
   status: RemoteSessionStatus;
+  // "unattended": opened with the tablet's password, nothing to Allow.
+  access?: "prompt" | "unattended";
   requester: { name: string };
   scope: { view: true; control: boolean; record: boolean };
   createdAt: string;

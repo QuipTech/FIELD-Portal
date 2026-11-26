@@ -12,6 +12,10 @@ rejected token is `401` with `code: "DEVICE_TOKEN_REVOKED"`, as today.
 
 ## How a session runs
 
+A tablet with a FIELD ID skips steps 2 and 3: see the
+[tablet access contract](tablet-access-contract.md). The steps below with
+Allow / Decline apply to tablets paired with a code.
+
 1. A Portal user with `mc.remote` clicks **Connect to Remote Session** on the
    machine's **Machine app** tab. The Portal opens a small window and calls
    `POST /machines/{machineId}/remote-sessions`. The tablet must be online

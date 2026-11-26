@@ -1,4 +1,11 @@
-import { IsBoolean, IsIn, IsOptional, IsUUID } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+} from 'class-validator';
 
 // How long the operator has to Allow or Decline.
 export const REMOTE_REQUEST_SECONDS = 60;
@@ -38,12 +45,17 @@ export type RemoteTranscriptStatus =
   | 'completed'
   | 'failed';
 
+// prompt: the tablet operator allows it. unattended: a tablet with a FIELD ID,
+// opened with its password (migration 0143).
+export type RemoteAccessMode = 'prompt' | 'unattended';
+
 export interface RemoteSessionRow {
   id: string;
   tenant_id: string;
   machine_id: string;
   device_id: string;
   initiated_by: 'portal' | 'tablet';
+  access_mode: RemoteAccessMode;
   requester_id: string | null;
   requester_tenant_id: string;
   requester_name: string;
@@ -82,6 +94,7 @@ export interface RemoteSession {
   deviceId: string;
   status: RemoteSessionStatus;
   initiatedBy: 'portal' | 'tablet';
+  access: RemoteAccessMode;
   requester: { name: string };
   scope: { view: true; control: boolean; record: boolean };
   createdAt: string;
@@ -109,6 +122,7 @@ export const toRemoteSession = (row: RemoteSessionRow): RemoteSession => {
     deviceId: row.device_id,
     status: row.status,
     initiatedBy: row.initiated_by,
+    access: row.access_mode,
     requester: { name: row.requester_name },
     scope: {
       view: true,
@@ -151,6 +165,12 @@ export class CreateRemoteSessionDto {
   @IsOptional()
   @IsBoolean()
   control?: boolean;
+
+  // The tablet's password; needed when it has a FIELD ID.
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  password?: string;
 }
 
 export class RemoteDecisionDto {

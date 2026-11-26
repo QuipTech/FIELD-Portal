@@ -17,8 +17,9 @@ interface ConnectMachineButtonProps {
   className?: string;
 }
 
-// Pick a machine, show its code, then go to its Machine app tab once paired.
-export const ConnectMachineButton = ({ label = "Connect a machine", variant = "primary", className }: ConnectMachineButtonProps) => {
+// Pick a machine, enter its tablet's FIELD ID and password, then go to its
+// Machine app tab.
+export const ConnectMachineButton = ({ label = "Add a tablet", variant = "primary", className }: ConnectMachineButtonProps) => {
   const router = useRouter();
   const [isPicking, setIsPicking] = useState(false);
   const [machine, setMachine] = useState<FleetMachine | null>(null);

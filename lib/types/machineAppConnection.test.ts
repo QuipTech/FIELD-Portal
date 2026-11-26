@@ -1,15 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { formatCodeTimeLeft, formatPairingCode } from "./machineAppConnection";
+import { formatFieldId, isFieldId, normaliseFieldId } from "./machineAppConnection";
 
-describe("pairing code display", () => {
-  it("splits the code in two, keeping leading zeros", () => {
-    expect(formatPairingCode("012345")).toBe("012 345");
+describe("FIELD ID", () => {
+  it("is shown in groups of three", () => {
+    expect(formatFieldId("482915307")).toBe("482 915 307");
   });
 
-  it("counts down in minutes and seconds, stopping at zero", () => {
-    const expiresAt = "2026-11-06T12:15:00.000Z";
-    expect(formatCodeTimeLeft(expiresAt, Date.parse("2026-11-06T12:00:00.000Z"))).toBe("15:00");
-    expect(formatCodeTimeLeft(expiresAt, Date.parse("2026-11-06T12:14:55.000Z"))).toBe("0:05");
-    expect(formatCodeTimeLeft(expiresAt, Date.parse("2026-11-06T12:16:00.000Z"))).toBe("0:00");
+  it("accepts spaces and dashes, and needs 9 digits", () => {
+    expect(normaliseFieldId("482 915-307")).toBe("482915307");
+    expect(isFieldId("482 915 307")).toBe(true);
+    expect(isFieldId("48291530")).toBe(false);
   });
 });

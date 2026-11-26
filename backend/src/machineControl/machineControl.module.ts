@@ -24,8 +24,15 @@ import {
 import { DesignLibraryService } from './designs/designLibrary.service';
 import {
   DeviceRemoteSessionController,
+  RemoteAccessController,
   RemoteSessionController,
 } from './remote/remoteSession.controller';
+import {
+  DeviceTabletController,
+  DeviceTabletRegisterController,
+} from './tablets/deviceTablet.controller';
+import { TabletAccessService } from './tablets/tabletAccess.service';
+import { TabletCredentialsService } from './tablets/tabletCredentials.service';
 import { KvsSignalingService } from './remote/kvsSignaling.service';
 import { RemoteRecordingService } from './remote/remoteRecording.service';
 import { RemoteSessionService } from './remote/remoteSession.service';
@@ -45,6 +52,9 @@ import { DeviceDesignDeliveryService } from './designs/deviceDesignDelivery.serv
     AdminMachineControlController,
     RemoteSessionController,
     DeviceRemoteSessionController,
+    RemoteAccessController,
+    DeviceTabletRegisterController,
+    DeviceTabletController,
   ],
   providers: [
     MachineAppPairingService,
@@ -63,6 +73,8 @@ import { DeviceDesignDeliveryService } from './designs/deviceDesignDelivery.serv
     RemoteRecordingService,
     RemoteSessionService,
     RemoteSessionWorkerService,
+    TabletAccessService,
+    TabletCredentialsService,
   ],
 })
 export class MachineControlModule {}

@@ -78,6 +78,16 @@ export const requestSession = (
     params.requestSeconds,
   ]);
 
+export const startUnattended = (
+  client: Queryable,
+  params: { machineId: string; control: boolean; viewerClientId: string },
+) =>
+  one(client, 'SELECT * FROM mc_remote_start_unattended($1, $2, $3)', [
+    params.machineId,
+    params.control,
+    params.viewerClientId,
+  ]);
+
 export const decide = (
   client: Queryable,
   params: {
