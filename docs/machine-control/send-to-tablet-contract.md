@@ -33,10 +33,12 @@ rule).
 | --- | --- |
 | API | `https://staging-api.quiptechfield.com.au` (no `/api` prefix) |
 | Portal | `https://staging.quiptechfield.com.au` |
-| Deployed | **Not deployed yet.** Staging runs `4f8984b`, without this feature. The SHA and date will be sent after deployment (check with `GET /build`) |
+| Deployed | 27 November 2026, build `6c3de11` (check with `GET /build`) |
 
-The responses and samples below come from the code and its automated tests.
-None has been checked on staging or on a Windows tablet.
+Checked on staging: the build SHA, and that `GET` and `POST
+/machines/{id}/tablet-files` answer `401` without a sign-in. The other
+responses and samples come from the code and its automated tests. Nothing has
+been sent to a tablet on staging yet.
 
 **Test account:** not included here. It needs an organisation with Machine
 Control on, a user who is Owner or Organisation Admin (`mc.deliver`,
