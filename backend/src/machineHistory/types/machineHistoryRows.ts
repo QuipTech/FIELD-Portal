@@ -75,6 +75,12 @@ export interface HistoryEntryRow {
     recording_status: string;
     transcript_status: string;
   } | null;
+  // A 'file_transfer' entry's send (mc_file_send, migration 0144).
+  file_transfer?: {
+    status: string;
+    error: string | null;
+    files: { name: string; sizeBytes: number }[];
+  } | null;
 }
 
 export interface GalleryPhotoRow extends PhotoRow {

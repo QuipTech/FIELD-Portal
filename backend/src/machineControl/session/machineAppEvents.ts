@@ -6,6 +6,8 @@ export const MACHINE_APP_EVENTS = {
   sessionStarted: 'session:started',
   sessionStatus: 'session:status',
   sessionEnded: 'session:ended',
+  // A new design delivery for this tablet (migration 0144).
+  designAvailable: 'design:available',
 } as const;
 
 export type MachineAppEventName =
@@ -31,6 +33,8 @@ export interface MachineAppEvent extends Partial<SessionState> {
   deviceId: string;
   machineId: string;
   reason: SessionEndReason | null;
+  // design:available only.
+  deliveryId?: string;
 }
 
 // The connect_error a tablet gets, and the REST error code, for a token that

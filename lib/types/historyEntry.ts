@@ -1,16 +1,18 @@
 import type { IconName } from "@/components/icons/icon";
 import type { Tone } from "@/components/ui/tone";
 import type { RemoteSessionSummary } from "./remoteSession";
+import type { FileTransferSummary } from "./tabletFiles";
 
 // Entry types stored by the backend (technical_history_entries.entry_type).
-// "remote_session" is written by the system when a remote session ends.
-export type HistoryEntryType = "repair" | "inspection" | "fault" | "service" | "note" | "remote_session";
+// "remote_session" is written by the system when a remote session ends,
+// "file_transfer" when files are sent to the machine's tablet.
+export type HistoryEntryType = "repair" | "inspection" | "fault" | "service" | "note" | "remote_session" | "file_transfer";
 
 // What a technician picks when adding an entry ("note" is API-only).
 export const NEW_ENTRY_TYPES: HistoryEntryType[] = ["repair", "inspection", "fault", "service"];
 
 // What the history can be filtered by.
-export const FILTER_ENTRY_TYPES: HistoryEntryType[] = [...NEW_ENTRY_TYPES, "remote_session"];
+export const FILTER_ENTRY_TYPES: HistoryEntryType[] = [...NEW_ENTRY_TYPES, "remote_session", "file_transfer"];
 
 export interface HistoryPhoto {
   id: string;
@@ -49,6 +51,8 @@ export interface HistoryEntry {
   syncState: HistorySyncState;
   // Set on a "remote_session" entry.
   remoteSession?: RemoteSessionSummary | null;
+  // Set on a "file_transfer" entry.
+  fileTransfer?: FileTransferSummary | null;
 }
 
 export type HistoryDateRange = "30d" | "90d" | "365d" | "all";
@@ -104,4 +108,5 @@ export const historyEntryTypeMeta: Record<HistoryEntryType, HistoryEntryTypeMeta
   service: { label: "Service", icon: "tool", tone: "default" },
   note: { label: "Note", icon: "file", tone: "default" },
   remote_session: { label: "Remote session", icon: "broadcast", tone: "primary" },
+  file_transfer: { label: "Files to tablet", icon: "upload", tone: "default" },
 };

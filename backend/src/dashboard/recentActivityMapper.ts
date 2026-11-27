@@ -27,6 +27,7 @@ const ENTRY_TYPE_LABELS: Record<string, string> = {
   inspection: 'Inspection',
   fault: 'Fault',
   note: 'Note',
+  file_transfer: 'File transfer',
 };
 const KNOWLEDGE_TYPE_LABELS: Record<string, string> = {
   document: 'Document',

@@ -10,6 +10,7 @@ import { historyEntryTypeMeta, type HistoryEntry, type HistoryPhoto, type Histor
 import { HistoryPhotoLightbox } from "./historyPhotoLightbox";
 import { HistoryEntryDocuments } from "./historyEntryDocuments";
 import { RemoteSessionHistoryDetails } from "@/components/remoteSession/remoteSessionHistoryDetails";
+import { FileTransferDetails } from "@/components/machines/machineApp/fileTransferDetails";
 import { useMachineDetail } from "../../machineDetailContext";
 import { invalidateCached } from "@/lib/machineDetail/resourceCache";
 import { machineKeyPrefix } from "@/lib/machineDetail/machineDetailCacheKeys";
@@ -63,7 +64,7 @@ export const HistoryTimelineEntry = ({ entry, onDeletePhoto }: HistoryTimelineEn
         </span>
       </div>
       <h3 className="text-[15px] font-medium text-ink">{entry.title}</h3>
-      {entry.description && <p className="whitespace-pre-line text-xs text-mutedGray">{entry.description}</p>}
+      {entry.description && !entry.fileTransfer && <p className="whitespace-pre-line text-xs text-mutedGray">{entry.description}</p>}
       {describeEntryDetails(entry) && <span className="text-xs text-bodyGray">{describeEntryDetails(entry)}</span>}
       {entry.photos.length > 0 && (
         <div className="flex flex-wrap gap-2">
@@ -86,6 +87,7 @@ export const HistoryTimelineEntry = ({ entry, onDeletePhoto }: HistoryTimelineEn
         </div>
       )}
       <HistoryEntryDocuments documents={entry.documents} />
+      {entry.fileTransfer && <FileTransferDetails transfer={entry.fileTransfer} />}
       {entry.remoteSession && (
         <RemoteSessionHistoryDetails
           machineId={machineId}

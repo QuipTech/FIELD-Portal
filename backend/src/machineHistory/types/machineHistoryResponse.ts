@@ -73,6 +73,14 @@ export interface HistoryEntry {
   // Set on a 'remote_session' entry. Playback and the transcript come from
   // /machines/:machineId/remote-sessions/:id/recording and /transcript.
   remoteSession: RemoteSessionSummary | null;
+  // Set on a 'file_transfer' entry: files sent to the machine's tablet.
+  fileTransfer: FileTransferSummary | null;
+}
+
+export interface FileTransferSummary {
+  status: string;
+  error: string | null;
+  files: { name: string; sizeBytes: number }[];
 }
 
 export interface RemoteSessionSummary {

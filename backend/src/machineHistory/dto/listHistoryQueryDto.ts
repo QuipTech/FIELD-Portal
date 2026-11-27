@@ -14,10 +14,12 @@ import { HISTORY_ENTRY_TYPES } from './createHistoryEntryDto';
 export const MAX_HISTORY_PAGE_SIZE = 100;
 
 // Filterable types: everything a person can add, plus entries the system
-// writes (a remote session that ran, migration 0139).
+// writes (a remote session that ran, migration 0139; files sent to the
+// tablet, migration 0144).
 export const HISTORY_FILTER_TYPES = [
   ...HISTORY_ENTRY_TYPES,
   'remote_session',
+  'file_transfer',
 ] as const;
 
 // The history filters, shared by the list and its export. Every filter is

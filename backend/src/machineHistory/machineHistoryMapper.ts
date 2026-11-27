@@ -94,6 +94,13 @@ export const toHistoryEntry = async (
   remoteSession: row.remote_session
     ? toRemoteSessionSummary(row.remote_session)
     : null,
+  fileTransfer: row.file_transfer
+    ? {
+        status: row.file_transfer.status,
+        error: row.file_transfer.error,
+        files: row.file_transfer.files,
+      }
+    : null,
 });
 
 const toRemoteSessionSummary = (

@@ -3,8 +3,9 @@ import type { LifecycleState } from "./machineLifecycle";
 import type { MachineSharing } from "./machineGroup";
 import type { MachineDocumentFile } from "./machineDocument";
 import type { RemoteSessionSummary } from "./remoteSession";
+import type { FileTransferSummary } from "./tabletFiles";
 
-export type LiveHistoryEntryType = "service" | "repair" | "inspection" | "fault" | "note" | "remote_session";
+export type LiveHistoryEntryType = "service" | "repair" | "inspection" | "fault" | "note" | "remote_session" | "file_transfer";
 
 export interface MachineSummary {
   id: string;
@@ -70,6 +71,8 @@ export interface LiveHistoryEntry {
   documents?: MachineDocumentFile[];
   // A "remote_session" entry's session; missing from older backends.
   remoteSession?: RemoteSessionSummary | null;
+  // A "file_transfer" entry's send; missing from older backends.
+  fileTransfer?: FileTransferSummary | null;
 }
 
 export interface MachinePhotoUploadResponse {

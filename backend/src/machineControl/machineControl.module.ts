@@ -22,6 +22,8 @@ import {
   DeviceDesignDeliveryController,
 } from './designs/designDelivery.controller';
 import { DesignLibraryService } from './designs/designLibrary.service';
+import { TabletFilesController } from './designs/tabletFiles.controller';
+import { TabletFilesService } from './designs/tabletFiles.service';
 import {
   DeviceRemoteSessionController,
   RemoteAccessController,
@@ -48,6 +50,7 @@ import { DeviceDesignDeliveryService } from './designs/deviceDesignDelivery.serv
     DeviceFileTransferController,
     DesignLibraryController,
     DeviceDesignDeliveryController,
+    TabletFilesController,
     McDevicesController,
     AdminMachineControlController,
     RemoteSessionController,
@@ -62,6 +65,7 @@ import { DeviceDesignDeliveryService } from './designs/deviceDesignDelivery.serv
     DeviceFileTransferService,
     DesignLibraryService,
     DeviceDesignDeliveryService,
+    TabletFilesService,
     DeviceTokenGuard,
     MachineAppGateway,
     MachineAppEventListenerService,
