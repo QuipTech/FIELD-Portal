@@ -118,18 +118,19 @@ export const previousDesigns = (
 export const insertDeliveries = (
   client: PoolClient,
   tenantId: string,
-  version: DesignVersion,
+  version: Pick<DesignVersion, 'id' | 'projectId' | 'project'>,
   batchId: string,
   previewHash: string,
   targets: DesignTarget[],
 ) =>
-  client.query(
+  client.query<{ id: string }>(
     `INSERT INTO mc_design_deliveries
      (sender_tenant_id, device_tenant_id, device_id, machine_id, machine_label, site,
       project_id, version_id, batch_id, project_name, preview_hash, created_at)
    SELECT $1, t."tenantId", t."deviceId", t."machineId", t.label, t.site, $2, $3, $4, $6, $7, clock_timestamp()
    FROM jsonb_to_recordset($5::jsonb)
-     AS t("tenantId" uuid, "deviceId" uuid, "machineId" uuid, label text, site text)`,
+     AS t("tenantId" uuid, "deviceId" uuid, "machineId" uuid, label text, site text)
+   RETURNING id`,
     [
       tenantId,
       version.projectId,

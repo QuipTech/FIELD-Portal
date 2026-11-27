@@ -56,7 +56,9 @@ export const listHistoryEntries = async (
               'started_at', rs.started_at, 'ended_at', rs.ended_at,
               'end_reason', rs.end_reason,
               'recording_status', rs.recording_status,
-              'transcript_status', rs.transcript_status) END AS remote_session
+              'transcript_status', rs.transcript_status) END AS remote_session,
+            CASE WHEN e.design_delivery_id IS NOT NULL
+              THEN mc_file_send(e.design_delivery_id) END AS file_transfer
      FROM technical_history_entries e
      LEFT JOIN users u ON u.id = e.created_by
      LEFT JOIN mc_remote_sessions rs ON rs.id = e.remote_session_id

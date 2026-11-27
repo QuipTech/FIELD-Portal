@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Icon } from "@/components/icons/icon";
+import { SendToTablet } from "@/components/machines/machineApp/sendToTablet";
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loadingSpinner";
+import { PERMISSIONS } from "@/lib/auth/permissionCodes";
+import { usePermissions } from "@/lib/auth/usePermissions";
 import { shouldSendKey, toKeyMessage, toScreenPoint, type ControlMessage } from "@/lib/remoteSession/controlInput";
 import { useRemoteSession } from "@/lib/remoteSession/useRemoteSession";
 import { formatRemoteDuration, remoteEndReasonLabel, type RemoteSession } from "@/lib/types/remoteSession";
@@ -69,7 +72,8 @@ const EndedSummary = ({ session, hasRecorded }: { session: RemoteSession | null;
 };
 
 // The remote session window: the tablet's live screen, with tap, type and
-// scroll sent to it, a microphone, the recording indicator and End.
+// scroll sent to it, a microphone, the recording indicator, files to send
+// and End.
 export const RemoteSessionViewer = ({ machineId, machineLabel, startedSession }: RemoteSessionViewerProps) => {
   const video = useRef<HTMLVideoElement>(null);
   const remote = useRemoteSession(machineId, video, startedSession);
@@ -83,6 +87,10 @@ export const RemoteSessionViewer = ({ machineId, machineLabel, startedSession }:
   const [playbackBlocked, setPlaybackBlocked] = useState(false);
   const [clipboardError, setClipboardError] = useState("");
   const live = phase === "live" || phase === "connecting";
+  const { can, isLoaded } = usePermissions();
+  const canSendFiles = live && isLoaded && can(PERMISSIONS.sendMachineControlFiles);
+  const [showFiles, setShowFiles] = useState(false);
+  const [droppedFiles, setDroppedFiles] = useState<File[] | null>(null);
   const canControl = phase === "live" && !playbackBlocked && Boolean(session?.scope.control) &&
     remote.connectionState === "connected" && remote.controlReady;
   const elapsed = useElapsed(session?.startedAt ?? null, phase === "live" || phase === "connecting");
@@ -203,7 +211,22 @@ export const RemoteSessionViewer = ({ machineId, machineLabel, startedSession }:
   };
 
   return (
-    <div ref={viewer} className="flex h-screen flex-col bg-[#0f1115] text-white">
+    <div
+      ref={viewer}
+      className="flex h-screen flex-col bg-[#0f1115] text-white"
+      // A file dropped anywhere is offered to the tablet. Always handled, or
+      // the browser would open the file and leave the session.
+      onDragOver={(event) => {
+        if (event.dataTransfer.types.includes("Files")) event.preventDefault();
+      }}
+      onDrop={(event) => {
+        if (!event.dataTransfer.types.includes("Files")) return;
+        event.preventDefault();
+        if (!canSendFiles) return;
+        setDroppedFiles(Array.from(event.dataTransfer.files));
+        setShowFiles(true);
+      }}
+    >
       <header className="flex flex-wrap items-center gap-3 border-b border-white/10 px-4 py-2.5">
         <Icon name="broadcast" className="h-5 w-5 text-white/70" />
         <div className="flex min-w-0 flex-col">
@@ -300,6 +323,18 @@ export const RemoteSessionViewer = ({ machineId, machineLabel, startedSession }:
               title="Full screen"
             >
               <Icon name="ext" />
+            </Button>
+          )}
+          {canSendFiles && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="!text-white hover:!bg-white/10"
+              onClick={() => setShowFiles((open) => !open)}
+              aria-expanded={showFiles}
+            >
+              <Icon name="upload" />
+              Send to tablet
             </Button>
           )}
           {canControl && (
@@ -442,6 +477,22 @@ export const RemoteSessionViewer = ({ machineId, machineLabel, startedSession }:
               </div>
             )}
           </div>
+        )}
+
+        {canSendFiles && (
+          // Stays mounted when closed, so chosen files and a running send survive.
+          <aside
+            aria-label="Send to tablet"
+            className={`absolute right-0 top-0 z-10 max-h-full w-80 max-w-full flex-col gap-3 overflow-y-auto rounded-bl-xl bg-surface p-4 text-ink shadow-xl ${showFiles ? "flex" : "hidden"}`}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-[15px] font-medium">Send to tablet</h2>
+              <button type="button" aria-label="Close" onClick={() => setShowFiles(false)} className="rounded-md p-1 text-bodyGray hover:bg-fillGray">
+                <Icon name="x" className="h-4 w-4" />
+              </button>
+            </div>
+            <SendToTablet machineId={machineId} incoming={droppedFiles} />
+          </aside>
         )}
 
         {(phase === "requesting" || phase === "waiting") && (

@@ -7,6 +7,7 @@ import { Icon } from "@/components/icons/icon";
 import { ConnectMachineAppDialog } from "@/components/machines/machineApp/connectMachineAppDialog";
 import { RemoteSessionButton } from "@/components/machines/machineApp/remoteSessionButton";
 import { ResetTabletPasswordDialog } from "@/components/machines/machineApp/resetTabletPasswordDialog";
+import { SendToTablet } from "@/components/machines/machineApp/sendToTablet";
 import { buttonBaseClasses, buttonSizeClasses, buttonVariantClasses } from "@/components/ui/buttonStyles";
 import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirmDialog";
@@ -28,7 +29,7 @@ import { MachineControlOffNotice } from "@/components/machineControl/machineCont
 // Machine app tab: add this machine's tablet, then reach it remotely.
 const MachineAppPage = () => {
   const { machineId, machine, notify } = useMachineDetail();
-  const { machineControlEnabled } = usePermissions();
+  const { machineControlEnabled, can } = usePermissions();
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
@@ -109,6 +110,15 @@ const MachineAppPage = () => {
               View machine documents
             </Link>
           </div>
+          {canManage && can(PERMISSIONS.sendMachineControlFiles) && (
+            <div className="mt-2 flex max-w-xl flex-col items-start gap-2 border-t border-borderGray pt-4">
+              <span className="text-[15px] font-medium text-ink">Send to tablet</span>
+              <p className="text-sm text-bodyGray">
+                Files appear on the tablet under Files › Remote session files. Each send is saved to this machine&apos;s History.
+              </p>
+              <SendToTablet machineId={machineId} />
+            </div>
+          )}
           <div className="mt-2 flex flex-col items-start gap-2 border-t border-borderGray pt-4">
             <span className="text-[15px] font-medium text-ink">Remote access</span>
             <p className="text-sm text-bodyGray">

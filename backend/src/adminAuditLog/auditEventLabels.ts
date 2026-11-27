@@ -33,6 +33,7 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   'mc_pairing_code:create': 'Created machine app pairing code',
   'mc_device:create': 'Connected machine app',
   'mc_device:delete': 'Disconnected machine app',
+  'mc_design_delivery:create': 'Sent files to a machine tablet',
   'machine_control_setting:update': 'Changed Machine Control access',
   'machine_model:create': 'Added machine model',
   'machine_model:update': 'Updated machine model',
